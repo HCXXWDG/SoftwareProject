@@ -1,0 +1,49 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - develop
+      - "feature/**"
+  pull_request:
+    branches:
+      - develop
+  workflow_dispatch:
+
+jobs:
+  backend-verify:
+    name: Backend verify
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Verify backend
+        run: ./mvnw -B "-Dmaven.wagon.http.retryHandler.count=3" verify
+
+      - name: Upload backend jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: commute-mood-api
+          path: backend/target/commute-mood-api-*.jar
+
+      - name: Upload backend test reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-surefire-reports
+          path: backend/target/surefire-reports/

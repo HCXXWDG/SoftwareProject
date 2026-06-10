@@ -2,7 +2,11 @@ package com.example.commutemood.domain;
 
 public record GeoBounds(double west, double south, double east, double north) {
     public GeoBounds {
-        if (west >= east || south >= north) {
+        if (!Double.isFinite(west) || !Double.isFinite(south)
+                || !Double.isFinite(east) || !Double.isFinite(north)
+                || west < -180 || east > 180
+                || south < -90 || north > 90
+                || west >= east || south >= north) {
             throw new IllegalArgumentException("Invalid bounding box");
         }
     }
