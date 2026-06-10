@@ -5,6 +5,7 @@ import com.example.commutemood.repository.CommuteRecordRepository;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -20,7 +21,14 @@ public class JdbcCommuteRecordRepository implements CommuteRecordRepository {
     }
 
     @Override
+    @Transactional
     public void save(CommuteRecord record) {
+        jdbcTemplate.update("""
+                        INSERT INTO device_profile(device_hash)
+                        VALUES (?)
+                        ON CONFLICT (device_hash)
+                        DO UPDATE SET last_seen_at = now()
+                        """, record.deviceHash());
         jdbcTemplate.update("""
                         INSERT INTO commute_record
                             (id, device_hash, route_id, route_label, end_stress_level,

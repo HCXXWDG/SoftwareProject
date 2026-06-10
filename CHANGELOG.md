@@ -7,7 +7,33 @@ All notable changes follow Semantic Versioning and Keep a Changelog.
 ### Added
 - React/TypeScript map dashboard with AMap and offline demo modes.
 - Spring Boot API for reports, heatmap, route comparison and commute trends.
-- PostGIS migrations, simulated seed dataset, Docker Compose and CI.
+- Backend Docker image for running the Spring Boot API in containers.
+- PostGIS Docker Compose stack for local PostgreSQL/PostGIS deployment.
+- PostgreSQL demo seed migration for heatmap reports, commute trends and a sample route query.
+- Optional Maven mirror settings for environments where Maven Central is unstable.
+- Route-query persistence for storing route comparison inputs and JSON results in PostGIS.
+- Route history API for reading recent route comparisons by device.
+- Heatmap refresh API for persisting computed cells into the PostGIS `emotion_cell` cache.
+- Backend CI workflow for running Java 17 Maven tests on pushes and pull requests.
+- Structured commute trend summary with average stress, stress delta and trend direction.
+- OpenAPI metadata and controller tags for clearer Swagger API documentation.
+
+### Changed
+- Extended the postgres profile to pass `DEVICE_HASH_SALT` into Flyway migrations.
+- Updated `.env.example` with backend, CORS and PostGIS runtime variables.
+- Clarified production startup documentation for the current backend/PostGIS Compose stack.
+- Documented backend API endpoints in `README.md`.
+- Backend CI now runs Maven verify and uploads the API jar plus Surefire test report artifacts.
+- Expanded JDBC repository test coverage for PostGIS heatmap cache writes.
+- Expanded API smoke coverage for mood report submission and commute completion.
+- Actuator info now exposes backend name, version, mode and description.
+- Ignored Maven wrapper cache downloads to keep local build artifacts out of commits.
+
+### Fixed
+- Missing required request headers now return a structured 400 response.
+- Commute and route-query writes now refresh PostGIS `device_profile` activity timestamps.
+- Non-finite coordinates, invalid heatmap bounds and invalid trend timezones now return 400 responses.
+- Missing query parameters, type mismatches and malformed JSON now return structured 400 responses.
 
 ## [0.1.0] - 2026-06-10
 

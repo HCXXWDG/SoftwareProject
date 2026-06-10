@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: commute-mood-postgis
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-commute_mood}
+      POSTGRES_USER: ${POSTGRES_USER:-commute}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-commute_dev_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../backend
+    container_name: commute-mood-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: postgres
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-commute_mood}
+      POSTGRES_USER: ${POSTGRES_USER:-commute}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-commute_dev_password}
+      DEVICE_HASH_SALT: ${DEVICE_HASH_SALT:-local-demo-salt-change-before-deploy}
+      AMAP_WEB_KEY: ${AMAP_WEB_KEY:-}
+      APP_CORS_ORIGINS: ${APP_CORS_ORIGINS:-http://localhost:5173}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
