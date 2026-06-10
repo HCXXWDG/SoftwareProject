@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: commute-mood-api
+  profiles:
+    default: demo
+  datasource:
+    url: jdbc:h2:mem:commute;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  flyway:
+    enabled: false
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: 8080
+  error:
+    include-message: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  device-hash-salt: ${DEVICE_HASH_SALT:local-demo-salt-change-before-deploy}
+  amap:
+    web-key: ${AMAP_WEB_KEY:}
+  cors-origins:
+    - http://localhost:5173
+

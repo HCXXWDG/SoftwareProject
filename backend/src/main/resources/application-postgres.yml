@@ -1,0 +1,8 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:commute_mood}
+    username: ${POSTGRES_USER:commute}
+    password: ${POSTGRES_PASSWORD:commute_dev_password}
+  flyway:
+    enabled: true
+

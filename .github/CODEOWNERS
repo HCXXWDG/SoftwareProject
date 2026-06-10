@@ -1,0 +1,5 @@
+/frontend/ @member-a @member-c
+/backend/ @member-b @member-c
+/docs/ @member-a @member-b @member-c
+/infra/ @member-b
+

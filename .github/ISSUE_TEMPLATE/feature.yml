@@ -1,0 +1,30 @@
+name: 功能任务
+description: 用户故事、功能或工程能力
+title: "[Feature] "
+labels: ["feature"]
+body:
+  - type: textarea
+    id: story
+    attributes:
+      label: 用户故事
+      description: 作为谁，我希望做什么，从而获得什么价值。
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收标准
+      description: 使用 Given / When / Then 或可检查清单描述。
+    validations:
+      required: true
+  - type: dropdown
+    id: owner
+    attributes:
+      label: 主责角色
+      options:
+        - 成员A：项目/前端
+        - 成员B：后端/Geo
+        - 成员C：地图/质量
+    validations:
+      required: true
+

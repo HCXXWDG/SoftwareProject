@@ -1,0 +1,29 @@
+name: 缺陷
+description: 可复现的软件缺陷
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期与实际结果
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: 严重程度
+      options:
+        - S1 阻塞
+        - S2 严重
+        - S3 一般
+        - S4 轻微
+    validations:
+      required: true
+

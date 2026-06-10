@@ -1,0 +1,29 @@
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Environment and secrets
+.env
+.env.local
+!.env.example
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+
+# Backend
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+
+# Logs and OS files
+*.log
+.DS_Store
+Thumbs.db
+
+# Generated course artifacts
+outputs/
+
