@@ -30,6 +30,7 @@ All notable changes follow Semantic Versioning and Keep a Changelog.
 - Backend CI now runs Maven verify and uploads the API jar plus Surefire test report artifacts.
 - Expanded JDBC repository test coverage for PostGIS heatmap cache writes.
 - Expanded API smoke coverage for mood report submission and commute completion.
+- Added unit tests for report submission validation, rate limiting and commute completion persistence.
 - Actuator info now exposes backend name, version, mode and description.
 - Ignored Maven wrapper cache downloads to keep local build artifacts out of commits.
 
