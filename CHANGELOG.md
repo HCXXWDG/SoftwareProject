@@ -7,6 +7,7 @@ All notable changes follow Semantic Versioning and Keep a Changelog.
 ### Added
 - PostGIS dev startup script at `scripts/start-postgis-dev.ps1`.
 - Integration smoke script for validating the frontend-to-backend API chain locally.
+- Testcontainers PostGIS integration tests for Flyway seed, spatial reports and commute trends.
 - React/TypeScript map dashboard with AMap and offline demo modes.
 - Spring Boot API for reports, heatmap, route comparison and commute trends.
 - Backend Docker image for running the Spring Boot API in containers.
