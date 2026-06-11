@@ -16,6 +16,7 @@ export interface MapAdapter {
   destroy: () => void;
   getViewport: () => MapViewport;
   project: (point: GeoPoint) => ProjectedPoint;
+  unproject: (point: ProjectedPoint) => GeoPoint;
   subscribe: (listener: () => void) => () => void;
 }
 
@@ -109,6 +110,13 @@ export function createAMapAdapter(
       return {
         x: readPixel(projected, "x"),
         y: readPixel(projected, "y"),
+      };
+    },
+    unproject: (point) => {
+      const lngLat = map.containerToLngLat([point.x, point.y]);
+      return {
+        longitude: readCoordinate(lngLat, "getLng", "lng"),
+        latitude: readCoordinate(lngLat, "getLat", "lat"),
       };
     },
     subscribe: (listener) => {

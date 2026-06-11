@@ -4,7 +4,8 @@ import { MapSurface } from "./features/map";
 import { fetchHeatmap } from "./services/heatmap";
 import { compareRoutes } from "./services/route";
 import { fetchTrends } from "./services/commute";
-import type { MapPageState, HeatmapCell, GeoPoint } from "./types";
+import { submitReport } from "./services/report";
+import type { MapPageState, HeatmapCell, GeoPoint, MapFeedbackDraft } from "./types";
 
 const initialMapState: MapPageState = {
   heatmapCells: [],
@@ -57,6 +58,33 @@ function App() {
     [loadHeatmap],
   );
 
+  /** 提交情绪反馈（由地图长按触发） */
+  const handleFeedbackSubmit = useCallback(
+    async (draft: MapFeedbackDraft) => {
+      await submitReport({
+        location: draft.location,
+        stressLevel: draft.stressLevel,
+        tag: draft.tag,
+        reportedAt: new Date().toISOString(),
+      });
+    },
+    [],
+  );
+
+  /** 路线选择（由地图路线点击触发） */
+  const handleRouteSelect = useCallback((routeId: string) => {
+    setMapState((prev) => ({
+      ...prev,
+      routeComparison: prev.routeComparison
+        ? {
+            ...prev.routeComparison,
+            routes: prev.routeComparison.routes,
+          }
+        : null,
+    }));
+    void routeId;
+  }, []);
+
   /** 首次加载：热力图 + 路线对比 + 通勤趋势 */
   useEffect(() => {
     loadHeatmap(DEFAULT_BBOX);
@@ -91,7 +119,11 @@ function App() {
       mapSlot={
         <MapSurface
           heatmapCells={mapState.heatmapCells}
+          routes={mapState.routeComparison?.routes ?? []}
+          selectedRouteId={mapState.routeComparison?.fastestRouteId}
           loading={mapState.loading}
+          onFeedbackSubmit={handleFeedbackSubmit}
+          onRouteSelect={handleRouteSelect}
           onViewportChange={handleViewportChange}
         />
       }
