@@ -16,13 +16,29 @@ export interface MapPageProps {
  * - 无业务代码，状态全量通过 Props 接收
  */
 export function MapPage({ state, mapSlot }: MapPageProps) {
+  const { heatmapCells, loading, error } = state;
+  const hasData = heatmapCells.length > 0;
+
   return (
     <div className="map-page">
-      {state.error && <div className="map-page__error">{state.error}</div>}
+      {error && (
+        <div className="map-page__error" role="alert">
+          <span className="map-page__error-icon">⚠️</span>
+          <span>{error}</span>
+        </div>
+      )}
 
-      {state.loading && (
-        <div className="map-page__loading">
-          <span>加载中…</span>
+      {loading && (
+        <div className="map-page__loading" role="status">
+          <span className="map-page__spinner" />
+          <span>正在加载热力图数据…</span>
+        </div>
+      )}
+
+      {!loading && !error && hasData && (
+        <div className="map-page__summary" role="status" aria-label="数据摘要">
+          <span className="map-page__badge">{heatmapCells.length}</span>
+          <span className="map-page__label">个热力图单元格已加载</span>
         </div>
       )}
 

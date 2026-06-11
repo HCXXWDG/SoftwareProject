@@ -25,17 +25,71 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.7);
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.75);
+  color: #6b7280;
+  font-size: 0.9rem;
   z-index: 10;
 }
 
+.map-page__spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #d1d5db;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: map-spin 0.7s linear infinite;
+}
+
+@keyframes map-spin {
+  to { transform: rotate(360deg); }
+}
+
 .map-page__error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 12px 16px;
-  background: #fff2f0;
-  border: 1px solid #ffccc7;
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
   border-radius: 6px;
-  color: #ff4d4f;
+  color: #991b1b;
   margin: 8px;
+  font-size: 0.9rem;
+}
+
+.map-page__error-icon {
+  font-size: 1.1rem;
+}
+
+.map-page__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 8px 12px;
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+  border-radius: 6px;
+  margin: 8px;
+  font-size: 0.9rem;
+  position: relative;
+  z-index: 5;
+}
+
+.map-page__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  height: 1.6rem;
+  padding: 0 0.35rem;
+  background: #059669;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 /* 桌面端 */
