@@ -26,14 +26,21 @@ const DEBOUNCE_MS = 300;
 function App() {
   const [mapState, setMapState] = useState<MapPageState>(initialMapState);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  /** 获取热力图 */
+  /** 获取热力图（自动取消旧请求，避免竞态） */
   const loadHeatmap = useCallback(async (bbox: string, zoom?: number) => {
+    // 取消进行中的旧请求
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setMapState((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      const cells: HeatmapCell[] = await fetchHeatmap(bbox, zoom);
+      const cells: HeatmapCell[] = await fetchHeatmap(bbox, zoom, 168, controller.signal);
       setMapState((prev) => ({ ...prev, heatmapCells: cells, loading: false }));
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       const msg = err instanceof Error ? err.message : "加载热力图数据失败";
       setMapState((prev) => ({ ...prev, loading: false, error: msg }));
     }
@@ -74,6 +81,7 @@ function App() {
 
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      abortRef.current?.abort();
     };
   }, [loadHeatmap]);
 

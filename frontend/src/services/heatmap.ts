@@ -5,8 +5,9 @@ import type { HeatmapCell } from "../types";
 export async function fetchHeatmap(
   bbox: string,
   zoom: number = 16,
-  hours: number = 168
+  hours: number = 168,
+  signal?: AbortSignal,
 ): Promise<HeatmapCell[]> {
   const params = new URLSearchParams({ bbox, zoom: String(zoom), hours: String(hours) });
-  return api.get<HeatmapCell[]>(`/api/v1/heatmap?${params}`);
+  return api.get<HeatmapCell[]>(`/api/v1/heatmap?${params}`, signal);
 }
