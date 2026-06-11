@@ -4,6 +4,8 @@ import com.example.commutemood.api.dto.ReportRequest;
 import com.example.commutemood.application.ReportService;
 import com.example.commutemood.repository.SaveOutcome;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -29,6 +31,7 @@ public class ReportController {
     @PostMapping
     @Operation(summary = "Submit a mood report")
     public ResponseEntity<Map<String, Object>> submit(
+            @Parameter(name = "X-Device-Id", description = "Anonymous browser device identifier", required = true, in = ParameterIn.HEADER)
             @RequestHeader("X-Device-Id") String deviceId,
             @Valid @RequestBody ReportRequest request
     ) {

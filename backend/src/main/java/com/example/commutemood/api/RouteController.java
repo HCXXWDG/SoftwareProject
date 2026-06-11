@@ -6,6 +6,8 @@ import com.example.commutemood.domain.GeoPoint;
 import com.example.commutemood.domain.RouteComparison;
 import com.example.commutemood.domain.RouteQueryHistory;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,6 +33,7 @@ public class RouteController {
     @PostMapping("/compare")
     @Operation(summary = "Compare candidate routes")
     public RouteComparison compare(
+            @Parameter(name = "X-Device-Id", description = "Optional device identifier for route history", in = ParameterIn.HEADER)
             @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
             @Valid @RequestBody RouteCompareRequest request
     ) {
@@ -43,7 +46,9 @@ public class RouteController {
     @GetMapping("/history")
     @Operation(summary = "Get recent route comparisons")
     public List<RouteQueryHistory> history(
+            @Parameter(name = "X-Device-Id", description = "Anonymous browser device identifier", required = true, in = ParameterIn.HEADER)
             @RequestHeader("X-Device-Id") String deviceId,
+            @Parameter(description = "Maximum number of history records", example = "10")
             @RequestParam(defaultValue = "10") int limit
     ) {
         return routeComparisonService.getHistory(deviceId, limit);

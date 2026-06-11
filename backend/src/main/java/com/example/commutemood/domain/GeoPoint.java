@@ -1,6 +1,14 @@
 package com.example.commutemood.domain;
 
-public record GeoPoint(double longitude, double latitude) {
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "WGS84 geographic coordinate")
+public record GeoPoint(
+        @Schema(description = "Longitude in degrees", example = "116.398")
+        double longitude,
+        @Schema(description = "Latitude in degrees", example = "39.908")
+        double latitude
+) {
     public GeoPoint {
         if (!Double.isFinite(longitude) || !Double.isFinite(latitude)
                 || longitude < -180 || longitude > 180
@@ -9,4 +17,3 @@ public record GeoPoint(double longitude, double latitude) {
         }
     }
 }
-

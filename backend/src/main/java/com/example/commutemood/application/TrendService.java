@@ -2,6 +2,7 @@ package com.example.commutemood.application;
 
 import com.example.commutemood.domain.CommuteRecord;
 import com.example.commutemood.repository.CommuteRecordRepository;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -117,21 +118,39 @@ public class TrendService {
         return "stable";
     }
 
-    public record TrendPoint(LocalDate date, Double averageStress, int commuteCount) {
+    @Schema(description = "Daily commute trend point")
+    public record TrendPoint(
+            @Schema(description = "Calendar date in the requested timezone", example = "2026-06-10")
+            LocalDate date,
+            @Schema(description = "Average end-of-trip stress for the day")
+            Double averageStress,
+            @Schema(description = "Number of commutes completed on this day", example = "2")
+            int commuteCount
+    ) {
     }
 
+    @Schema(description = "Aggregated commute trend summary")
     public record TrendSummary(
+            @Schema(description = "Average end-of-trip stress across the window")
             Double averageStress,
+            @Schema(description = "Recent average minus earlier average")
             Double stressDelta,
+            @Schema(description = "Trend direction", allowableValues = {"improving", "worsening", "stable", "unknown"})
             String direction,
+            @Schema(description = "Whether there is enough data for a reliable trend")
             boolean sampleSufficient
     ) {
     }
 
+    @Schema(description = "Commute trend response")
     public record TrendResult(
+            @Schema(description = "Daily trend points")
             List<TrendPoint> points,
+            @Schema(description = "Recommendation for the next commute")
             String recommendation,
+            @Schema(description = "Total commutes in the requested window", example = "7")
             int totalCommutes,
+            @Schema(description = "Aggregated trend summary")
             TrendSummary summary
     ) {
     }

@@ -41,6 +41,7 @@
                                                                                  {
                                                                                      "name":  "X-Device-Id",
                                                                                      "in":  "header",
+                                                                                     "description":  "Optional device identifier for route history",
                                                                                      "required":  false,
                                                                                      "schema":  {
                                                                                                     "type":  "string"
@@ -82,6 +83,7 @@
                                                                           {
                                                                               "name":  "X-Device-Id",
                                                                               "in":  "header",
+                                                                              "description":  "Anonymous browser device identifier",
                                                                               "required":  true,
                                                                               "schema":  {
                                                                                              "type":  "string"
@@ -126,30 +128,36 @@
                                                                                   {
                                                                                       "name":  "bbox",
                                                                                       "in":  "query",
+                                                                                      "description":  "Bounding box as west,south,east,north",
                                                                                       "required":  true,
                                                                                       "schema":  {
                                                                                                      "type":  "string"
-                                                                                                 }
+                                                                                                 },
+                                                                                      "example":  "116.39,39.90,116.41,39.92"
                                                                                   },
                                                                                   {
                                                                                       "name":  "zoom",
                                                                                       "in":  "query",
+                                                                                      "description":  "Map zoom level used for cell size",
                                                                                       "required":  false,
                                                                                       "schema":  {
                                                                                                      "type":  "integer",
                                                                                                      "format":  "int32",
                                                                                                      "default":  16
-                                                                                                 }
+                                                                                                 },
+                                                                                      "example":  16
                                                                                   },
                                                                                   {
                                                                                       "name":  "hours",
                                                                                       "in":  "query",
+                                                                                      "description":  "Lookback window in hours",
                                                                                       "required":  false,
                                                                                       "schema":  {
                                                                                                      "type":  "integer",
                                                                                                      "format":  "int32",
                                                                                                      "default":  168
-                                                                                                 }
+                                                                                                 },
+                                                                                      "example":  168
                                                                                   }
                                                                               ],
                                                                "responses":  {
@@ -180,6 +188,7 @@
                                                                                     {
                                                                                         "name":  "X-Device-Id",
                                                                                         "in":  "header",
+                                                                                        "description":  "Anonymous browser device identifier",
                                                                                         "required":  true,
                                                                                         "schema":  {
                                                                                                        "type":  "string"
@@ -221,6 +230,7 @@
                                                                                 {
                                                                                     "name":  "X-Device-Id",
                                                                                     "in":  "header",
+                                                                                    "description":  "Anonymous browser device identifier",
                                                                                     "required":  true,
                                                                                     "schema":  {
                                                                                                    "type":  "string"
@@ -229,12 +239,14 @@
                                                                                 {
                                                                                     "name":  "limit",
                                                                                     "in":  "query",
+                                                                                    "description":  "Maximum number of history records",
                                                                                     "required":  false,
                                                                                     "schema":  {
                                                                                                    "type":  "integer",
                                                                                                    "format":  "int32",
                                                                                                    "default":  10
-                                                                                               }
+                                                                                               },
+                                                                                    "example":  10
                                                                                 }
                                                                             ],
                                                              "responses":  {
@@ -265,30 +277,36 @@
                                                                          {
                                                                              "name":  "bbox",
                                                                              "in":  "query",
+                                                                             "description":  "Bounding box as west,south,east,north",
                                                                              "required":  true,
                                                                              "schema":  {
                                                                                             "type":  "string"
-                                                                                        }
+                                                                                        },
+                                                                             "example":  "116.39,39.90,116.41,39.92"
                                                                          },
                                                                          {
                                                                              "name":  "zoom",
                                                                              "in":  "query",
+                                                                             "description":  "Map zoom level used for cell size",
                                                                              "required":  false,
                                                                              "schema":  {
                                                                                             "type":  "integer",
                                                                                             "format":  "int32",
                                                                                             "default":  16
-                                                                                        }
+                                                                                        },
+                                                                             "example":  16
                                                                          },
                                                                          {
                                                                              "name":  "hours",
                                                                              "in":  "query",
+                                                                             "description":  "Lookback window in hours",
                                                                              "required":  false,
                                                                              "schema":  {
                                                                                             "type":  "integer",
                                                                                             "format":  "int32",
                                                                                             "default":  168
-                                                                                        }
+                                                                                        },
+                                                                             "example":  168
                                                                          }
                                                                      ],
                                                       "responses":  {
@@ -319,6 +337,7 @@
                                                                                  {
                                                                                      "name":  "X-Device-Id",
                                                                                      "in":  "header",
+                                                                                     "description":  "Anonymous browser device identifier",
                                                                                      "required":  true,
                                                                                      "schema":  {
                                                                                                     "type":  "string"
@@ -327,21 +346,25 @@
                                                                                  {
                                                                                      "name":  "days",
                                                                                      "in":  "query",
+                                                                                     "description":  "Number of days to include",
                                                                                      "required":  false,
                                                                                      "schema":  {
                                                                                                     "type":  "integer",
                                                                                                     "format":  "int32",
                                                                                                     "default":  7
-                                                                                                }
+                                                                                                },
+                                                                                     "example":  7
                                                                                  },
                                                                                  {
                                                                                      "name":  "timezone",
                                                                                      "in":  "query",
+                                                                                     "description":  "IANA timezone for grouping daily points",
                                                                                      "required":  false,
                                                                                      "schema":  {
                                                                                                     "type":  "string",
                                                                                                     "default":  "Asia/Shanghai"
-                                                                                                }
+                                                                                                },
+                                                                                     "example":  "Asia/Shanghai"
                                                                                  }
                                                                              ],
                                                               "responses":  {
@@ -363,16 +386,21 @@
                        "schemas":  {
                                        "PointRequest":  {
                                                             "type":  "object",
+                                                            "description":  "WGS84 geographic coordinate",
                                                             "properties":  {
                                                                                "longitude":  {
                                                                                                  "type":  "number",
                                                                                                  "format":  "double",
+                                                                                                 "description":  "Longitude in degrees",
+                                                                                                 "example":  116.398,
                                                                                                  "maximum":  180,
                                                                                                  "minimum":  -180
                                                                                              },
                                                                                "latitude":  {
                                                                                                 "type":  "number",
                                                                                                 "format":  "double",
+                                                                                                "description":  "Latitude in degrees",
+                                                                                                "example":  39.908,
                                                                                                 "maximum":  90,
                                                                                                 "minimum":  -90
                                                                                             }
@@ -384,12 +412,15 @@
                                                         },
                                        "RouteCompareRequest":  {
                                                                    "type":  "object",
+                                                                   "description":  "Route comparison request with origin and destination",
                                                                    "properties":  {
                                                                                       "origin":  {
-                                                                                                     "$ref":  "#/components/schemas/PointRequest"
+                                                                                                     "$ref":  "#/components/schemas/PointRequest",
+                                                                                                     "description":  "Trip origin"
                                                                                                  },
                                                                                       "destination":  {
-                                                                                                          "$ref":  "#/components/schemas/PointRequest"
+                                                                                                          "$ref":  "#/components/schemas/PointRequest",
+                                                                                                          "description":  "Trip destination"
                                                                                                       }
                                                                                   },
                                                                    "required":  [
@@ -399,77 +430,108 @@
                                                                },
                                        "GeoPoint":  {
                                                         "type":  "object",
+                                                        "description":  "WGS84 geographic coordinate",
                                                         "properties":  {
                                                                            "longitude":  {
                                                                                              "type":  "number",
-                                                                                             "format":  "double"
+                                                                                             "format":  "double",
+                                                                                             "description":  "Longitude in degrees",
+                                                                                             "example":  116.398
                                                                                          },
                                                                            "latitude":  {
                                                                                             "type":  "number",
-                                                                                            "format":  "double"
+                                                                                            "format":  "double",
+                                                                                            "description":  "Latitude in degrees",
+                                                                                            "example":  39.908
                                                                                         }
                                                                        }
                                                     },
                                        "RouteComparison":  {
                                                                "type":  "object",
+                                                               "description":  "Route comparison result with recommendation",
                                                                "properties":  {
                                                                                   "routes":  {
                                                                                                  "type":  "array",
+                                                                                                 "description":  "Scored route candidates",
                                                                                                  "items":  {
                                                                                                                "$ref":  "#/components/schemas/ScoredRoute"
                                                                                                            }
                                                                                              },
                                                                                   "fastestRouteId":  {
-                                                                                                         "type":  "string"
+                                                                                                         "type":  "string",
+                                                                                                         "description":  "Fastest route identifier",
+                                                                                                         "example":  "route-fast"
                                                                                                      },
                                                                                   "leastStressfulRouteId":  {
-                                                                                                                "type":  "string"
+                                                                                                                "type":  "string",
+                                                                                                                "description":  "Least stressful route identifier",
+                                                                                                                "example":  "route-calm"
                                                                                                             },
                                                                                   "recommendation":  {
-                                                                                                         "type":  "string"
+                                                                                                         "type":  "string",
+                                                                                                         "description":  "Human-readable recommendation for the next commute"
                                                                                                      },
                                                                                   "recommendAlternative":  {
-                                                                                                               "type":  "boolean"
+                                                                                                               "type":  "boolean",
+                                                                                                               "description":  "Whether the alternative route should be preferred"
                                                                                                            }
                                                                               }
                                                            },
                                        "ScoredRoute":  {
                                                            "type":  "object",
+                                                           "description":  "Route candidate with stress scoring metadata",
                                                            "properties":  {
                                                                               "id":  {
-                                                                                         "type":  "string"
+                                                                                         "type":  "string",
+                                                                                         "description":  "Route identifier",
+                                                                                         "example":  "route-fast"
                                                                                      },
                                                                               "label":  {
-                                                                                            "type":  "string"
+                                                                                            "type":  "string",
+                                                                                            "description":  "Human-readable route label",
+                                                                                            "example":  "æå¿«è·¯çº¿ A"
                                                                                         },
                                                                               "distanceMeters":  {
                                                                                                      "type":  "integer",
-                                                                                                     "format":  "int32"
+                                                                                                     "format":  "int32",
+                                                                                                     "description":  "Route distance in meters",
+                                                                                                     "example":  4200
                                                                                                  },
                                                                               "durationSeconds":  {
                                                                                                       "type":  "integer",
-                                                                                                      "format":  "int32"
+                                                                                                      "format":  "int32",
+                                                                                                      "description":  "Estimated duration in seconds",
+                                                                                                      "example":  1080
                                                                                                   },
                                                                               "stressExposure":  {
                                                                                                      "type":  "number",
-                                                                                                     "format":  "double"
+                                                                                                     "format":  "double",
+                                                                                                     "description":  "Accumulated stress exposure along the route",
+                                                                                                     "example":  48.2
                                                                                                  },
                                                                               "stressScore":  {
                                                                                                   "type":  "number",
-                                                                                                  "format":  "double"
+                                                                                                  "format":  "double",
+                                                                                                  "description":  "Normalized stress score",
+                                                                                                  "example":  62.0
                                                                                               },
                                                                               "confidence":  {
                                                                                                  "type":  "number",
-                                                                                                 "format":  "double"
+                                                                                                 "format":  "double",
+                                                                                                 "description":  "Confidence in the score",
+                                                                                                 "example":  0.72
                                                                                              },
                                                                               "fastest":  {
-                                                                                              "type":  "boolean"
+                                                                                              "type":  "boolean",
+                                                                                              "description":  "Whether this route is the fastest candidate"
                                                                                           },
                                                                               "leastStressful":  {
-                                                                                                     "type":  "boolean"
+                                                                                                     "type":  "boolean",
+                                                                                                     "description":  "Whether this route is the least stressful candidate"
                                                                                                  },
                                                                               "polyline":  {
                                                                                                "type":  "array",
+                                                                                               "description":  "Route polyline for map drawing",
                                                                                                "items":  {
                                                                                                              "$ref":  "#/components/schemas/GeoPoint"
                                                                                                          }
@@ -478,16 +540,23 @@
                                                        },
                                        "ReportRequest":  {
                                                              "type":  "object",
+                                                             "description":  "Mood report submitted from the map",
                                                              "properties":  {
                                                                                 "location":  {
-                                                                                                 "$ref":  "#/components/schemas/PointRequest"
+                                                                                                 "$ref":  "#/components/schemas/PointRequest",
+                                                                                                 "description":  "Report location on the map"
                                                                                              },
                                                                                 "stressLevel":  {
                                                                                                     "type":  "integer",
-                                                                                                    "format":  "int32"
+                                                                                                    "format":  "int32",
+                                                                                                    "description":  "Self-reported stress level",
+                                                                                                    "example":  75,
+                                                                                                    "maximum":  100,
+                                                                                                    "minimum":  0
                                                                                                 },
                                                                                 "tag":  {
                                                                                             "type":  "string",
+                                                                                            "description":  "Primary mood tag for this report",
                                                                                             "enum":  [
                                                                                                          "NOISE",
                                                                                                          "CROWD",
@@ -498,7 +567,8 @@
                                                                                         },
                                                                                 "reportedAt":  {
                                                                                                    "type":  "string",
-                                                                                                   "format":  "date-time"
+                                                                                                   "format":  "date-time",
+                                                                                                   "description":  "Client-side report timestamp; defaults to server time when omitted"
                                                                                                }
                                                                             },
                                                              "required":  [
@@ -509,27 +579,38 @@
                                                          },
                                        "HeatmapCell":  {
                                                            "type":  "object",
+                                                           "description":  "Aggregated heatmap cell for map rendering",
                                                            "properties":  {
                                                                               "cellId":  {
-                                                                                             "type":  "string"
+                                                                                             "type":  "string",
+                                                                                             "description":  "Stable cell identifier",
+                                                                                             "example":  "z16-116398-39908"
                                                                                          },
                                                                               "center":  {
-                                                                                             "$ref":  "#/components/schemas/GeoPoint"
+                                                                                             "$ref":  "#/components/schemas/GeoPoint",
+                                                                                             "description":  "Cell center coordinate"
                                                                                          },
                                                                               "score":  {
                                                                                             "type":  "number",
-                                                                                            "format":  "double"
+                                                                                            "format":  "double",
+                                                                                            "description":  "Aggregated stress score",
+                                                                                            "example":  62.5
                                                                                         },
                                                                               "confidence":  {
                                                                                                  "type":  "number",
-                                                                                                 "format":  "double"
+                                                                                                 "format":  "double",
+                                                                                                 "description":  "Confidence based on sample count",
+                                                                                                 "example":  0.78
                                                                                              },
                                                                               "count":  {
                                                                                             "type":  "integer",
-                                                                                            "format":  "int32"
+                                                                                            "format":  "int32",
+                                                                                            "description":  "Number of reports in this cell",
+                                                                                            "example":  12
                                                                                         },
                                                                               "dominantTag":  {
                                                                                                   "type":  "string",
+                                                                                                  "description":  "Most frequent mood tag in this cell",
                                                                                                   "enum":  [
                                                                                                                "NOISE",
                                                                                                                "CROWD",
@@ -542,60 +623,84 @@
                                                        },
                                        "CommuteCompleteRequest":  {
                                                                       "type":  "object",
+                                                                      "description":  "Completed commute feedback for trend tracking",
                                                                       "properties":  {
                                                                                          "routeId":  {
                                                                                                          "type":  "string",
+                                                                                                         "description":  "Selected route identifier",
+                                                                                                         "example":  "route-fast",
                                                                                                          "minLength":  1
                                                                                                      },
                                                                                          "routeLabel":  {
                                                                                                             "type":  "string",
+                                                                                                            "description":  "Human-readable route label",
+                                                                                                            "example":  "æå¿«è·¯çº¿ A",
                                                                                                             "minLength":  1
                                                                                                         },
                                                                                          "endStressLevel":  {
                                                                                                                 "type":  "integer",
-                                                                                                                "format":  "int32"
+                                                                                                                "format":  "int32",
+                                                                                                                "description":  "End-of-trip stress level",
+                                                                                                                "example":  25,
+                                                                                                                "maximum":  100,
+                                                                                                                "minimum":  0
                                                                                                             },
                                                                                          "durationMinutes":  {
                                                                                                                  "type":  "integer",
                                                                                                                  "format":  "int32",
+                                                                                                                 "description":  "Trip duration in minutes",
+                                                                                                                 "example":  18,
                                                                                                                  "maximum":  600,
                                                                                                                  "minimum":  1
                                                                                                              },
                                                                                          "selectedScore":  {
                                                                                                                "type":  "number",
                                                                                                                "format":  "double",
+                                                                                                               "description":  "Stress score of the selected route",
+                                                                                                               "example":  62,
                                                                                                                "maximum":  100,
                                                                                                                "minimum":  0
                                                                                                            },
                                                                                          "fastestScore":  {
                                                                                                               "type":  "number",
                                                                                                               "format":  "double",
+                                                                                                              "description":  "Stress score of the fastest route",
+                                                                                                              "example":  62,
                                                                                                               "maximum":  100,
                                                                                                               "minimum":  0
                                                                                                           },
                                                                                          "alternativeLabel":  {
-                                                                                                                  "type":  "string"
+                                                                                                                  "type":  "string",
+                                                                                                                  "description":  "Alternative route label when one was shown",
+                                                                                                                  "example":  "å°å¿ç´¯è·¯çº¿ B"
                                                                                                               },
                                                                                          "alternativeScore":  {
                                                                                                                   "type":  "number",
                                                                                                                   "format":  "double",
+                                                                                                                  "description":  "Alternative route stress score",
+                                                                                                                  "example":  43,
                                                                                                                   "maximum":  100,
                                                                                                                   "minimum":  0
                                                                                                               },
                                                                                          "alternativeDurationRatio":  {
                                                                                                                           "type":  "number",
                                                                                                                           "format":  "double",
+                                                                                                                          "description":  "Alternative route duration divided by fastest duration",
+                                                                                                                          "example":  1.12,
                                                                                                                           "minimum":  1
                                                                                                                       },
                                                                                          "confidence":  {
                                                                                                             "type":  "number",
                                                                                                             "format":  "double",
+                                                                                                            "description":  "Confidence in route scoring",
+                                                                                                            "example":  0.72,
                                                                                                             "maximum":  1,
                                                                                                             "minimum":  0
                                                                                                         },
                                                                                          "completedAt":  {
                                                                                                              "type":  "string",
-                                                                                                             "format":  "date-time"
+                                                                                                             "format":  "date-time",
+                                                                                                             "description":  "Completion timestamp; defaults to server time when omitted"
                                                                                                          }
                                                                                      },
                                                                       "required":  [
@@ -610,133 +715,179 @@
                                                                   },
                                        "CommuteRecord":  {
                                                              "type":  "object",
+                                                             "description":  "Persisted commute completion record",
                                                              "properties":  {
                                                                                 "id":  {
                                                                                            "type":  "string",
-                                                                                           "format":  "uuid"
+                                                                                           "format":  "uuid",
+                                                                                           "description":  "Record identifier"
                                                                                        },
                                                                                 "deviceHash":  {
-                                                                                                   "type":  "string"
+                                                                                                   "type":  "string",
+                                                                                                   "description":  "Hashed anonymous device identifier"
                                                                                                },
                                                                                 "routeId":  {
-                                                                                                "type":  "string"
+                                                                                                "type":  "string",
+                                                                                                "description":  "Selected route identifier",
+                                                                                                "example":  "route-fast"
                                                                                             },
                                                                                 "routeLabel":  {
-                                                                                                   "type":  "string"
+                                                                                                   "type":  "string",
+                                                                                                   "description":  "Human-readable route label"
                                                                                                },
                                                                                 "endStressLevel":  {
                                                                                                        "type":  "integer",
-                                                                                                       "format":  "int32"
+                                                                                                       "format":  "int32",
+                                                                                                       "description":  "End-of-trip stress level",
+                                                                                                       "example":  25
                                                                                                    },
                                                                                 "durationMinutes":  {
                                                                                                         "type":  "integer",
-                                                                                                        "format":  "int32"
+                                                                                                        "format":  "int32",
+                                                                                                        "description":  "Trip duration in minutes",
+                                                                                                        "example":  18
                                                                                                     },
                                                                                 "selectedScore":  {
                                                                                                       "type":  "number",
-                                                                                                      "format":  "double"
+                                                                                                      "format":  "double",
+                                                                                                      "description":  "Stress score of the selected route"
                                                                                                   },
                                                                                 "fastestScore":  {
                                                                                                      "type":  "number",
-                                                                                                     "format":  "double"
+                                                                                                     "format":  "double",
+                                                                                                     "description":  "Stress score of the fastest route"
                                                                                                  },
                                                                                 "alternativeLabel":  {
-                                                                                                         "type":  "string"
+                                                                                                         "type":  "string",
+                                                                                                         "description":  "Alternative route label when one was shown"
                                                                                                      },
                                                                                 "alternativeScore":  {
                                                                                                          "type":  "number",
-                                                                                                         "format":  "double"
+                                                                                                         "format":  "double",
+                                                                                                         "description":  "Alternative route stress score"
                                                                                                      },
                                                                                 "alternativeDurationRatio":  {
                                                                                                                  "type":  "number",
-                                                                                                                 "format":  "double"
+                                                                                                                 "format":  "double",
+                                                                                                                 "description":  "Alternative route duration ratio"
                                                                                                              },
                                                                                 "confidence":  {
                                                                                                    "type":  "number",
-                                                                                                   "format":  "double"
+                                                                                                   "format":  "double",
+                                                                                                   "description":  "Confidence in route scoring"
                                                                                                },
                                                                                 "completedAt":  {
                                                                                                     "type":  "string",
-                                                                                                    "format":  "date-time"
+                                                                                                    "format":  "date-time",
+                                                                                                    "description":  "Completion timestamp"
                                                                                                 }
                                                                             }
                                                          },
                                        "RouteQueryHistory":  {
                                                                  "type":  "object",
+                                                                 "description":  "Stored route comparison query and result",
                                                                  "properties":  {
                                                                                     "id":  {
                                                                                                "type":  "string",
-                                                                                               "format":  "uuid"
+                                                                                               "format":  "uuid",
+                                                                                               "description":  "History record identifier"
                                                                                            },
                                                                                     "origin":  {
-                                                                                                   "$ref":  "#/components/schemas/GeoPoint"
+                                                                                                   "$ref":  "#/components/schemas/GeoPoint",
+                                                                                                   "description":  "Trip origin"
                                                                                                },
                                                                                     "destination":  {
-                                                                                                        "$ref":  "#/components/schemas/GeoPoint"
+                                                                                                        "$ref":  "#/components/schemas/GeoPoint",
+                                                                                                        "description":  "Trip destination"
                                                                                                     },
                                                                                     "result":  {
-                                                                                                   "$ref":  "#/components/schemas/RouteComparison"
+                                                                                                   "$ref":  "#/components/schemas/RouteComparison",
+                                                                                                   "description":  "Route comparison result"
                                                                                                },
                                                                                     "createdAt":  {
                                                                                                       "type":  "string",
-                                                                                                      "format":  "date-time"
+                                                                                                      "format":  "date-time",
+                                                                                                      "description":  "Query timestamp"
                                                                                                   }
                                                                                 }
                                                              },
                                        "TrendPoint":  {
                                                           "type":  "object",
+                                                          "description":  "Daily commute trend point",
                                                           "properties":  {
                                                                              "date":  {
                                                                                           "type":  "string",
-                                                                                          "format":  "date"
+                                                                                          "format":  "date",
+                                                                                          "description":  "Calendar date in the requested timezone",
+                                                                                          "example":  "2026-06-10"
                                                                                       },
                                                                              "averageStress":  {
                                                                                                    "type":  "number",
-                                                                                                   "format":  "double"
+                                                                                                   "format":  "double",
+                                                                                                   "description":  "Average end-of-trip stress for the day"
                                                                                                },
                                                                              "commuteCount":  {
                                                                                                   "type":  "integer",
-                                                                                                  "format":  "int32"
+                                                                                                  "format":  "int32",
+                                                                                                  "description":  "Number of commutes completed on this day",
+                                                                                                  "example":  2
                                                                                               }
                                                                          }
                                                       },
                                        "TrendResult":  {
                                                            "type":  "object",
+                                                           "description":  "Commute trend response",
                                                            "properties":  {
                                                                               "points":  {
                                                                                              "type":  "array",
+                                                                                             "description":  "Daily trend points",
                                                                                              "items":  {
                                                                                                            "$ref":  "#/components/schemas/TrendPoint"
                                                                                                        }
                                                                                          },
                                                                               "recommendation":  {
-                                                                                                     "type":  "string"
+                                                                                                     "type":  "string",
+                                                                                                     "description":  "Recommendation for the next commute"
                                                                                                  },
                                                                               "totalCommutes":  {
                                                                                                     "type":  "integer",
-                                                                                                    "format":  "int32"
+                                                                                                    "format":  "int32",
+                                                                                                    "description":  "Total commutes in the requested window",
+                                                                                                    "example":  7
                                                                                                 },
                                                                               "summary":  {
-                                                                                              "$ref":  "#/components/schemas/TrendSummary"
+                                                                                              "$ref":  "#/components/schemas/TrendSummary",
+                                                                                              "description":  "Aggregated trend summary"
                                                                                           }
                                                                           }
                                                        },
                                        "TrendSummary":  {
                                                             "type":  "object",
+                                                            "description":  "Aggregated commute trend summary",
                                                             "properties":  {
                                                                                "averageStress":  {
                                                                                                      "type":  "number",
-                                                                                                     "format":  "double"
+                                                                                                     "format":  "double",
+                                                                                                     "description":  "Average end-of-trip stress across the window"
                                                                                                  },
                                                                                "stressDelta":  {
                                                                                                    "type":  "number",
-                                                                                                   "format":  "double"
+                                                                                                   "format":  "double",
+                                                                                                   "description":  "Recent average minus earlier average"
                                                                                                },
                                                                                "direction":  {
-                                                                                                 "type":  "string"
+                                                                                                 "type":  "string",
+                                                                                                 "description":  "Trend direction",
+                                                                                                 "enum":  [
+                                                                                                              "improving",
+                                                                                                              "worsening",
+                                                                                                              "stable",
+                                                                                                              "unknown"
+                                                                                                          ]
                                                                                              },
                                                                                "sampleSufficient":  {
-                                                                                                        "type":  "boolean"
+                                                                                                        "type":  "boolean",
+                                                                                                        "description":  "Whether there is enough data for a reliable trend"
                                                                                                     }
                                                                            }
                                                         }

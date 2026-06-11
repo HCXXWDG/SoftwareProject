@@ -4,6 +4,7 @@ import com.example.commutemood.application.HeatmapService;
 import com.example.commutemood.domain.GeoBounds;
 import com.example.commutemood.domain.HeatmapCell;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,8 +27,11 @@ public class HeatmapController {
     @GetMapping
     @Operation(summary = "Get heatmap cells")
     public List<HeatmapCell> get(
+            @Parameter(description = "Bounding box as west,south,east,north", example = "116.39,39.90,116.41,39.92")
             @RequestParam String bbox,
+            @Parameter(description = "Map zoom level used for cell size", example = "16")
             @RequestParam(defaultValue = "16") int zoom,
+            @Parameter(description = "Lookback window in hours", example = "168")
             @RequestParam(defaultValue = "168") int hours
     ) {
         return heatmapService.getHeatmap(parseBounds(bbox), zoom, hours);
@@ -36,8 +40,11 @@ public class HeatmapController {
     @PostMapping("/refresh")
     @Operation(summary = "Refresh persisted heatmap cells")
     public List<HeatmapCell> refresh(
+            @Parameter(description = "Bounding box as west,south,east,north", example = "116.39,39.90,116.41,39.92")
             @RequestParam String bbox,
+            @Parameter(description = "Map zoom level used for cell size", example = "16")
             @RequestParam(defaultValue = "16") int zoom,
+            @Parameter(description = "Lookback window in hours", example = "168")
             @RequestParam(defaultValue = "168") int hours
     ) {
         return heatmapService.refreshCachedHeatmap(parseBounds(bbox), zoom, hours);
