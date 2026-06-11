@@ -102,6 +102,8 @@ class ApiSmokeTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.routes.length()").value(3))
+                .andExpect(jsonPath("$.fastestRouteId").value("route-fast"))
+                .andExpect(jsonPath("$.leastStressfulRouteId").value("route-calm"))
                 .andExpect(jsonPath("$.recommendation").exists());
     }
 

@@ -5,6 +5,8 @@ All notable changes follow Semantic Versioning and Keep a Changelog.
 ## [Unreleased]
 
 ### Added
+- PostGIS dev startup script at `scripts/start-postgis-dev.ps1`.
+- Integration smoke script for validating the frontend-to-backend API chain locally.
 - React/TypeScript map dashboard with AMap and offline demo modes.
 - Spring Boot API for reports, heatmap, route comparison and commute trends.
 - Backend Docker image for running the Spring Boot API in containers.
@@ -19,6 +21,7 @@ All notable changes follow Semantic Versioning and Keep a Changelog.
 - OpenAPI metadata and controller tags for clearer Swagger API documentation.
 
 ### Changed
+- Merged `develop` frontend shell for local integration debugging.
 - Extended the postgres profile to pass `DEVICE_HASH_SALT` into Flyway migrations.
 - Updated `.env.example` with backend, CORS and PostGIS runtime variables.
 - Clarified production startup documentation for the current backend/PostGIS Compose stack.
@@ -30,6 +33,9 @@ All notable changes follow Semantic Versioning and Keep a Changelog.
 - Ignored Maven wrapper cache downloads to keep local build artifacts out of commits.
 
 ### Fixed
+- Mock route comparison now returns distinct fastest and least-stressful route IDs for the standard Beijing demo coordinates.
+- PostgreSQL commute trend queries now read nullable numeric columns without failing on JDBC row mapping.
+- Root URL now redirects to Swagger UI instead of returning a 500 error page.
 - Missing required request headers now return a structured 400 response.
 - Commute and route-query writes now refresh PostGIS `device_profile` activity timestamps.
 - Non-finite coordinates, invalid heatmap bounds and invalid trend timezones now return 400 responses.

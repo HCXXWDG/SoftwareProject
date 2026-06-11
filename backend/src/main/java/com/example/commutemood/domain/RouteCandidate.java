@@ -7,7 +7,17 @@ public record RouteCandidate(
         String label,
         int distanceMeters,
         int durationSeconds,
-        List<GeoPoint> polyline
+        List<GeoPoint> polyline,
+        Double demoStressExposure
 ) {
+    public RouteCandidate(
+            String id,
+            String label,
+            int distanceMeters,
+            int durationSeconds,
+            List<GeoPoint> polyline
+    ) {
+        this(id, label, distanceMeters, durationSeconds, polyline, null);
+    }
 }
 

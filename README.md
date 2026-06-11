@@ -67,6 +67,12 @@ npm run dev
 
 后端健康检查：`GET http://localhost:8080/actuator/health`。接口契约见 [docs/团队协作与接口约定.md](docs/团队协作与接口约定.md)。
 
+仅验证后端链路时，可在后端启动后运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/integration-smoke.ps1
+```
+
 ## 后端 API
 
 | 方法 | 路径 | 说明 |
