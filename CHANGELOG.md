@@ -20,6 +20,7 @@ All notable changes follow Semantic Versioning and Keep a Changelog.
 - Backend CI workflow for running Java 17 Maven tests on pushes and pull requests.
 - Structured commute trend summary with average stress, stress delta and trend direction.
 - OpenAPI metadata and controller tags for clearer Swagger API documentation.
+- Committed OpenAPI contract snapshot at `docs/openapi.json` for frontend and integration reference.
 
 ### Changed
 - Merged `develop` frontend shell for local integration debugging.

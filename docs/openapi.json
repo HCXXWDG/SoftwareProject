@@ -1,0 +1,745 @@
+﻿{
+    "openapi":  "3.1.0",
+    "info":  {
+                 "title":  "Commute Mood API",
+                 "description":  "Backend API for commute mood reports, heatmaps, routes and trends.",
+                 "version":  "0.1.0"
+             },
+    "servers":  [
+                    {
+                        "url":  "http://localhost:8080",
+                        "description":  "Local development server"
+                    }
+                ],
+    "tags":  [
+                 {
+                     "name":  "Heatmap",
+                     "description":  "Read and refresh commute mood heatmap cells."
+                 },
+                 {
+                     "name":  "Routes",
+                     "description":  "Compare routes and read route-query history."
+                 },
+                 {
+                     "name":  "Reports",
+                     "description":  "Submit commute mood reports for heatmap aggregation."
+                 },
+                 {
+                     "name":  "Commutes",
+                     "description":  "Complete commutes and read commute trend summaries."
+                 }
+             ],
+    "paths":  {
+                  "/api/v1/routes/compare":  {
+                                                 "post":  {
+                                                              "tags":  [
+                                                                           "Routes"
+                                                                       ],
+                                                              "summary":  "Compare candidate routes",
+                                                              "operationId":  "compare",
+                                                              "parameters":  [
+                                                                                 {
+                                                                                     "name":  "X-Device-Id",
+                                                                                     "in":  "header",
+                                                                                     "required":  false,
+                                                                                     "schema":  {
+                                                                                                    "type":  "string"
+                                                                                                }
+                                                                                 }
+                                                                             ],
+                                                              "requestBody":  {
+                                                                                  "content":  {
+                                                                                                  "application/json":  {
+                                                                                                                           "schema":  {
+                                                                                                                                          "$ref":  "#/components/schemas/RouteCompareRequest"
+                                                                                                                                      }
+                                                                                                                       }
+                                                                                              },
+                                                                                  "required":  true
+                                                                              },
+                                                              "responses":  {
+                                                                                "200":  {
+                                                                                            "description":  "OK",
+                                                                                            "content":  {
+                                                                                                            "*/*":  {
+                                                                                                                        "schema":  {
+                                                                                                                                       "$ref":  "#/components/schemas/RouteComparison"
+                                                                                                                                   }
+                                                                                                                    }
+                                                                                                        }
+                                                                                        }
+                                                                            }
+                                                          }
+                                             },
+                  "/api/v1/reports":  {
+                                          "post":  {
+                                                       "tags":  [
+                                                                    "Reports"
+                                                                ],
+                                                       "summary":  "Submit a mood report",
+                                                       "operationId":  "submit",
+                                                       "parameters":  [
+                                                                          {
+                                                                              "name":  "X-Device-Id",
+                                                                              "in":  "header",
+                                                                              "required":  true,
+                                                                              "schema":  {
+                                                                                             "type":  "string"
+                                                                                         }
+                                                                          }
+                                                                      ],
+                                                       "requestBody":  {
+                                                                           "content":  {
+                                                                                           "application/json":  {
+                                                                                                                    "schema":  {
+                                                                                                                                   "$ref":  "#/components/schemas/ReportRequest"
+                                                                                                                               }
+                                                                                                                }
+                                                                                       },
+                                                                           "required":  true
+                                                                       },
+                                                       "responses":  {
+                                                                         "200":  {
+                                                                                     "description":  "OK",
+                                                                                     "content":  {
+                                                                                                     "*/*":  {
+                                                                                                                 "schema":  {
+                                                                                                                                "type":  "object",
+                                                                                                                                "additionalProperties":  {
+
+                                                                                                                                                         }
+                                                                                                                            }
+                                                                                                             }
+                                                                                                 }
+                                                                                 }
+                                                                     }
+                                                   }
+                                      },
+                  "/api/v1/heatmap/refresh":  {
+                                                  "post":  {
+                                                               "tags":  [
+                                                                            "Heatmap"
+                                                                        ],
+                                                               "summary":  "Refresh persisted heatmap cells",
+                                                               "operationId":  "refresh",
+                                                               "parameters":  [
+                                                                                  {
+                                                                                      "name":  "bbox",
+                                                                                      "in":  "query",
+                                                                                      "required":  true,
+                                                                                      "schema":  {
+                                                                                                     "type":  "string"
+                                                                                                 }
+                                                                                  },
+                                                                                  {
+                                                                                      "name":  "zoom",
+                                                                                      "in":  "query",
+                                                                                      "required":  false,
+                                                                                      "schema":  {
+                                                                                                     "type":  "integer",
+                                                                                                     "format":  "int32",
+                                                                                                     "default":  16
+                                                                                                 }
+                                                                                  },
+                                                                                  {
+                                                                                      "name":  "hours",
+                                                                                      "in":  "query",
+                                                                                      "required":  false,
+                                                                                      "schema":  {
+                                                                                                     "type":  "integer",
+                                                                                                     "format":  "int32",
+                                                                                                     "default":  168
+                                                                                                 }
+                                                                                  }
+                                                                              ],
+                                                               "responses":  {
+                                                                                 "200":  {
+                                                                                             "description":  "OK",
+                                                                                             "content":  {
+                                                                                                             "*/*":  {
+                                                                                                                         "schema":  {
+                                                                                                                                        "type":  "array",
+                                                                                                                                        "items":  {
+                                                                                                                                                      "$ref":  "#/components/schemas/HeatmapCell"
+                                                                                                                                                  }
+                                                                                                                                    }
+                                                                                                                     }
+                                                                                                         }
+                                                                                         }
+                                                                             }
+                                                           }
+                                              },
+                  "/api/v1/commutes/complete":  {
+                                                    "post":  {
+                                                                 "tags":  [
+                                                                              "Commutes"
+                                                                          ],
+                                                                 "summary":  "Complete a commute",
+                                                                 "operationId":  "complete",
+                                                                 "parameters":  [
+                                                                                    {
+                                                                                        "name":  "X-Device-Id",
+                                                                                        "in":  "header",
+                                                                                        "required":  true,
+                                                                                        "schema":  {
+                                                                                                       "type":  "string"
+                                                                                                   }
+                                                                                    }
+                                                                                ],
+                                                                 "requestBody":  {
+                                                                                     "content":  {
+                                                                                                     "application/json":  {
+                                                                                                                              "schema":  {
+                                                                                                                                             "$ref":  "#/components/schemas/CommuteCompleteRequest"
+                                                                                                                                         }
+                                                                                                                          }
+                                                                                                 },
+                                                                                     "required":  true
+                                                                                 },
+                                                                 "responses":  {
+                                                                                   "200":  {
+                                                                                               "description":  "OK",
+                                                                                               "content":  {
+                                                                                                               "*/*":  {
+                                                                                                                           "schema":  {
+                                                                                                                                          "$ref":  "#/components/schemas/CommuteRecord"
+                                                                                                                                      }
+                                                                                                                       }
+                                                                                                           }
+                                                                                           }
+                                                                               }
+                                                             }
+                                                },
+                  "/api/v1/routes/history":  {
+                                                 "get":  {
+                                                             "tags":  [
+                                                                          "Routes"
+                                                                      ],
+                                                             "summary":  "Get recent route comparisons",
+                                                             "operationId":  "history",
+                                                             "parameters":  [
+                                                                                {
+                                                                                    "name":  "X-Device-Id",
+                                                                                    "in":  "header",
+                                                                                    "required":  true,
+                                                                                    "schema":  {
+                                                                                                   "type":  "string"
+                                                                                               }
+                                                                                },
+                                                                                {
+                                                                                    "name":  "limit",
+                                                                                    "in":  "query",
+                                                                                    "required":  false,
+                                                                                    "schema":  {
+                                                                                                   "type":  "integer",
+                                                                                                   "format":  "int32",
+                                                                                                   "default":  10
+                                                                                               }
+                                                                                }
+                                                                            ],
+                                                             "responses":  {
+                                                                               "200":  {
+                                                                                           "description":  "OK",
+                                                                                           "content":  {
+                                                                                                           "*/*":  {
+                                                                                                                       "schema":  {
+                                                                                                                                      "type":  "array",
+                                                                                                                                      "items":  {
+                                                                                                                                                    "$ref":  "#/components/schemas/RouteQueryHistory"
+                                                                                                                                                }
+                                                                                                                                  }
+                                                                                                                   }
+                                                                                                       }
+                                                                                       }
+                                                                           }
+                                                         }
+                                             },
+                  "/api/v1/heatmap":  {
+                                          "get":  {
+                                                      "tags":  [
+                                                                   "Heatmap"
+                                                               ],
+                                                      "summary":  "Get heatmap cells",
+                                                      "operationId":  "get",
+                                                      "parameters":  [
+                                                                         {
+                                                                             "name":  "bbox",
+                                                                             "in":  "query",
+                                                                             "required":  true,
+                                                                             "schema":  {
+                                                                                            "type":  "string"
+                                                                                        }
+                                                                         },
+                                                                         {
+                                                                             "name":  "zoom",
+                                                                             "in":  "query",
+                                                                             "required":  false,
+                                                                             "schema":  {
+                                                                                            "type":  "integer",
+                                                                                            "format":  "int32",
+                                                                                            "default":  16
+                                                                                        }
+                                                                         },
+                                                                         {
+                                                                             "name":  "hours",
+                                                                             "in":  "query",
+                                                                             "required":  false,
+                                                                             "schema":  {
+                                                                                            "type":  "integer",
+                                                                                            "format":  "int32",
+                                                                                            "default":  168
+                                                                                        }
+                                                                         }
+                                                                     ],
+                                                      "responses":  {
+                                                                        "200":  {
+                                                                                    "description":  "OK",
+                                                                                    "content":  {
+                                                                                                    "*/*":  {
+                                                                                                                "schema":  {
+                                                                                                                               "type":  "array",
+                                                                                                                               "items":  {
+                                                                                                                                             "$ref":  "#/components/schemas/HeatmapCell"
+                                                                                                                                         }
+                                                                                                                           }
+                                                                                                            }
+                                                                                                }
+                                                                                }
+                                                                    }
+                                                  }
+                                      },
+                  "/api/v1/commutes/trends":  {
+                                                  "get":  {
+                                                              "tags":  [
+                                                                           "Commutes"
+                                                                       ],
+                                                              "summary":  "Get commute trends",
+                                                              "operationId":  "trends",
+                                                              "parameters":  [
+                                                                                 {
+                                                                                     "name":  "X-Device-Id",
+                                                                                     "in":  "header",
+                                                                                     "required":  true,
+                                                                                     "schema":  {
+                                                                                                    "type":  "string"
+                                                                                                }
+                                                                                 },
+                                                                                 {
+                                                                                     "name":  "days",
+                                                                                     "in":  "query",
+                                                                                     "required":  false,
+                                                                                     "schema":  {
+                                                                                                    "type":  "integer",
+                                                                                                    "format":  "int32",
+                                                                                                    "default":  7
+                                                                                                }
+                                                                                 },
+                                                                                 {
+                                                                                     "name":  "timezone",
+                                                                                     "in":  "query",
+                                                                                     "required":  false,
+                                                                                     "schema":  {
+                                                                                                    "type":  "string",
+                                                                                                    "default":  "Asia/Shanghai"
+                                                                                                }
+                                                                                 }
+                                                                             ],
+                                                              "responses":  {
+                                                                                "200":  {
+                                                                                            "description":  "OK",
+                                                                                            "content":  {
+                                                                                                            "*/*":  {
+                                                                                                                        "schema":  {
+                                                                                                                                       "$ref":  "#/components/schemas/TrendResult"
+                                                                                                                                   }
+                                                                                                                    }
+                                                                                                        }
+                                                                                        }
+                                                                            }
+                                                          }
+                                              }
+              },
+    "components":  {
+                       "schemas":  {
+                                       "PointRequest":  {
+                                                            "type":  "object",
+                                                            "properties":  {
+                                                                               "longitude":  {
+                                                                                                 "type":  "number",
+                                                                                                 "format":  "double",
+                                                                                                 "maximum":  180,
+                                                                                                 "minimum":  -180
+                                                                                             },
+                                                                               "latitude":  {
+                                                                                                "type":  "number",
+                                                                                                "format":  "double",
+                                                                                                "maximum":  90,
+                                                                                                "minimum":  -90
+                                                                                            }
+                                                                           },
+                                                            "required":  [
+                                                                             "latitude",
+                                                                             "longitude"
+                                                                         ]
+                                                        },
+                                       "RouteCompareRequest":  {
+                                                                   "type":  "object",
+                                                                   "properties":  {
+                                                                                      "origin":  {
+                                                                                                     "$ref":  "#/components/schemas/PointRequest"
+                                                                                                 },
+                                                                                      "destination":  {
+                                                                                                          "$ref":  "#/components/schemas/PointRequest"
+                                                                                                      }
+                                                                                  },
+                                                                   "required":  [
+                                                                                    "destination",
+                                                                                    "origin"
+                                                                                ]
+                                                               },
+                                       "GeoPoint":  {
+                                                        "type":  "object",
+                                                        "properties":  {
+                                                                           "longitude":  {
+                                                                                             "type":  "number",
+                                                                                             "format":  "double"
+                                                                                         },
+                                                                           "latitude":  {
+                                                                                            "type":  "number",
+                                                                                            "format":  "double"
+                                                                                        }
+                                                                       }
+                                                    },
+                                       "RouteComparison":  {
+                                                               "type":  "object",
+                                                               "properties":  {
+                                                                                  "routes":  {
+                                                                                                 "type":  "array",
+                                                                                                 "items":  {
+                                                                                                               "$ref":  "#/components/schemas/ScoredRoute"
+                                                                                                           }
+                                                                                             },
+                                                                                  "fastestRouteId":  {
+                                                                                                         "type":  "string"
+                                                                                                     },
+                                                                                  "leastStressfulRouteId":  {
+                                                                                                                "type":  "string"
+                                                                                                            },
+                                                                                  "recommendation":  {
+                                                                                                         "type":  "string"
+                                                                                                     },
+                                                                                  "recommendAlternative":  {
+                                                                                                               "type":  "boolean"
+                                                                                                           }
+                                                                              }
+                                                           },
+                                       "ScoredRoute":  {
+                                                           "type":  "object",
+                                                           "properties":  {
+                                                                              "id":  {
+                                                                                         "type":  "string"
+                                                                                     },
+                                                                              "label":  {
+                                                                                            "type":  "string"
+                                                                                        },
+                                                                              "distanceMeters":  {
+                                                                                                     "type":  "integer",
+                                                                                                     "format":  "int32"
+                                                                                                 },
+                                                                              "durationSeconds":  {
+                                                                                                      "type":  "integer",
+                                                                                                      "format":  "int32"
+                                                                                                  },
+                                                                              "stressExposure":  {
+                                                                                                     "type":  "number",
+                                                                                                     "format":  "double"
+                                                                                                 },
+                                                                              "stressScore":  {
+                                                                                                  "type":  "number",
+                                                                                                  "format":  "double"
+                                                                                              },
+                                                                              "confidence":  {
+                                                                                                 "type":  "number",
+                                                                                                 "format":  "double"
+                                                                                             },
+                                                                              "fastest":  {
+                                                                                              "type":  "boolean"
+                                                                                          },
+                                                                              "leastStressful":  {
+                                                                                                     "type":  "boolean"
+                                                                                                 },
+                                                                              "polyline":  {
+                                                                                               "type":  "array",
+                                                                                               "items":  {
+                                                                                                             "$ref":  "#/components/schemas/GeoPoint"
+                                                                                                         }
+                                                                                           }
+                                                                          }
+                                                       },
+                                       "ReportRequest":  {
+                                                             "type":  "object",
+                                                             "properties":  {
+                                                                                "location":  {
+                                                                                                 "$ref":  "#/components/schemas/PointRequest"
+                                                                                             },
+                                                                                "stressLevel":  {
+                                                                                                    "type":  "integer",
+                                                                                                    "format":  "int32"
+                                                                                                },
+                                                                                "tag":  {
+                                                                                            "type":  "string",
+                                                                                            "enum":  [
+                                                                                                         "NOISE",
+                                                                                                         "CROWD",
+                                                                                                         "SUN",
+                                                                                                         "ODOR",
+                                                                                                         "OTHER"
+                                                                                                     ]
+                                                                                        },
+                                                                                "reportedAt":  {
+                                                                                                   "type":  "string",
+                                                                                                   "format":  "date-time"
+                                                                                               }
+                                                                            },
+                                                             "required":  [
+                                                                              "location",
+                                                                              "stressLevel",
+                                                                              "tag"
+                                                                          ]
+                                                         },
+                                       "HeatmapCell":  {
+                                                           "type":  "object",
+                                                           "properties":  {
+                                                                              "cellId":  {
+                                                                                             "type":  "string"
+                                                                                         },
+                                                                              "center":  {
+                                                                                             "$ref":  "#/components/schemas/GeoPoint"
+                                                                                         },
+                                                                              "score":  {
+                                                                                            "type":  "number",
+                                                                                            "format":  "double"
+                                                                                        },
+                                                                              "confidence":  {
+                                                                                                 "type":  "number",
+                                                                                                 "format":  "double"
+                                                                                             },
+                                                                              "count":  {
+                                                                                            "type":  "integer",
+                                                                                            "format":  "int32"
+                                                                                        },
+                                                                              "dominantTag":  {
+                                                                                                  "type":  "string",
+                                                                                                  "enum":  [
+                                                                                                               "NOISE",
+                                                                                                               "CROWD",
+                                                                                                               "SUN",
+                                                                                                               "ODOR",
+                                                                                                               "OTHER"
+                                                                                                           ]
+                                                                                              }
+                                                                          }
+                                                       },
+                                       "CommuteCompleteRequest":  {
+                                                                      "type":  "object",
+                                                                      "properties":  {
+                                                                                         "routeId":  {
+                                                                                                         "type":  "string",
+                                                                                                         "minLength":  1
+                                                                                                     },
+                                                                                         "routeLabel":  {
+                                                                                                            "type":  "string",
+                                                                                                            "minLength":  1
+                                                                                                        },
+                                                                                         "endStressLevel":  {
+                                                                                                                "type":  "integer",
+                                                                                                                "format":  "int32"
+                                                                                                            },
+                                                                                         "durationMinutes":  {
+                                                                                                                 "type":  "integer",
+                                                                                                                 "format":  "int32",
+                                                                                                                 "maximum":  600,
+                                                                                                                 "minimum":  1
+                                                                                                             },
+                                                                                         "selectedScore":  {
+                                                                                                               "type":  "number",
+                                                                                                               "format":  "double",
+                                                                                                               "maximum":  100,
+                                                                                                               "minimum":  0
+                                                                                                           },
+                                                                                         "fastestScore":  {
+                                                                                                              "type":  "number",
+                                                                                                              "format":  "double",
+                                                                                                              "maximum":  100,
+                                                                                                              "minimum":  0
+                                                                                                          },
+                                                                                         "alternativeLabel":  {
+                                                                                                                  "type":  "string"
+                                                                                                              },
+                                                                                         "alternativeScore":  {
+                                                                                                                  "type":  "number",
+                                                                                                                  "format":  "double",
+                                                                                                                  "maximum":  100,
+                                                                                                                  "minimum":  0
+                                                                                                              },
+                                                                                         "alternativeDurationRatio":  {
+                                                                                                                          "type":  "number",
+                                                                                                                          "format":  "double",
+                                                                                                                          "minimum":  1
+                                                                                                                      },
+                                                                                         "confidence":  {
+                                                                                                            "type":  "number",
+                                                                                                            "format":  "double",
+                                                                                                            "maximum":  1,
+                                                                                                            "minimum":  0
+                                                                                                        },
+                                                                                         "completedAt":  {
+                                                                                                             "type":  "string",
+                                                                                                             "format":  "date-time"
+                                                                                                         }
+                                                                                     },
+                                                                      "required":  [
+                                                                                       "confidence",
+                                                                                       "durationMinutes",
+                                                                                       "endStressLevel",
+                                                                                       "fastestScore",
+                                                                                       "routeId",
+                                                                                       "routeLabel",
+                                                                                       "selectedScore"
+                                                                                   ]
+                                                                  },
+                                       "CommuteRecord":  {
+                                                             "type":  "object",
+                                                             "properties":  {
+                                                                                "id":  {
+                                                                                           "type":  "string",
+                                                                                           "format":  "uuid"
+                                                                                       },
+                                                                                "deviceHash":  {
+                                                                                                   "type":  "string"
+                                                                                               },
+                                                                                "routeId":  {
+                                                                                                "type":  "string"
+                                                                                            },
+                                                                                "routeLabel":  {
+                                                                                                   "type":  "string"
+                                                                                               },
+                                                                                "endStressLevel":  {
+                                                                                                       "type":  "integer",
+                                                                                                       "format":  "int32"
+                                                                                                   },
+                                                                                "durationMinutes":  {
+                                                                                                        "type":  "integer",
+                                                                                                        "format":  "int32"
+                                                                                                    },
+                                                                                "selectedScore":  {
+                                                                                                      "type":  "number",
+                                                                                                      "format":  "double"
+                                                                                                  },
+                                                                                "fastestScore":  {
+                                                                                                     "type":  "number",
+                                                                                                     "format":  "double"
+                                                                                                 },
+                                                                                "alternativeLabel":  {
+                                                                                                         "type":  "string"
+                                                                                                     },
+                                                                                "alternativeScore":  {
+                                                                                                         "type":  "number",
+                                                                                                         "format":  "double"
+                                                                                                     },
+                                                                                "alternativeDurationRatio":  {
+                                                                                                                 "type":  "number",
+                                                                                                                 "format":  "double"
+                                                                                                             },
+                                                                                "confidence":  {
+                                                                                                   "type":  "number",
+                                                                                                   "format":  "double"
+                                                                                               },
+                                                                                "completedAt":  {
+                                                                                                    "type":  "string",
+                                                                                                    "format":  "date-time"
+                                                                                                }
+                                                                            }
+                                                         },
+                                       "RouteQueryHistory":  {
+                                                                 "type":  "object",
+                                                                 "properties":  {
+                                                                                    "id":  {
+                                                                                               "type":  "string",
+                                                                                               "format":  "uuid"
+                                                                                           },
+                                                                                    "origin":  {
+                                                                                                   "$ref":  "#/components/schemas/GeoPoint"
+                                                                                               },
+                                                                                    "destination":  {
+                                                                                                        "$ref":  "#/components/schemas/GeoPoint"
+                                                                                                    },
+                                                                                    "result":  {
+                                                                                                   "$ref":  "#/components/schemas/RouteComparison"
+                                                                                               },
+                                                                                    "createdAt":  {
+                                                                                                      "type":  "string",
+                                                                                                      "format":  "date-time"
+                                                                                                  }
+                                                                                }
+                                                             },
+                                       "TrendPoint":  {
+                                                          "type":  "object",
+                                                          "properties":  {
+                                                                             "date":  {
+                                                                                          "type":  "string",
+                                                                                          "format":  "date"
+                                                                                      },
+                                                                             "averageStress":  {
+                                                                                                   "type":  "number",
+                                                                                                   "format":  "double"
+                                                                                               },
+                                                                             "commuteCount":  {
+                                                                                                  "type":  "integer",
+                                                                                                  "format":  "int32"
+                                                                                              }
+                                                                         }
+                                                      },
+                                       "TrendResult":  {
+                                                           "type":  "object",
+                                                           "properties":  {
+                                                                              "points":  {
+                                                                                             "type":  "array",
+                                                                                             "items":  {
+                                                                                                           "$ref":  "#/components/schemas/TrendPoint"
+                                                                                                       }
+                                                                                         },
+                                                                              "recommendation":  {
+                                                                                                     "type":  "string"
+                                                                                                 },
+                                                                              "totalCommutes":  {
+                                                                                                    "type":  "integer",
+                                                                                                    "format":  "int32"
+                                                                                                },
+                                                                              "summary":  {
+                                                                                              "$ref":  "#/components/schemas/TrendSummary"
+                                                                                          }
+                                                                          }
+                                                       },
+                                       "TrendSummary":  {
+                                                            "type":  "object",
+                                                            "properties":  {
+                                                                               "averageStress":  {
+                                                                                                     "type":  "number",
+                                                                                                     "format":  "double"
+                                                                                                 },
+                                                                               "stressDelta":  {
+                                                                                                   "type":  "number",
+                                                                                                   "format":  "double"
+                                                                                               },
+                                                                               "direction":  {
+                                                                                                 "type":  "string"
+                                                                                             },
+                                                                               "sampleSufficient":  {
+                                                                                                        "type":  "boolean"
+                                                                                                    }
+                                                                           }
+                                                        }
+                                   }
+                   }
+}
