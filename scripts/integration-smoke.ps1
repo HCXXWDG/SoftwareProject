@@ -80,6 +80,15 @@ Test-Endpoint "Trends" {
     Write-Host "total: $($trends.totalCommutes) direction: $($trends.summary.direction)"
 }
 
+Test-Endpoint "Demo browser trends" {
+    $trends = Invoke-RestMethod -Uri "$base/api/v1/commutes/trends?days=7&timezone=Asia/Shanghai" `
+        -Headers @{ "X-Device-Id" = "demo-browser" }
+    if ($trends.totalCommutes -lt 7) {
+        throw "Expected demo-browser seed to include 7 commutes, got $($trends.totalCommutes)"
+    }
+    Write-Host "demo-browser total: $($trends.totalCommutes) direction: $($trends.summary.direction)"
+}
+
 Test-Endpoint "CORS preflight" {
     $headers = curl.exe -s -D - -o NUL -X OPTIONS "$base/api/v1/heatmap?bbox=116.39,39.90,116.41,39.92&zoom=16" `
         -H "Origin: http://localhost:5173" `

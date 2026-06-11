@@ -45,7 +45,7 @@ Assert-True ($comparison.routes[0].polyline.Count -ge 2) "route polyline has at 
 Write-Host "`n[Trend demo device]"
 $deviceId = $manifest.commuteTrendDemo.deviceId
 $trends = Invoke-RestMethod "$BaseUrl/api/v1/commutes/trends?days=7&timezone=Asia/Shanghai" -Headers @{ "X-Device-Id" = $deviceId }
-Assert-True ($trends.totalCommutes -ge 1) "demo-browser has commute history (got $($trends.totalCommutes))"
+Assert-True ($trends.totalCommutes -ge 7) "demo-browser has seeded commute history (got $($trends.totalCommutes))"
 Assert-True ($null -ne $trends.summary.direction -and $trends.summary.direction.Length -gt 0) "trend summary includes direction"
 Assert-True ($trends.points.Count -eq 7) "trend window returns seven daily points"
 

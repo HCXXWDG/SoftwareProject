@@ -101,15 +101,42 @@
                                                                            "required":  true
                                                                        },
                                                        "responses":  {
-                                                                         "200":  {
-                                                                                     "description":  "OK",
+                                                                         "201":  {
+                                                                                     "description":  "Report accepted",
                                                                                      "content":  {
                                                                                                      "*/*":  {
                                                                                                                  "schema":  {
-                                                                                                                                "type":  "object",
-                                                                                                                                "additionalProperties":  {
-
-                                                                                                                                                         }
+                                                                                                                                "$ref":  "#/components/schemas/ReportSubmissionResponse"
+                                                                                                                            }
+                                                                                                             }
+                                                                                                 }
+                                                                                 },
+                                                                         "409":  {
+                                                                                     "description":  "Duplicate report within five minutes nearby",
+                                                                                     "content":  {
+                                                                                                     "*/*":  {
+                                                                                                                 "schema":  {
+                                                                                                                                "$ref":  "#/components/schemas/ReportSubmissionResponse"
+                                                                                                                            }
+                                                                                                             }
+                                                                                                 }
+                                                                                 },
+                                                                         "429":  {
+                                                                                     "description":  "Too many reports within one minute",
+                                                                                     "content":  {
+                                                                                                     "*/*":  {
+                                                                                                                 "schema":  {
+                                                                                                                                "$ref":  "#/components/schemas/ApiErrorResponse"
+                                                                                                                            }
+                                                                                                             }
+                                                                                                 }
+                                                                                 },
+                                                                         "400":  {
+                                                                                     "description":  "Invalid request",
+                                                                                     "content":  {
+                                                                                                     "*/*":  {
+                                                                                                                 "schema":  {
+                                                                                                                                "$ref":  "#/components/schemas/ApiErrorResponse"
                                                                                                                             }
                                                                                                              }
                                                                                                  }
@@ -577,6 +604,50 @@
                                                                               "tag"
                                                                           ]
                                                          },
+                                       "ReportSubmissionResponse":  {
+                                                                        "type":  "object",
+                                                                        "description":  "Mood report submission outcome",
+                                                                        "properties":  {
+                                                                                           "status":  {
+                                                                                                          "type":  "string",
+                                                                                                          "description":  "Submission status",
+                                                                                                          "enum":  [
+                                                                                                                       "created",
+                                                                                                                       "duplicate"
+                                                                                                                   ]
+                                                                                                      },
+                                                                                           "message":  {
+                                                                                                           "type":  "string",
+                                                                                                           "description":  "Outcome message for the client UI"
+                                                                                                       }
+                                                                                       }
+                                                                    },
+                                       "ApiErrorResponse":  {
+                                                                "type":  "object",
+                                                                "description":  "Structured API error response",
+                                                                "properties":  {
+                                                                                   "timestamp":  {
+                                                                                                     "type":  "string",
+                                                                                                     "description":  "Error timestamp in ISO-8601",
+                                                                                                     "example":  "2026-06-10T08:30:00Z"
+                                                                                                 },
+                                                                                   "status":  {
+                                                                                                  "type":  "integer",
+                                                                                                  "format":  "int32",
+                                                                                                  "description":  "HTTP status code",
+                                                                                                  "example":  400
+                                                                                              },
+                                                                                   "code":  {
+                                                                                                "type":  "string",
+                                                                                                "description":  "Machine-readable error code",
+                                                                                                "example":  "invalid_request"
+                                                                                            },
+                                                                                   "message":  {
+                                                                                                   "type":  "string",
+                                                                                                   "description":  "Human-readable error message"
+                                                                                               }
+                                                                               }
+                                                            },
                                        "HeatmapCell":  {
                                                            "type":  "object",
                                                            "description":  "Aggregated heatmap cell for map rendering",

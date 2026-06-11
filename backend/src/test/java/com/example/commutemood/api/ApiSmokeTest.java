@@ -51,6 +51,32 @@ class ApiSmokeTest {
     }
 
     @Test
+    void rejectsDuplicateReportWithinRadius() throws Exception {
+        String deviceId = "api-smoke-duplicate-device";
+        String payload = """
+                {
+                  "location":{"longitude":116.401,"latitude":39.915},
+                  "stressLevel":75,
+                  "tag":"CROWD",
+                  "reportedAt":"%s"
+                }
+                """.formatted(Instant.now());
+
+        mockMvc.perform(post("/api/v1/reports")
+                        .header("X-Device-Id", deviceId)
+                        .contentType("application/json")
+                        .content(payload))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/v1/reports")
+                        .header("X-Device-Id", deviceId)
+                        .contentType("application/json")
+                        .content(payload))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value("duplicate"));
+    }
+
+    @Test
     void servesHeatmapFromDemoSeed() throws Exception {
         mockMvc.perform(get("/api/v1/heatmap")
                         .param("bbox", "116.39,39.90,116.41,39.92")

@@ -25,6 +25,8 @@ All notable changes follow Semantic Versioning and Keep a Changelog.
 - Seed data manifest, demo API snapshots and verification script under `data/seed/` and `scripts/verify-seed-data.ps1`.
 - Committed OpenAPI contract snapshot at `docs/openapi.json` for frontend and integration reference.
 - Refreshed OpenAPI snapshot with DTO and response model schema descriptions.
+- Flyway migration `V3__align_demo_seed_labels.sql` for existing PostGIS databases with English demo labels.
+- Structured error and report submission DTOs (`ApiErrorResponse`, `ReportSubmissionResponse`) with Swagger response codes.
 
 ### Changed
 - Merged `develop` frontend shell for local integration debugging.
@@ -42,8 +44,11 @@ All notable changes follow Semantic Versioning and Keep a Changelog.
 - Aligned frontend `TrendResult` TypeScript type with backend trend summary fields.
 - Actuator info now exposes backend name, version, mode and description.
 - Ignored Maven wrapper cache downloads to keep local build artifacts out of commits.
+- Documented OpenAPI snapshot link, error response bodies and `demo-browser` trend device ID in the team contract.
 
 ### Fixed
+- Aligned PostGIS demo seed route labels and recommendation text with the Chinese demo profile labels via Flyway V3.
+- Structured API error and report submission responses are now documented in OpenAPI via `ApiErrorResponse` and `ReportSubmissionResponse`.
 - PostGIS Testcontainers integration tests now declare the PostGIS image as a compatible PostgreSQL substitute for Testcontainers 1.21+.
 - Mock route comparison now returns distinct fastest and least-stressful route IDs for the standard Beijing demo coordinates.
 - PostgreSQL commute trend queries now read nullable numeric columns without failing on JDBC row mapping.

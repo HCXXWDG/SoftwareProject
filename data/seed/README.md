@@ -24,6 +24,20 @@
 
 两者使用相同的 5 个聚类中心与 500 条报告规则，详见 `manifest.json`。
 
+## 演示设备 ID
+
+后端种子通勤趋势与路线历史绑定请求头：
+
+```http
+X-Device-Id: demo-browser
+```
+
+前端默认在 `localStorage` 生成随机 UUID，因此直接打开页面时趋势可能为空。联调验收请：
+
+- 使用 `scripts/integration-smoke.ps1` / `scripts/verify-seed-data.ps1`（内含 `demo-browser` 检查），或
+- 手动指定 `X-Device-Id: demo-browser` 调用趋势 API，或
+- 先 `POST /api/v1/commutes/complete` 写入当前设备的通勤记录。
+
 ## 验证
 
 后端启动后运行：

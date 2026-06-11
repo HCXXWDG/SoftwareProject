@@ -47,6 +47,16 @@ class OpenApiContractTest {
     }
 
     @Test
+    void documentsErrorResponseSchemas() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.components.schemas.ApiErrorResponse.properties.code").exists())
+                .andExpect(jsonPath("$.components.schemas.ReportSubmissionResponse.properties.status").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/reports'].post.responses['429']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/reports'].post.responses['409']").exists());
+    }
+
+    @Test
     void documentsDeviceHeaderOnProtectedEndpoints() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
