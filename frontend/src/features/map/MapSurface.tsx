@@ -160,7 +160,7 @@ export function MapSurface({
       };
       const geoPoint = unprojector(relativePoint);
       setFeedbackGeoPoint(geoPoint);
-      setFeedbackPosition(position);
+      setFeedbackPosition(relativePoint);
     },
     [unprojector],
   );
@@ -227,6 +227,7 @@ export function MapSurface({
       aria-label="城市通勤情绪地图"
       className="map-surface"
       data-map-mode={mode}
+      onPointerCancel={handlePointerUp}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
