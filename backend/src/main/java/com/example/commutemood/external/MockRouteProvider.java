@@ -23,12 +23,12 @@ public class MockRouteProvider implements RouteProvider {
                 destination);
         List<GeoPoint> calmer = List.of(
                 origin,
-                new GeoPoint(origin.longitude() + dx * 0.22 - dy * 0.10,
-                        origin.latitude() + dy * 0.25 + dx * 0.07),
-                new GeoPoint(origin.longitude() + dx * 0.50 - dy * 0.14,
-                        origin.latitude() + dy * 0.55 + dx * 0.08),
-                new GeoPoint(origin.longitude() + dx * 0.76 - dy * 0.07,
-                        origin.latitude() + dy * 0.82 + dx * 0.04),
+                new GeoPoint(origin.longitude() + dx * 0.22 - dy * 0.18,
+                        origin.latitude() + dy * 0.25 + dx * 0.12),
+                new GeoPoint(origin.longitude() + dx * 0.50 - dy * 0.22,
+                        origin.latitude() + dy * 0.55 + dx * 0.15),
+                new GeoPoint(origin.longitude() + dx * 0.76 - dy * 0.14,
+                        origin.latitude() + dy * 0.82 + dx * 0.08),
                 destination);
         List<GeoPoint> scenic = List.of(
                 origin,
@@ -45,7 +45,7 @@ public class MockRouteProvider implements RouteProvider {
         return List.of(
                 new RouteCandidate("route-fast", "最快路线 A", baseDistance, baseDuration, fastest),
                 new RouteCandidate("route-calm", "少心累路线 B",
-                        (int) polylineDistance(calmer), (int) (baseDuration * 1.12), calmer),
+                        (int) polylineDistance(calmer), (int) (baseDuration * 1.08), calmer),
                 new RouteCandidate("route-scenic", "备选路线 C",
                         (int) polylineDistance(scenic), (int) (baseDuration * 1.28), scenic));
     }

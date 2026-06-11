@@ -51,6 +51,13 @@ docker compose -f infra/compose.yml --env-file .env up --build
 - 默认 `demo`：内存数据、模拟候选路线，适合开发与答辩。
 - `postgres`：PostGIS、Flyway、高德 Web Service；未配置高德 Key 时仍回退模拟路线。
 
+## 持续集成
+
+Backend CI 流水线自动执行以下检查：
+
+- **Java 17 + Maven verify**：每次 Push 或 Pull Request 自动运行 `mvnw verify`，包含编译、单元测试和集成测试。
+- 前端 CI 在后续分支接入后补充 `npm run build` 与 `npm test`。
+
 ## 团队协作与文件同步
 
 ### 分支用途

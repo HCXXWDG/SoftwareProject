@@ -42,5 +42,21 @@ class ApiSmokeTest {
                 .andExpect(jsonPath("$.routes.length()").value(3))
                 .andExpect(jsonPath("$.recommendation").exists());
     }
+
+    @Test
+    void fastestAndLeastStressfulShouldBeDifferentRoutes() throws Exception {
+        mockMvc.perform(post("/api/v1/routes/compare")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "origin":{"longitude":116.395,"latitude":39.905},
+                                  "destination":{"longitude":116.405,"latitude":39.910}
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.routes.length()").value(3))
+                .andExpect(jsonPath("$.fastestRouteId").value("route-fast"))
+                .andExpect(jsonPath("$.leastStressfulRouteId").value("route-calm"));
+    }
 }
 
