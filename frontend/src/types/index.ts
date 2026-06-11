@@ -64,11 +64,20 @@ export interface TrendPoint {
   commuteCount: number;
 }
 
+/** 趋势摘要 */
+export interface TrendSummary {
+  averageStress: number | null;
+  stressDelta: number | null;
+  direction: "improving" | "worsening" | "stable" | "unknown";
+  sampleSufficient: boolean;
+}
+
 /** 趋势结果 */
 export interface TrendResult {
   points: TrendPoint[];
   recommendation: string;
   totalCommutes: number;
+  summary: TrendSummary;
 }
 
 /** 提交通勤反馈 */
