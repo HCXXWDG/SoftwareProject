@@ -22,6 +22,7 @@ All notable changes follow Semantic Versioning and Keep a Changelog.
 - OpenAPI metadata and controller tags for clearer Swagger API documentation.
 - `@Schema` descriptions on request DTOs, response models and controller parameters.
 - OpenAPI export script at `scripts/export-openapi.ps1`.
+- Seed data manifest, demo API snapshots and verification script under `data/seed/` and `scripts/verify-seed-data.ps1`.
 - Committed OpenAPI contract snapshot at `docs/openapi.json` for frontend and integration reference.
 - Refreshed OpenAPI snapshot with DTO and response model schema descriptions.
 

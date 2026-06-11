@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "description": "Deterministic commute mood demo seed specification shared by demo profile and PostGIS Flyway V2.",
+  "randomSeed": 20260610,
+  "emotionReports": {
+    "count": 500,
+    "simulated": true,
+    "lookbackHours": 168,
+    "deviceHashPattern": "simulated-device-{index}",
+    "stressLevels": [0, 25, 50, 75, 100],
+    "clusters": [
+      { "name": "BUSY_CENTER", "longitude": 116.3993, "latitude": 39.9086, "meanStress": 78, "spread": 0.0012 },
+      { "name": "CALM_NORTH", "longitude": 116.3998, "latitude": 39.9121, "meanStress": 24, "spread": 0.0014 },
+      { "name": "BUSY_GATE", "longitude": 116.4045, "latitude": 39.9114, "meanStress": 72, "spread": 0.0008 },
+      { "name": "CALM_WEST", "longitude": 116.3938, "latitude": 39.9062, "meanStress": 32, "spread": 0.0010 },
+      { "name": "MIXED_SOUTH", "longitude": 116.3990, "latitude": 39.9049, "meanStress": 55, "spread": 0.0013 }
+    ]
+  },
+  "commuteTrendDemo": {
+    "deviceId": "demo-browser",
+    "records": 7,
+    "stressHistory": [75, 50, 75, 50, 25, 50, 25]
+  },
+  "routeCompareFixture": {
+    "origin": { "longitude": 116.392, "latitude": 39.905 },
+    "destination": { "longitude": 116.405, "latitude": 39.912 },
+    "expectedFastestRouteId": "route-fast",
+    "expectedLeastStressfulRouteId": "route-calm",
+    "snapshotFile": "route-comparison.demo.json"
+  },
+  "heatmapFixture": {
+    "bbox": "116.39,39.90,116.41,39.92",
+    "zoom": 16,
+    "hours": 168,
+    "minimumCells": 20
+  },
+  "sources": {
+    "demoProfile": "backend/src/main/java/com/example/commutemood/config/DemoDataInitializer.java",
+    "postgresMigration": "backend/src/main/resources/db/migration/V2__seed_simulated_data.sql"
+  }
+}

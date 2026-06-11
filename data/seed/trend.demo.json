@@ -1,0 +1,19 @@
+{
+  "points": [
+    { "date": "2026-06-05", "averageStress": 75.0, "commuteCount": 1 },
+    { "date": "2026-06-06", "averageStress": 50.0, "commuteCount": 1 },
+    { "date": "2026-06-07", "averageStress": 75.0, "commuteCount": 1 },
+    { "date": "2026-06-08", "averageStress": 50.0, "commuteCount": 1 },
+    { "date": "2026-06-09", "averageStress": 25.0, "commuteCount": 1 },
+    { "date": "2026-06-10", "averageStress": 50.0, "commuteCount": 1 },
+    { "date": "2026-06-11", "averageStress": 25.0, "commuteCount": 1 }
+  ],
+  "recommendation": "明天试 少心累路线 B，预计更从容。",
+  "totalCommutes": 7,
+  "summary": {
+    "averageStress": 50.0,
+    "stressDelta": -25.0,
+    "direction": "improving",
+    "sampleSufficient": true
+  }
+}

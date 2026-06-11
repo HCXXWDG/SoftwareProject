@@ -1,14 +1,43 @@
 # Simulated Seed Data
 
-本目录保存课程演示所需的模拟数据生成说明或可重复导入的数据文件。
+本目录保存课程演示所需的模拟数据说明、固定种子规格与可复用的 API 响应快照。
 
-约定：
+## 约定
 
-- 至少生成 500 条情绪反馈记录。
-- 所有模拟数据必须标记为 `simulated=true`。
+- 至少 500 条情绪反馈记录（`simulated=true`）。
 - 坐标统一使用 GCJ-02。
 - 不放置姓名、手机号、真实设备标识或连续定位轨迹。
-- 随机生成器使用固定种子，保证三名成员得到相同测试结果。
+- 随机生成器使用固定种子 `20260610`，保证三名成员得到相同测试结果。
 
-成员 B 负责数据生成与导入，成员 C 负责验证热力图和路线展示效果。
+## 文件说明
 
+| 文件 | 用途 |
+|------|------|
+| `manifest.json` | 种子规格：聚类中心、设备哈希模式、联调 bbox 与路线 fixture |
+| `route-comparison.demo.json` | 标准北京 demo 起终点下的路线对比响应（成员 C 离线参考） |
+| `trend.demo.json` | `demo-browser` 设备的 7 日趋势示例（成员 A 面板参考） |
+
+## 数据来源
+
+- **demo Profile**：`backend/.../DemoDataInitializer.java`（H2 内存，启动时写入）
+- **postgres Profile**：Flyway `V2__seed_simulated_data.sql`（PostGIS 持久化）
+
+两者使用相同的 5 个聚类中心与 500 条报告规则，详见 `manifest.json`。
+
+## 验证
+
+后端启动后运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/verify-seed-data.ps1
+```
+
+完整 API 链路验收：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/integration-smoke.ps1
+```
+
+OpenAPI 契约见 `docs/openapi.json`；在线文档：`http://localhost:8080/swagger-ui.html`。
+
+成员 B 负责数据生成与导入脚本，成员 C 负责验证热力图和路线展示效果。

@@ -1,0 +1,62 @@
+{
+  "routes": [
+    {
+      "id": "route-fast",
+      "label": "最快路线 A",
+      "distanceMeters": 1364,
+      "durationSeconds": 240,
+      "stressExposure": 68.0,
+      "stressScore": 51.0,
+      "confidence": 0.72,
+      "fastest": true,
+      "leastStressful": false,
+      "polyline": [
+        { "longitude": 116.392, "latitude": 39.905 },
+        { "longitude": 116.3993, "latitude": 39.9086 },
+        { "longitude": 116.4025, "latitude": 39.91 },
+        { "longitude": 116.4045, "latitude": 39.9114 },
+        { "longitude": 116.405, "latitude": 39.912 }
+      ]
+    },
+    {
+      "id": "route-calm",
+      "label": "少心累路线 B",
+      "distanceMeters": 1827,
+      "durationSeconds": 252,
+      "stressExposure": 28.0,
+      "stressScore": 27.25,
+      "confidence": 0.72,
+      "fastest": false,
+      "leastStressful": true,
+      "polyline": [
+        { "longitude": 116.392, "latitude": 39.905 },
+        { "longitude": 116.3938, "latitude": 39.9062 },
+        { "longitude": 116.3915, "latitude": 39.9095 },
+        { "longitude": 116.3998, "latitude": 39.9121 },
+        { "longitude": 116.405, "latitude": 39.912 }
+      ]
+    },
+    {
+      "id": "route-scenic",
+      "label": "备选路线 C",
+      "distanceMeters": 1471,
+      "durationSeconds": 307,
+      "stressExposure": 50.91,
+      "stressScore": 63.18,
+      "confidence": 0.27,
+      "fastest": false,
+      "leastStressful": false,
+      "polyline": [
+        { "longitude": 116.392, "latitude": 39.905 },
+        { "longitude": 116.39518, "latitude": 39.90509 },
+        { "longitude": 116.40066, "latitude": 39.90664 },
+        { "longitude": 116.40321, "latitude": 39.90959 },
+        { "longitude": 116.405, "latitude": 39.912 }
+      ]
+    }
+  ],
+  "fastestRouteId": "route-fast",
+  "leastStressfulRouteId": "route-calm",
+  "recommendation": "明天试少心累路线 B，预计更从容。",
+  "recommendAlternative": true
+}
