@@ -393,3 +393,59 @@
     }
   }
 }
+
+/* ── Route Overlay ── */
+.map-surface__route-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2.5;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.map-surface__route-line {
+  transition: all 250ms ease;
+  pointer-events: auto;
+}
+
+.map-surface__route-line:hover {
+  stroke-opacity: 0.9;
+  stroke-width: 5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-surface__route-line {
+    transition: none;
+  }
+}
+
+/* ── Route Legend ── */
+.map-surface__route-legend {
+  position: absolute;
+  z-index: 5;
+  left: 12px;
+  bottom: 56px;
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid rgba(38, 73, 89, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 3px 12px rgba(30, 58, 73, 0.12);
+  backdrop-filter: blur(8px);
+}
+
+.map-surface__route-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #416170;
+}
+
+.map-surface__route-legend-item--selected {
+  font-weight: 700;
+  color: #183848;
+}

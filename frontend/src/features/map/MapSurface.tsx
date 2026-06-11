@@ -14,6 +14,8 @@ import type {
 import { EmojiFountain } from "./EmojiFountain";
 import { FeedbackPanel } from "./FeedbackPanel";
 import { HeatmapOverlay } from "./HeatmapOverlay";
+import { RouteLegend } from "./RouteLegend";
+import { RouteOverlay } from "./RouteOverlay";
 import { loadAMap } from "./amapLoader";
 import { createAMapAdapter, type MapAdapter } from "./mapAdapter";
 import { OfflineMap } from "./OfflineMap";
@@ -217,11 +219,6 @@ export function MapSurface({
     setFountainEmoji(null);
   }, []);
 
-  // Suppress unused-variable warnings for contract props used in future tasks
-  void routes;
-  void selectedRouteId;
-  void onRouteSelect;
-
   return (
     <section
       aria-label="城市通勤情绪地图"
@@ -252,6 +249,16 @@ export function MapSurface({
         />
       )}
 
+      {mode !== "loading" && routes.length > 0 && (
+        <RouteOverlay
+          project={(point) => projector(point)}
+          routes={routes}
+          selectedRouteId={selectedRouteId}
+          viewportRevision={viewportRevision}
+          onRouteSelect={onRouteSelect}
+        />
+      )}
+
       {feedbackPosition && (
         <FeedbackPanel
           position={feedbackPosition}
@@ -267,6 +274,10 @@ export function MapSurface({
           position={fountainPosition}
           onComplete={handleFountainComplete}
         />
+      )}
+
+      {routes.length > 0 && (
+        <RouteLegend routes={routes} selectedRouteId={selectedRouteId} />
       )}
 
       <div className="map-surface__mode-badge" role="status">

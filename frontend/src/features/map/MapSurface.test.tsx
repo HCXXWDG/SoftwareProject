@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { HeatmapCell, MapFeedbackDraft } from "../../types";
+import type { HeatmapCell, MapFeedbackDraft, ScoredRoute } from "../../types";
 import {
   resetAMapLoaderForTests,
   type AMapNamespaceLike,
@@ -267,4 +267,40 @@ describe("MapSurface", () => {
 
     vi.useRealTimers();
   }, 10_000);
+
+  it("renders route overlay and legend when routes are provided", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+
+    const routes: ScoredRoute[] = [
+      {
+        id: "route-fast",
+        label: "最快路线",
+        distanceMeters: 2100,
+        durationSeconds: 720,
+        stressExposure: 67.2,
+        stressScore: 50.4,
+        confidence: 0.68,
+        fastest: true,
+        leastStressful: false,
+        polyline: [
+          { longitude: 116.392, latitude: 39.905 },
+          { longitude: 116.405, latitude: 39.912 },
+        ],
+      },
+    ];
+
+    render(
+      <MapSurface
+        {...defaultProps}
+        heatmapCells={[]}
+        loading={false}
+        routes={routes}
+        selectedRouteId="route-fast"
+      />,
+    );
+
+    expect(await screen.findByTestId("route-overlay")).toBeInTheDocument();
+    expect(screen.getByTestId("route-legend")).toBeInTheDocument();
+    expect(screen.getByText("最快路线")).toBeInTheDocument();
+  });
 });
