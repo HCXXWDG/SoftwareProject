@@ -71,7 +71,19 @@ npm run dev
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/integration-smoke.ps1
+powershell -ExecutionPolicy Bypass -File scripts/verify-seed-data.ps1
 ```
+
+常用脚本：
+
+| 脚本 | 说明 |
+| --- | --- |
+| `scripts/integration-smoke.ps1` | 全链路 API 冒烟（health、热力图、反馈、路线、通勤、趋势） |
+| `scripts/verify-seed-data.ps1` | 验证 500 条种子数据与 demo 路线 fixture |
+| `scripts/export-openapi.ps1` | 从运行中后端导出 `docs/openapi.json` |
+| `scripts/start-postgis-dev.ps1` | 一键启动 PostGIS + API + 前端联调 |
+
+演示数据规格与离线快照见 [data/seed/README.md](data/seed/README.md)。
 
 ## 后端 API
 
