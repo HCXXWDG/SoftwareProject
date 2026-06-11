@@ -32,6 +32,7 @@ All notable changes follow Semantic Versioning and Keep a Changelog.
 - Expanded JDBC repository test coverage for PostGIS heatmap cache writes.
 - Expanded API smoke coverage for mood report submission and commute completion.
 - Added unit tests for report submission validation, rate limiting and commute completion persistence.
+- Added unit tests for API error mapping and report rate limiter window behavior.
 - Aligned frontend `TrendResult` TypeScript type with backend trend summary fields.
 - Actuator info now exposes backend name, version, mode and description.
 - Ignored Maven wrapper cache downloads to keep local build artifacts out of commits.
