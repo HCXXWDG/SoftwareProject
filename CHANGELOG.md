@@ -34,6 +34,7 @@ All notable changes follow Semantic Versioning and Keep a Changelog.
 - Ignored Maven wrapper cache downloads to keep local build artifacts out of commits.
 
 ### Fixed
+- PostGIS Testcontainers integration tests now declare the PostGIS image as a compatible PostgreSQL substitute for Testcontainers 1.21+.
 - Mock route comparison now returns distinct fastest and least-stressful route IDs for the standard Beijing demo coordinates.
 - PostgreSQL commute trend queries now read nullable numeric columns without failing on JDBC row mapping.
 - Root URL now redirects to Swagger UI instead of returning a 500 error page.

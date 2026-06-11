@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import java.time.Instant;
 
@@ -29,7 +30,8 @@ class PostgisIntegrationTest {
 
     @Container
     @SuppressWarnings("resource")
-    static PostgreSQLContainer<?> postgis = new PostgreSQLContainer<>("postgis/postgis:16-3.4")
+    static PostgreSQLContainer<?> postgis = new PostgreSQLContainer<>(
+            DockerImageName.parse("postgis/postgis:16-3.4").asCompatibleSubstituteFor("postgres"))
             .withDatabaseName("commute_mood")
             .withUsername("commute")
             .withPassword("commute_dev_password");
