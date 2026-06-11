@@ -65,7 +65,7 @@ npm run dev
 3. 选择起终点，触发路线对比，返回双路线结果。
 4. 完成通勤后，趋势面板显示七日数据和次日建议。
 
-后端健康检查：`GET http://localhost:8080/actuator/health`。接口契约见 [docs/团队协作与接口约定.md](docs/团队协作与接口约定.md)。
+后端健康检查：`GET http://localhost:8080/actuator/health`。接口契约见 [docs/团队协作与接口约定.md](docs/团队协作与接口约定.md) 与导出的 [docs/openapi.json](docs/openapi.json)。
 
 仅验证后端链路时，可在后端启动后运行：
 
