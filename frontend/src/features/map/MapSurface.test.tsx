@@ -227,14 +227,28 @@ describe("MapSurface", () => {
     );
 
     const section = screen.getByLabelText("城市通勤情绪地图");
+    const mapCanvas = screen.getByTestId("map-canvas");
+    vi.spyOn(mapCanvas, "getBoundingClientRect").mockReturnValue({
+      bottom: 650,
+      height: 600,
+      left: 100,
+      right: 1060,
+      top: 50,
+      width: 960,
+      x: 100,
+      y: 50,
+      toJSON: () => ({}),
+    });
 
     // Simulate long press: pointer down then wait 650ms
     act(() => {
-      fireEvent.pointerDown(section, {
-        pointerId: 1,
+      const pointerDown = new MouseEvent("pointerdown", {
+        bubbles: true,
         clientX: 480,
         clientY: 300,
       });
+      Object.defineProperty(pointerDown, "pointerId", { value: 1 });
+      fireEvent(section, pointerDown);
     });
 
     // Advance timer past 600ms threshold wrapped in act
@@ -245,6 +259,7 @@ describe("MapSurface", () => {
     // Feedback panel should appear
     const panel = screen.getByTestId("feedback-panel");
     expect(panel).toBeInTheDocument();
+    expect(panel).toHaveStyle({ left: "380px", top: "250px" });
 
     // Select stress level and tag
     fireEvent.click(screen.getByRole("button", { name: /压力 75/ }));
