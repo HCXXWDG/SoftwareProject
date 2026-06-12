@@ -222,3 +222,230 @@
     transition: none;
   }
 }
+
+/* ── Feedback Panel ── */
+.map-surface__feedback-panel {
+  position: absolute;
+  z-index: 6;
+  display: grid;
+  min-width: 220px;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(38, 73, 89, 0.16);
+  border-radius: 12px;
+  transform: translate(12px, calc(-100% - 12px));
+  color: #183848;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 10px 32px rgba(30, 58, 73, 0.24);
+  backdrop-filter: blur(10px);
+}
+
+.map-surface__feedback-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.map-surface__feedback-close {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 4px;
+  color: #607888;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.map-surface__feedback-close:hover {
+  background: #edf4f7;
+}
+
+.map-surface__feedback-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.map-surface__feedback-group legend {
+  margin-bottom: 4px;
+  color: #416170;
+  font-size: 11px;
+}
+
+.map-surface__feedback-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.map-surface__feedback-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: #f4f8fa;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.map-surface__feedback-btn:hover {
+  background: #e4eff5;
+}
+
+.map-surface__feedback-btn[aria-pressed="true"] {
+  border-color: #2368ff;
+  background: #e8f0ff;
+}
+
+.map-surface__feedback-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.map-surface__feedback-emoji {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.map-surface__feedback-label {
+  font-size: 10px;
+  color: #416170;
+}
+
+.map-surface__feedback-submit {
+  margin-top: 4px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  background: #2368ff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background-color 120ms ease;
+}
+
+.map-surface__feedback-submit:hover:not(:disabled) {
+  background: #1a54d4;
+}
+
+.map-surface__feedback-submit:disabled {
+  cursor: not-allowed;
+  background: #a4bfde;
+}
+
+/* ── Emoji Fountain ── */
+.map-surface__emoji-fountain {
+  position: absolute;
+  z-index: 7;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.map-surface__emoji-particle {
+  position: absolute;
+  font-size: 22px;
+  line-height: 1;
+  animation: emoji-burst 800ms ease-out forwards;
+  animation-delay: var(--particle-delay, 0ms);
+  opacity: 0;
+}
+
+@keyframes emoji-burst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(var(--particle-angle, 0deg)) scale(0.6);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(
+        calc(sin(var(--particle-angle, 0deg)) * 60px),
+        calc(-40px - cos(var(--particle-angle, 0deg)) * 30px)
+      )
+      scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+        calc(sin(var(--particle-angle, 0deg)) * 80px),
+        calc(-20px - cos(var(--particle-angle, 0deg)) * 50px)
+      )
+      scale(0.8);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-surface__emoji-particle {
+    animation: emoji-fade 400ms ease-out forwards;
+  }
+
+  @keyframes emoji-fade {
+    0% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+}
+
+/* ── Route Overlay ── */
+.map-surface__route-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2.5;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.map-surface__route-line {
+  transition: all 250ms ease;
+  pointer-events: auto;
+}
+
+.map-surface__route-line:hover {
+  stroke-opacity: 0.9;
+  stroke-width: 5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-surface__route-line {
+    transition: none;
+  }
+}
+
+/* ── Route Legend ── */
+.map-surface__route-legend {
+  position: absolute;
+  z-index: 5;
+  left: 12px;
+  bottom: 56px;
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid rgba(38, 73, 89, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 3px 12px rgba(30, 58, 73, 0.12);
+  backdrop-filter: blur(8px);
+}
+
+.map-surface__route-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #416170;
+}
+
+.map-surface__route-legend-item--selected {
+  font-weight: 700;
+  color: #183848;
+}
