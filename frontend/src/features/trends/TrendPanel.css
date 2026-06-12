@@ -1,0 +1,98 @@
+.trend-panel {
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(38, 73, 89, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(30, 58, 73, 0.08);
+  margin: 8px 12px;
+}
+
+.trend-panel--empty {
+  text-align: center;
+}
+
+.trend-panel__empty-text {
+  color: #607888;
+  font-size: 0.85rem;
+  margin: 0 0 10px;
+}
+
+.trend-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.trend-panel__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1a3a4d;
+}
+
+.trend-panel__count {
+  font-size: 0.8rem;
+  color: #607888;
+}
+
+.trend-panel__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.trend-panel__table th {
+  text-align: left;
+  padding: 4px 6px;
+  color: #607888;
+  font-weight: 500;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.trend-panel__table td {
+  padding: 5px 6px;
+  color: #1a3a4d;
+}
+
+.trend-panel__stress-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.trend-panel__recommendation {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  background: #f0f9ff;
+  border-radius: 6px;
+  color: #1e40af;
+  font-size: 0.82rem;
+}
+
+.trend-panel__complete-btn {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px 0;
+  background: #2368ff;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.trend-panel__complete-btn:hover:not(:disabled) {
+  background: #1b54d4;
+}
+
+.trend-panel__complete-btn:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}

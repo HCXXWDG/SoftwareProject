@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { MapPage } from "./pages/MapPage";
 import { MapSurface } from "./features/map";
 import { RoutePanel } from "./features/routes";
+import { TrendPanel } from "./features/trends";
 import { fetchHeatmap } from "./services/heatmap";
 import { compareRoutes } from "./services/route";
-import { fetchTrends } from "./services/commute";
+import { fetchTrends, completeCommute } from "./services/commute";
 import { submitReport } from "./services/report";
 import type { MapPageState, HeatmapCell, GeoPoint, MapFeedbackDraft } from "./types";
 
@@ -20,7 +21,7 @@ const initialMapState: MapPageState = {
 
 /** 默认地图视口 bbox（北京西直门附近，匹配后端 Demo 数据区域） */
 const DEFAULT_BBOX = "116.39,39.90,116.41,39.92";
-/** 标准 demo 起终点（与后端 ApiSmokeTest 一致） */
+/** 预设 Demo 起终点（与后端 ApiSmokeTest 一致） */
 const DEMO_ORIGIN: GeoPoint = { longitude: 116.395, latitude: 39.905 };
 const DEMO_DESTINATION: GeoPoint = { longitude: 116.405, latitude: 39.910 };
 const DEBOUNCE_MS = 300;
@@ -28,6 +29,7 @@ const DEBOUNCE_MS = 300;
 function App() {
   const [mapState, setMapState] = useState<MapPageState>(initialMapState);
   const [selectedRouteId, setSelectedRouteId] = useState<string | undefined>();
+  const [completingCommute, setCompletingCommute] = useState(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -77,6 +79,47 @@ function App() {
   const handleRouteSelect = useCallback((routeId: string) => {
     setSelectedRouteId(routeId);
   }, []);
+
+  /** 完成本次通勤：调用 completeCommute 后刷新趋势数据 */
+  const handleCompleteCommute = useCallback(async () => {
+    const comparison = mapState.routeComparison;
+    if (!comparison) return;
+
+    const selectedId = selectedRouteId ?? comparison.fastestRouteId;
+    const selected = comparison.routes.find((r) => r.id === selectedId);
+    if (!selected) return;
+
+    const fastest = comparison.routes.find((r) => r.id === comparison.fastestRouteId);
+    const alternative = comparison.routes.find((r) => r.id !== selectedId);
+
+    setCompletingCommute(true);
+    try {
+      await completeCommute({
+        routeId: selected.id,
+        routeLabel: selected.label,
+        endStressLevel: Math.round(selected.stressScore),
+        durationMinutes: Math.round(selected.durationSeconds / 60),
+        selectedScore: selected.stressScore,
+        fastestScore: fastest?.stressScore ?? selected.stressScore,
+        alternativeLabel: alternative?.label,
+        alternativeScore: alternative?.stressScore,
+        alternativeDurationRatio:
+          alternative && fastest
+            ? alternative.durationSeconds / fastest.durationSeconds
+            : undefined,
+        confidence: selected.confidence,
+        completedAt: new Date().toISOString(),
+      });
+
+      // 刷新趋势数据
+      const freshTrend = await fetchTrends();
+      setMapState((prev) => ({ ...prev, trend: freshTrend }));
+    } catch {
+      // 后端不可用时静默降级
+    } finally {
+      setCompletingCommute(false);
+    }
+  }, [mapState.routeComparison, selectedRouteId]);
 
   /** 首次加载：热力图 + 路线对比 + 通勤趋势 */
   useEffect(() => {
@@ -129,6 +172,11 @@ function App() {
           onSelectRoute={handleRouteSelect}
         />
       )}
+      <TrendPanel
+        trend={mapState.trend}
+        onCompleteCommute={handleCompleteCommute}
+        completing={completingCommute}
+      />
     </>
   );
 }
