@@ -13,22 +13,18 @@ public class MockRouteProvider implements RouteProvider {
     public List<RouteCandidate> findCandidates(GeoPoint origin, GeoPoint destination) {
         double dx = destination.longitude() - origin.longitude();
         double dy = destination.latitude() - origin.latitude();
-        GeoPoint midpoint = new GeoPoint(origin.longitude() + dx * 0.5, origin.latitude() + dy * 0.5);
 
         List<GeoPoint> fastest = List.of(
                 origin,
-                new GeoPoint(origin.longitude() + dx * 0.32, origin.latitude() + dy * 0.27),
-                midpoint,
-                new GeoPoint(origin.longitude() + dx * 0.72, origin.latitude() + dy * 0.77),
+                new GeoPoint(116.3993, 39.9086),
+                new GeoPoint(116.4025, 39.9100),
+                new GeoPoint(116.4045, 39.9114),
                 destination);
         List<GeoPoint> calmer = List.of(
                 origin,
-                new GeoPoint(origin.longitude() + dx * 0.22 - dy * 0.10,
-                        origin.latitude() + dy * 0.25 + dx * 0.07),
-                new GeoPoint(origin.longitude() + dx * 0.50 - dy * 0.14,
-                        origin.latitude() + dy * 0.55 + dx * 0.08),
-                new GeoPoint(origin.longitude() + dx * 0.76 - dy * 0.07,
-                        origin.latitude() + dy * 0.82 + dx * 0.04),
+                new GeoPoint(116.3938, 39.9062),
+                new GeoPoint(116.3915, 39.9095),
+                new GeoPoint(116.3998, 39.9121),
                 destination);
         List<GeoPoint> scenic = List.of(
                 origin,
@@ -43,11 +39,11 @@ public class MockRouteProvider implements RouteProvider {
         int baseDistance = (int) polylineDistance(fastest);
         int baseDuration = Math.max(240, (int) (baseDistance / 8.5));
         return List.of(
-                new RouteCandidate("route-fast", "最快路线 A", baseDistance, baseDuration, fastest),
+                new RouteCandidate("route-fast", "最快路线 A", baseDistance, baseDuration, fastest, 68.0),
                 new RouteCandidate("route-calm", "少心累路线 B",
-                        (int) polylineDistance(calmer), (int) (baseDuration * 1.12), calmer),
+                        (int) polylineDistance(calmer), baseDuration + 12, calmer, 28.0),
                 new RouteCandidate("route-scenic", "备选路线 C",
-                        (int) polylineDistance(scenic), (int) (baseDuration * 1.28), scenic));
+                        (int) polylineDistance(scenic), (int) (baseDuration * 1.28), scenic, null));
     }
 
     private double polylineDistance(List<GeoPoint> points) {

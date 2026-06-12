@@ -5,4 +5,6 @@ spring:
     password: ${POSTGRES_PASSWORD:commute_dev_password}
   flyway:
     enabled: true
+    placeholders:
+      deviceHashSalt: ${DEVICE_HASH_SALT:local-demo-salt-change-before-deploy}
 
