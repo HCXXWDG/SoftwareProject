@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { MapPage } from "./pages/MapPage";
 import { MapSurface } from "./features/map";
+import { RoutePanel } from "./features/routes";
 import { fetchHeatmap } from "./services/heatmap";
 import { compareRoutes } from "./services/route";
 import { fetchTrends } from "./services/commute";
-import type { MapPageState, HeatmapCell, GeoPoint } from "./types";
+import { submitReport } from "./services/report";
+import type { MapPageState, HeatmapCell, GeoPoint, MapFeedbackDraft } from "./types";
 
 const initialMapState: MapPageState = {
   heatmapCells: [],
@@ -25,6 +27,7 @@ const DEBOUNCE_MS = 300;
 
 function App() {
   const [mapState, setMapState] = useState<MapPageState>(initialMapState);
+  const [selectedRouteId, setSelectedRouteId] = useState<string | undefined>();
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -57,6 +60,24 @@ function App() {
     [loadHeatmap],
   );
 
+  /** 提交情绪反馈（由地图长按触发） */
+  const handleFeedbackSubmit = useCallback(
+    async (draft: MapFeedbackDraft) => {
+      await submitReport({
+        location: draft.location,
+        stressLevel: draft.stressLevel,
+        tag: draft.tag,
+        reportedAt: new Date().toISOString(),
+      });
+    },
+    [],
+  );
+
+  /** 路线选择（由地图路线或面板点击触发） */
+  const handleRouteSelect = useCallback((routeId: string) => {
+    setSelectedRouteId(routeId);
+  }, []);
+
   /** 首次加载：热力图 + 路线对比 + 通勤趋势 */
   useEffect(() => {
     loadHeatmap(DEFAULT_BBOX);
@@ -86,16 +107,29 @@ function App() {
   }, [loadHeatmap]);
 
   return (
-    <MapPage
-      state={mapState}
-      mapSlot={
-        <MapSurface
-          heatmapCells={mapState.heatmapCells}
-          loading={mapState.loading}
-          onViewportChange={handleViewportChange}
+    <>
+      <MapPage
+        state={mapState}
+        mapSlot={
+          <MapSurface
+            heatmapCells={mapState.heatmapCells}
+            routes={mapState.routeComparison?.routes ?? []}
+            selectedRouteId={selectedRouteId ?? mapState.routeComparison?.fastestRouteId}
+            loading={mapState.loading}
+            onFeedbackSubmit={handleFeedbackSubmit}
+            onRouteSelect={handleRouteSelect}
+            onViewportChange={handleViewportChange}
+          />
+        }
+      />
+      {mapState.routeComparison && (
+        <RoutePanel
+          routes={mapState.routeComparison.routes}
+          selectedRouteId={selectedRouteId ?? mapState.routeComparison.fastestRouteId}
+          onSelectRoute={handleRouteSelect}
         />
-      }
-    />
+      )}
+    </>
   );
 }
 

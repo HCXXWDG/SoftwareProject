@@ -5,6 +5,7 @@ import {
   DEFAULT_MAP_CENTER,
   projectGeoPoint,
   scoreToColor,
+  unprojectGeoPoint,
 } from "./viewport";
 
 describe("map viewport helpers", () => {
@@ -34,5 +35,15 @@ describe("map viewport helpers", () => {
     expect(scoreToColor(100)).toBe("rgb(239, 68, 68)");
     expect(confidenceToOpacity(0)).toBe(0.18);
     expect(confidenceToOpacity(2)).toBe(1);
+  });
+
+  it("round-trips project then unproject back to the original GeoPoint", () => {
+    const size = { width: 960, height: 600 };
+    const original = { longitude: 116.405, latitude: 39.915 };
+    const projected = projectGeoPoint(original, DEFAULT_MAP_CENTER, 14, size);
+    const recovered = unprojectGeoPoint(projected, DEFAULT_MAP_CENTER, 14, size);
+
+    expect(recovered.longitude).toBeCloseTo(original.longitude, 5);
+    expect(recovered.latitude).toBeCloseTo(original.latitude, 5);
   });
 });

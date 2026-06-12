@@ -20,6 +20,9 @@ const namespace = {
     lngLatToContainer() {
       return { x: 0, y: 0 };
     }
+    containerToLngLat() {
+      return { getLng: () => 116.4, getLat: () => 39.91 };
+    }
     off() {}
     on() {}
   },

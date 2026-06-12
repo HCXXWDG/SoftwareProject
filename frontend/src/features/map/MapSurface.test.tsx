@@ -1,11 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { HeatmapCell } from "../../types";
+import type { HeatmapCell, MapFeedbackDraft, ScoredRoute } from "../../types";
 import {
   resetAMapLoaderForTests,
   type AMapNamespaceLike,
 } from "./amapLoader";
-import { MapSurface } from "./MapSurface";
+import { MapSurface, type MapSurfaceProps } from "./MapSurface";
 
 const heatmapCell: HeatmapCell = {
   cellId: "cell-1",
@@ -17,6 +17,13 @@ const heatmapCell: HeatmapCell = {
   confidence: 0.05,
   count: 18,
   dominantTag: "NOISE",
+};
+
+const defaultProps: Omit<MapSurfaceProps, "heatmapCells" | "loading"> = {
+  routes: [],
+  onFeedbackSubmit: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  onRouteSelect: vi.fn(),
+  onViewportChange: vi.fn(),
 };
 
 function lastCall(mock: ReturnType<typeof vi.fn>): unknown[] {
@@ -35,6 +42,7 @@ describe("MapSurface", () => {
 
     render(
       <MapSurface
+        {...defaultProps}
         heatmapCells={[heatmapCell]}
         loading={false}
         onViewportChange={onViewportChange}
@@ -56,9 +64,9 @@ describe("MapSurface", () => {
 
     render(
       <MapSurface
+        {...defaultProps}
         heatmapCells={[heatmapCell]}
         loading={false}
-        onViewportChange={vi.fn()}
       />,
     );
 
@@ -84,6 +92,7 @@ describe("MapSurface", () => {
 
     render(
       <MapSurface
+        {...defaultProps}
         heatmapCells={[]}
         loading={false}
         onViewportChange={onViewportChange}
@@ -110,9 +119,9 @@ describe("MapSurface", () => {
 
     render(
       <MapSurface
+        {...defaultProps}
         heatmapCells={[]}
         loading={false}
-        onViewportChange={vi.fn()}
       />,
     );
     const script = document.querySelector<HTMLScriptElement>(
@@ -147,6 +156,9 @@ describe("MapSurface", () => {
         lngLatToContainer() {
           return { x: 480, y: 300 };
         }
+        containerToLngLat() {
+          return { getLng: () => 116.4, getLat: () => 39.91 };
+        }
         off(eventName: string) {
           listeners.delete(eventName);
         }
@@ -159,18 +171,18 @@ describe("MapSurface", () => {
 
     const { rerender, unmount } = render(
       <MapSurface
+        {...defaultProps}
         heatmapCells={[]}
         loading={false}
-        onViewportChange={vi.fn()}
       />,
     );
     expect(await screen.findByText("高德地图")).toBeInTheDocument();
 
     rerender(
       <MapSurface
+        {...defaultProps}
         heatmapCells={[heatmapCell]}
         loading={false}
-        onViewportChange={vi.fn()}
       />,
     );
 
@@ -188,13 +200,122 @@ describe("MapSurface", () => {
 
     render(
       <MapSurface
+        {...defaultProps}
         heatmapCells={[]}
         loading
-        onViewportChange={vi.fn()}
       />,
     );
 
     expect(await screen.findByText("正在更新情绪热力图")).toBeInTheDocument();
     expect(screen.getByTestId("offline-map")).toBeInTheDocument();
+  });
+
+  it("shows feedback panel on long press and submits feedback", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+    vi.useFakeTimers();
+    const onFeedbackSubmit = vi
+      .fn<(draft: MapFeedbackDraft) => Promise<void>>()
+      .mockResolvedValue(undefined);
+
+    render(
+      <MapSurface
+        {...defaultProps}
+        heatmapCells={[]}
+        loading={false}
+        onFeedbackSubmit={onFeedbackSubmit}
+      />,
+    );
+
+    const section = screen.getByLabelText("城市通勤情绪地图");
+    const mapCanvas = screen.getByTestId("map-canvas");
+    vi.spyOn(mapCanvas, "getBoundingClientRect").mockReturnValue({
+      bottom: 650,
+      height: 600,
+      left: 100,
+      right: 1060,
+      top: 50,
+      width: 960,
+      x: 100,
+      y: 50,
+      toJSON: () => ({}),
+    });
+
+    // Simulate long press: pointer down then wait 650ms
+    act(() => {
+      const pointerDown = new MouseEvent("pointerdown", {
+        bubbles: true,
+        clientX: 480,
+        clientY: 300,
+      });
+      Object.defineProperty(pointerDown, "pointerId", { value: 1 });
+      fireEvent(section, pointerDown);
+    });
+
+    // Advance timer past 600ms threshold wrapped in act
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(700);
+    });
+
+    // Feedback panel should appear
+    const panel = screen.getByTestId("feedback-panel");
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveStyle({ left: "380px", top: "250px" });
+
+    // Select stress level and tag
+    fireEvent.click(screen.getByRole("button", { name: /压力 75/ }));
+    fireEvent.click(screen.getByRole("button", { name: /原因 拥挤/ }));
+
+    // Submit
+    fireEvent.click(screen.getByRole("button", { name: "提交反馈" }));
+
+    // Allow async submit to resolve
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    expect(onFeedbackSubmit).toHaveBeenCalledTimes(1);
+    const draft = onFeedbackSubmit.mock.calls[0][0];
+    expect(draft.stressLevel).toBe(75);
+    expect(draft.tag).toBe("CROWD");
+    expect(draft.location).toHaveProperty("longitude");
+    expect(draft.location).toHaveProperty("latitude");
+
+    vi.useRealTimers();
+  }, 10_000);
+
+  it("renders route overlay and legend when routes are provided", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+
+    const routes: ScoredRoute[] = [
+      {
+        id: "route-fast",
+        label: "最快路线",
+        distanceMeters: 2100,
+        durationSeconds: 720,
+        stressExposure: 67.2,
+        stressScore: 50.4,
+        confidence: 0.68,
+        fastest: true,
+        leastStressful: false,
+        polyline: [
+          { longitude: 116.392, latitude: 39.905 },
+          { longitude: 116.405, latitude: 39.912 },
+        ],
+      },
+    ];
+
+    render(
+      <MapSurface
+        {...defaultProps}
+        heatmapCells={[]}
+        loading={false}
+        routes={routes}
+        selectedRouteId="route-fast"
+      />,
+    );
+
+    expect(await screen.findByTestId("route-overlay")).toBeInTheDocument();
+    expect(screen.getByTestId("route-legend")).toBeInTheDocument();
+    expect(screen.getByText("最快路线")).toBeInTheDocument();
   });
 });
