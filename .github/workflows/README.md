@@ -2,11 +2,15 @@
 
 成员 C 负责本目录中的 CI 工作流。
 
-计划拆分为：
+当前工作流：
 
-- `frontend-ci.yml`：安装依赖、lint、Vitest 和生产构建。
-- `backend-ci.yml`：Maven 测试、打包和 JaCoCo 报告。
-- `e2e.yml`：启动演示环境并执行 Playwright 核心链路。
+- `frontend-ci.yml`：Node.js 22、`npm ci`、Vitest 和生产构建。
+- `backend-ci.yml`：Java 17、Maven `verify` 和 JaCoCo 报告。
 
-工作流不得打印高德 Key、数据库密码或其他 Secret。CI 文件完成前保留本说明，确保目录能被 Git 跟踪。
+两个工作流在指向 `develop` 的 Pull Request、`develop` 推送和手工触发时运行。
+分支保护要求的检查名称固定为 `Frontend CI` 和 `Backend CI`。
+
+后续加入 Playwright 依赖与稳定演示环境后，再新增 `e2e.yml` 覆盖核心链路。
+
+工作流不得打印高德 Key、数据库密码或其他 Secret。
 
