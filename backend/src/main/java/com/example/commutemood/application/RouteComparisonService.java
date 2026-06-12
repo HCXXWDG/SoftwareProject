@@ -5,9 +5,11 @@ import com.example.commutemood.domain.GeoPoint;
 import com.example.commutemood.domain.HeatmapCell;
 import com.example.commutemood.domain.RouteCandidate;
 import com.example.commutemood.domain.RouteComparison;
+import com.example.commutemood.domain.RouteQueryHistory;
 import com.example.commutemood.domain.ScoredRoute;
 import com.example.commutemood.external.AmapRouteProvider;
 import com.example.commutemood.external.MockRouteProvider;
+import com.example.commutemood.repository.RouteQueryRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -20,20 +22,30 @@ public class RouteComparisonService {
     private final MockRouteProvider mockRouteProvider;
     private final HeatmapService heatmapService;
     private final RouteScoringStrategy scoringStrategy;
+    private final DeviceIdentityService identityService;
+    private final RouteQueryRepository routeQueryRepository;
 
     public RouteComparisonService(
             AmapRouteProvider amapRouteProvider,
             MockRouteProvider mockRouteProvider,
             HeatmapService heatmapService,
-            RouteScoringStrategy scoringStrategy
+            RouteScoringStrategy scoringStrategy,
+            DeviceIdentityService identityService,
+            RouteQueryRepository routeQueryRepository
     ) {
         this.amapRouteProvider = amapRouteProvider;
         this.mockRouteProvider = mockRouteProvider;
         this.heatmapService = heatmapService;
         this.scoringStrategy = scoringStrategy;
+        this.identityService = identityService;
+        this.routeQueryRepository = routeQueryRepository;
     }
 
     public RouteComparison compare(GeoPoint origin, GeoPoint destination) {
+        return compare(null, origin, destination);
+    }
+
+    public RouteComparison compare(String rawDeviceId, GeoPoint origin, GeoPoint destination) {
         List<RouteCandidate> candidates = getCandidates(origin, destination);
         int fastestDuration = candidates.stream()
                 .mapToInt(RouteCandidate::durationSeconds)
@@ -78,12 +90,21 @@ public class RouteComparisonService {
                 + Math.round(fastest.stressScore() - leastStressful.stressScore()) + " 分。"
                 : "当前样本不足以稳定推荐绕行，建议先选择最快路线并继续反馈。";
 
-        return new RouteComparison(
+        RouteComparison comparison = new RouteComparison(
                 scored,
                 fastest.id(),
                 leastStressful.id(),
                 recommendation,
                 recommend);
+        saveRouteQuery(rawDeviceId, origin, destination, comparison);
+        return comparison;
+    }
+
+    public List<RouteQueryHistory> getHistory(String rawDeviceId, int limit) {
+        if (limit < 1 || limit > 50) {
+            throw new IllegalArgumentException("limit must be between 1 and 50");
+        }
+        return routeQueryRepository.findRecent(identityService.hash(rawDeviceId), limit);
     }
 
     private List<RouteCandidate> getCandidates(GeoPoint origin, GeoPoint destination) {
@@ -95,6 +116,18 @@ public class RouteComparisonService {
         } catch (RuntimeException ignored) {
             return mockRouteProvider.findCandidates(origin, destination);
         }
+    }
+
+    private void saveRouteQuery(
+            String rawDeviceId,
+            GeoPoint origin,
+            GeoPoint destination,
+            RouteComparison comparison
+    ) {
+        if (rawDeviceId == null || rawDeviceId.isBlank()) {
+            return;
+        }
+        routeQueryRepository.save(identityService.hash(rawDeviceId), origin, destination, comparison);
     }
 }
 

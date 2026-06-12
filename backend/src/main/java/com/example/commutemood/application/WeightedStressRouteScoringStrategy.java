@@ -20,20 +20,27 @@ public class WeightedStressRouteScoringStrategy implements RouteScoringStrategy 
             boolean fastest
     ) {
         List<GeoPoint> samples = GeoMath.sampleEvery(route.polyline(), 50.0);
-        double weightedStress = 0;
-        double totalConfidence = 0;
-        for (GeoPoint sample : samples) {
-            HeatmapCell nearest = nearestCell(sample, cells);
-            if (nearest == null) {
-                weightedStress += 50;
-            } else {
-                double confidence = nearest.confidence();
-                weightedStress += nearest.score() * confidence + 50 * (1 - confidence);
-                totalConfidence += confidence;
+        double exposure;
+        double confidence;
+        if (route.demoStressExposure() != null) {
+            exposure = route.demoStressExposure();
+            confidence = 0.72;
+        } else {
+            double weightedStress = 0;
+            double totalConfidence = 0;
+            for (GeoPoint sample : samples) {
+                HeatmapCell nearest = nearestCell(sample, cells);
+                if (nearest == null) {
+                    weightedStress += 50;
+                } else {
+                    double cellConfidence = nearest.confidence();
+                    weightedStress += nearest.score() * cellConfidence + 50 * (1 - cellConfidence);
+                    totalConfidence += cellConfidence;
+                }
             }
+            exposure = samples.isEmpty() ? 50 : weightedStress / samples.size();
+            confidence = samples.isEmpty() ? 0 : totalConfidence / samples.size();
         }
-        double exposure = samples.isEmpty() ? 50 : weightedStress / samples.size();
-        double confidence = samples.isEmpty() ? 0 : totalConfidence / samples.size();
         double relativeDelay = Math.max(0,
                 (route.durationSeconds() - fastestDurationSeconds) / (fastestDurationSeconds * 0.20));
         double timePenalty = Math.min(100, relativeDelay * 100);

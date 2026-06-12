@@ -32,7 +32,58 @@ npm install
 npm run dev
 ```
 
+如果 Maven Central 连接不稳定，可临时使用仓库内的国内镜像配置：
+
+```powershell
+cd backend
+.\mvnw.cmd -s .mvn/settings-cn.xml spring-boot:run
+```
+
 访问 `http://localhost:5173`。后端 Swagger UI 位于 `http://localhost:8080/swagger-ui.html`。
+
+## 集成联调
+
+前后端本地联调时，按以下顺序启动：
+
+```powershell
+# 终端 1：后端 demo 模式
+cd backend
+.\mvnw.cmd -s .mvn/settings-cn.xml spring-boot:run
+
+# 终端 2：前端
+cd frontend
+npm install
+npm run dev
+```
+
+前端默认通过 Vite 代理把 `/api` 转发到 `http://localhost:8080`，无需额外配置 CORS。若直接指定 API 地址，可在项目根目录复制 `.env.example` 为 `.env` 并设置 `VITE_API_BASE_URL=http://localhost:8080`。
+
+联调验收链路：
+
+1. 打开 `http://localhost:5173`，地图加载热力图。
+2. 长按地图提交 emoji 反馈，后端返回 `201`。
+3. 选择起终点，触发路线对比，返回双路线结果。
+4. 完成通勤后，趋势面板显示七日数据和次日建议。
+
+后端健康检查：`GET http://localhost:8080/actuator/health`。接口契约见 [docs/团队协作与接口约定.md](docs/团队协作与接口约定.md)。
+
+仅验证后端链路时，可在后端启动后运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/integration-smoke.ps1
+```
+
+## 后端 API
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `POST` | `/api/v1/reports` | 提交通勤情绪反馈，需要 `X-Device-Id` |
+| `GET` | `/api/v1/heatmap` | 查询指定 `bbox` 内的热力图格网 |
+| `POST` | `/api/v1/heatmap/refresh` | 重新计算热力图，并在 postgres 模式写入 `emotion_cell` |
+| `POST` | `/api/v1/routes/compare` | 对比候选路线，带 `X-Device-Id` 时记录查询历史 |
+| `GET` | `/api/v1/routes/history` | 查询设备最近路线对比历史，需要 `X-Device-Id` |
+| `POST` | `/api/v1/commutes/complete` | 记录一次完成的通勤，需要 `X-Device-Id` |
+| `GET` | `/api/v1/commutes/trends` | 查询七日通勤趋势和次日建议，需要 `X-Device-Id` |
 
 ## 生产式启动
 
@@ -44,7 +95,7 @@ npm run dev
 docker compose -f infra/compose.yml --env-file .env up --build
 ```
 
-访问 `http://localhost:5173`。
+后端 Swagger UI 位于 `http://localhost:8080/swagger-ui.html`。前端通过 `VITE_API_BASE_URL` 或 Vite 代理访问 API。
 
 ## Profile
 
@@ -62,7 +113,7 @@ docker compose -f infra/compose.yml --env-file .env up --build
 - `docs/*`：独立文档修改。
 - `test/*`、`ci/*`：测试和持续集成。
 
-所有修改通过 Pull Request 合并到 `develop`，至少由一名非作者成员评审。阶段版本测试通过后，再由 `develop` 合并到 `main`。
+所有修改通过 Pull Request 合并到 `develop`，至少由一名非作者成员评审。阶段版本测试通过后，再由 `develop` 合并到 `main`。后端 PR 会通过 Backend CI 自动运行 Java 17 Maven verify，并上传 jar 与测试报告。
 
 ### 第一次获取项目
 

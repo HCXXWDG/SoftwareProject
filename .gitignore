@@ -18,6 +18,8 @@ frontend/test-results/
 # Backend
 backend/target/
 backend/.mvn/wrapper/maven-wrapper.jar
+backend/.mvn/apache-maven-*/
+backend/.mvn/*.tar.gz
 
 # Logs and OS files
 *.log

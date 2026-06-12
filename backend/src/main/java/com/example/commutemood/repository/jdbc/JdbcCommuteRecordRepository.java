@@ -5,10 +5,12 @@ import com.example.commutemood.repository.CommuteRecordRepository;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 @Repository
 @Profile("postgres")
@@ -20,7 +22,14 @@ public class JdbcCommuteRecordRepository implements CommuteRecordRepository {
     }
 
     @Override
+    @Transactional
     public void save(CommuteRecord record) {
+        jdbcTemplate.update("""
+                        INSERT INTO device_profile(device_hash)
+                        VALUES (?)
+                        ON CONFLICT (device_hash)
+                        DO UPDATE SET last_seen_at = now()
+                        """, record.deviceHash());
         jdbcTemplate.update("""
                         INSERT INTO commute_record
                             (id, device_hash, route_id, route_label, end_stress_level,
@@ -44,7 +53,7 @@ public class JdbcCommuteRecordRepository implements CommuteRecordRepository {
                         ORDER BY completed_at
                         """,
                 (rs, rowNum) -> new CommuteRecord(
-                        rs.getObject("id", java.util.UUID.class),
+                        rs.getObject("id", UUID.class),
                         rs.getString("device_hash"),
                         rs.getString("route_id"),
                         rs.getString("route_label"),
@@ -53,11 +62,16 @@ public class JdbcCommuteRecordRepository implements CommuteRecordRepository {
                         rs.getDouble("selected_score"),
                         rs.getDouble("fastest_score"),
                         rs.getString("alternative_label"),
-                        rs.getObject("alternative_score", Double.class),
-                        rs.getObject("alternative_duration_ratio", Double.class),
+                        nullableDouble(rs, "alternative_score"),
+                        nullableDouble(rs, "alternative_duration_ratio"),
                         rs.getDouble("confidence"),
                         rs.getTimestamp("completed_at").toInstant()),
                 deviceHash, Timestamp.from(since));
+    }
+
+    private static Double nullableDouble(java.sql.ResultSet rs, String column) throws java.sql.SQLException {
+        double value = rs.getDouble(column);
+        return rs.wasNull() ? null : value;
     }
 }
 

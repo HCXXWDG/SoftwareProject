@@ -55,8 +55,9 @@ public class TrendService {
                 })
                 .toList();
 
+        TrendSummary summary = buildSummary(records);
         String recommendation = buildRecommendation(records);
-        return new TrendResult(points, recommendation, records.size());
+        return new TrendResult(points, recommendation, records.size(), summary);
     }
 
     private String buildRecommendation(List<CommuteRecord> records) {
@@ -80,10 +81,59 @@ public class TrendService {
         return Math.round(value * 100.0) / 100.0;
     }
 
+    private TrendSummary buildSummary(List<CommuteRecord> records) {
+        if (records.isEmpty()) {
+            return new TrendSummary(null, null, "unknown", false);
+        }
+        double averageStress = round(records.stream()
+                .mapToInt(CommuteRecord::endStressLevel)
+                .average()
+                .orElse(0));
+        if (records.size() < 2) {
+            return new TrendSummary(averageStress, null, "unknown", false);
+        }
+
+        int midpoint = records.size() / 2;
+        double earlierAverage = average(records.subList(0, midpoint));
+        double recentAverage = average(records.subList(midpoint, records.size()));
+        double delta = round(recentAverage - earlierAverage);
+        return new TrendSummary(averageStress, delta, trendDirection(delta), records.size() >= 3);
+    }
+
+    private double average(List<CommuteRecord> records) {
+        return records.stream()
+                .mapToInt(CommuteRecord::endStressLevel)
+                .average()
+                .orElse(0);
+    }
+
+    private String trendDirection(double delta) {
+        if (delta <= -5) {
+            return "improving";
+        }
+        if (delta >= 5) {
+            return "worsening";
+        }
+        return "stable";
+    }
+
     public record TrendPoint(LocalDate date, Double averageStress, int commuteCount) {
     }
 
-    public record TrendResult(List<TrendPoint> points, String recommendation, int totalCommutes) {
+    public record TrendSummary(
+            Double averageStress,
+            Double stressDelta,
+            String direction,
+            boolean sampleSufficient
+    ) {
+    }
+
+    public record TrendResult(
+            List<TrendPoint> points,
+            String recommendation,
+            int totalCommutes,
+            TrendSummary summary
+    ) {
     }
 }
 
