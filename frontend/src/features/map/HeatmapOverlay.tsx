@@ -28,6 +28,7 @@ export function HeatmapOverlay({
           aria-label={`查看热力点 ${cell.cellId}`}
           className="map-surface__heat-point"
           data-cell-id={cell.cellId}
+          data-testid="heatmap-point"
           key={cell.cellId}
           onClick={() => setSelectedCellId(cell.cellId)}
           style={{
@@ -44,6 +45,7 @@ export function HeatmapOverlay({
         <div
           aria-live="polite"
           className="map-surface__cell-details"
+          data-testid="heatmap-cell-details"
           role="status"
           style={{
             left: `${selected.point.x}px`,

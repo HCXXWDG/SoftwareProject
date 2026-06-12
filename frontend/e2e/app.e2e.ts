@@ -99,26 +99,28 @@ test.describe("Core user flow", () => {
     // Map should load (either amap or offline)
     await waitForMapReady(page);
 
-    // Heatmap cells should load
-    await expect(page.getByText(/个热力图单元格已加载/)).toBeVisible();
-
     // Heat points should be rendered
-    await expect(page.getByRole("button", { name: /查看热力点/ }).first()).toBeVisible();
+    const heatmap = page.getByTestId("heatmap-overlay");
+    await expect(heatmap.getByTestId("heatmap-point")).toHaveCount(
+      MOCK_HEATMAP.length,
+    );
   });
 
   test("clicks heatmap cell and shows details", async ({ page }) => {
     await mockAPI(page);
     await page.goto("/");
 
-    // Wait for heatmap to load
-    await expect(page.getByText(/个热力图单元格已加载/)).toBeVisible();
-
     // Click first heat point
-    const heatPoint = page.getByRole("button", { name: /查看热力点/ }).first();
+    const heatPoint = page
+      .getByTestId("heatmap-overlay")
+      .getByTestId("heatmap-point")
+      .first();
     await heatPoint.click();
 
     // Cell details should appear
-    await expect(page.getByText("NOISE")).toBeVisible();
+    const details = page.getByTestId("heatmap-cell-details");
+    await expect(details).toBeVisible();
+    await expect(details).toContainText("NOISE");
   });
 
   test("displays route overlay and comparison panel", async ({ page }) => {
@@ -175,14 +177,13 @@ test.describe("Core user flow", () => {
     const box = await mapSection.boundingBox();
     expect(box).not.toBeNull();
 
-    // Simulate long press (600ms hold)
+    // Hold until the application confirms the long press, then release.
     await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
     await page.mouse.down();
-    await page.waitForTimeout(700);
+    await expect(page.getByTestId("feedback-panel")).toBeVisible({
+      timeout: 3000,
+    });
     await page.mouse.up();
-
-    // Feedback panel should appear
-    await expect(page.getByTestId("feedback-panel")).toBeVisible();
 
     // Select stress level and tag
     await page.getByRole("button", { name: /压力 50/ }).click();

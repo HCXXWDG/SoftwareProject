@@ -73,6 +73,7 @@ describe("MapSurface", () => {
     const point = await screen.findByRole("button", {
       name: "查看热力点 cell-1",
     });
+    expect(point).toHaveAttribute("data-testid", "heatmap-point");
     expect(point).toHaveStyle({
       backgroundColor: "rgb(239, 68, 68)",
       opacity: "0.18",
@@ -80,6 +81,7 @@ describe("MapSurface", () => {
 
     fireEvent.click(point);
 
+    expect(screen.getByTestId("heatmap-cell-details")).toBeInTheDocument();
     expect(screen.getByText("NOISE")).toBeInTheDocument();
     expect(screen.getByText("压力 100")).toBeInTheDocument();
     expect(screen.getByText("置信度 5%")).toBeInTheDocument();
