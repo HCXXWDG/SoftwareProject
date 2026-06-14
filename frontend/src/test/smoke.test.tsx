@@ -289,6 +289,45 @@ describe("Commute submission flow", () => {
     });
   });
 
+  it("selecting least-stressful route sends correct routeId and alternative fallback", async () => {
+    const calls = mockFetchForCommute("success");
+    const { default: App } = await import("../App");
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText("完成本次通勤")).toBeInTheDocument();
+    });
+
+    // 选择压力档位
+    fireEvent.click(screen.getByRole("button", { name: "75" }));
+
+    // 选择路线 B（leastStressful, r2）
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "选择 路线 B" }));
+    });
+
+    await waitFor(() => {
+      const btn = screen.getByRole("button", { name: "完成本次通勤" });
+      expect(btn).not.toBeDisabled();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "完成本次通勤" }));
+    });
+
+    await waitFor(() => {
+      const completeCall = calls.find((c) =>
+        c.url.includes("/commutes/complete"),
+      );
+      expect(completeCall).toBeDefined();
+      const body = JSON.parse(completeCall!.init!.body as string);
+      // routeId 应为路线 B (r2)
+      expect(body.routeId).toBe("r2");
+      // 替代路线应回退到 fastest（路线 A），而非按数组顺序取
+      expect(body.alternativeLabel).toBe("路线 A");
+    });
+  });
+
   it("shows warning but not error when POST succeeds and trend refresh fails", async () => {
     mockFetchForCommute("success-trend-fail");
     const { default: App } = await import("../App");
