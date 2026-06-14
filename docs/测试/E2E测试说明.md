@@ -17,9 +17,13 @@ Full-stack E2E 不拦截 `/api/v1`，验证：
 - 热力图、路线对比和趋势请求真实到达 Spring Boot demo Profile。
 - 返回数据驱动地图热力点、路线面板和路线选择状态。
 - 长按反馈真实提交并返回 `201 created`。
+- 用户选择结束压力后真实提交完成通勤，接口返回 `200`。
+- 完成通勤后再次请求趋势，并在页面显示更新后的通勤次数。
 
 两层测试默认不读取高德 Key，地图使用离线模式。Mock E2E 用于快速定位
 前端回归，Full-stack E2E 用于发现代理、CORS、请求头和接口契约问题。
+两份 Playwright 配置会为测试启动的 Vite 显式清空高德环境变量，避免本地
+`.env.local` 影响测试可复现性。
 
 ## 本地运行
 
@@ -50,11 +54,12 @@ npm run test:e2e:integration
 
 ## CI
 
-`.github/workflows/e2e.yml` 在指向 `develop` 的 Pull Request 和 `develop`
-推送时运行，检查名称固定为 `E2E CI`。
+`.github/workflows/e2e.yml` 在指向 `develop` 或 `main` 的 Pull Request
+和两条分支推送时运行，检查名称固定为 `E2E CI`。
 
 `.github/workflows/fullstack-e2e.yml` 启动后端并运行真实链路，检查名称固定
 为 `Full-stack E2E`。失败时上传 Playwright HTML 报告、截图、首次重试
 trace 和后端日志。
 
-两个工作流也在 `main` 的 Pull Request 和推送时运行。
+`E2E CI` 与 `Full-stack E2E` 均为 `develop` 和 `main` 的 required
+checks。

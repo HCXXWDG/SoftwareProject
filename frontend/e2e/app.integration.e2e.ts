@@ -46,7 +46,7 @@ async function waitForInitialApiResponses(page: Page) {
 }
 
 test.describe("Full-stack demo flow", () => {
-  test("uses the real API for map, routes, trends, and feedback", async ({
+  test("uses the real API for map, routes, trends, feedback, and commute completion", async ({
     page,
   }) => {
     const [heatmapResponse, routesResponse, trendsResponse] =
@@ -123,5 +123,38 @@ test.describe("Full-stack demo flow", () => {
     await expect(page.getByTestId("feedback-panel")).not.toBeVisible({
       timeout: 5000,
     });
+
+    await page.getByRole("button", { name: "50", exact: true }).click();
+
+    const completePromise = page.waitForResponse((response) =>
+      isApiResponse(response, "POST", "/api/v1/commutes/complete"),
+    );
+    const refreshedTrendsPromise = page.waitForResponse((response) =>
+      isApiResponse(response, "GET", "/api/v1/commutes/trends"),
+    );
+
+    const completeButton = page.getByRole("button", {
+      name: "完成本次通勤",
+    });
+    await expect(completeButton).toBeEnabled();
+    await completeButton.click();
+
+    const completeResponse = await completePromise;
+    expect(completeResponse.status()).toBe(200);
+    expect(completeResponse.request().postDataJSON()).toMatchObject({
+      routeId: alternative!.id,
+      endStressLevel: 50,
+    });
+
+    const refreshedTrendsResponse = await refreshedTrendsPromise;
+    expect(refreshedTrendsResponse.status()).toBe(200);
+    const refreshedTrends =
+      (await refreshedTrendsResponse.json()) as TrendResponse;
+    expect(refreshedTrends.totalCommutes).toBeGreaterThan(
+      trends.totalCommutes,
+    );
+    await expect(
+      page.getByText(`共 ${refreshedTrends.totalCommutes} 次通勤`),
+    ).toBeVisible();
   });
 });
