@@ -26,23 +26,6 @@ const DEMO_ORIGIN: GeoPoint = { longitude: 116.395, latitude: 39.905 };
 const DEMO_DESTINATION: GeoPoint = { longitude: 116.405, latitude: 39.910 };
 const DEBOUNCE_MS = 300;
 
-/** 后端允许的压力等级集合 */
-const VALID_STRESS_LEVELS = [0, 25, 50, 75, 100] as const;
-
-/** 将任意压力分数吸附到后端允许的五档值 */
-export function snapStressLevel(score: number): number {
-  let nearest: number = VALID_STRESS_LEVELS[0];
-  let minDist = Math.abs(score - nearest);
-  for (const level of VALID_STRESS_LEVELS) {
-    const dist = Math.abs(score - level);
-    if (dist < minDist) {
-      nearest = level;
-      minDist = dist;
-    }
-  }
-  return nearest;
-}
-
 function App() {
   const [mapState, setMapState] = useState<MapPageState>(initialMapState);
   const [selectedRouteId, setSelectedRouteId] = useState<string | undefined>();
@@ -111,12 +94,13 @@ function App() {
     if (!selected) return;
 
     const fastest = comparison.routes.find((r) => r.id === comparison.fastestRouteId);
-    // 替代路线：优先取 leastStressful；若 leastStressful 与已选相同，回退到第一个非选中路线
+    // 替代路线：优先取 leastStressful；若与已选相同，显式回退到 fastestRouteId
     const leastStressful = comparison.routes.find((r) => r.id === comparison.leastStressfulRouteId);
     const alternative =
       leastStressful && leastStressful.id !== selectedId
         ? leastStressful
-        : comparison.routes.find((r) => r.id !== selectedId);
+        : comparison.routes.find((r) => r.id === comparison.fastestRouteId && r.id !== selectedId)
+          ?? comparison.routes.find((r) => r.id !== selectedId);
 
     setCompletingCommute(true);
     setCompleteCommuteError(null);
