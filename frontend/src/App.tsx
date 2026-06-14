@@ -111,7 +111,12 @@ function App() {
     if (!selected) return;
 
     const fastest = comparison.routes.find((r) => r.id === comparison.fastestRouteId);
-    const alternative = comparison.routes.find((r) => r.id === comparison.leastStressfulRouteId);
+    // 替代路线：优先取 leastStressful；若 leastStressful 与已选相同，回退到第一个非选中路线
+    const leastStressful = comparison.routes.find((r) => r.id === comparison.leastStressfulRouteId);
+    const alternative =
+      leastStressful && leastStressful.id !== selectedId
+        ? leastStressful
+        : comparison.routes.find((r) => r.id !== selectedId);
 
     setCompletingCommute(true);
     setCompleteCommuteError(null);

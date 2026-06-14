@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { MapPage } from "../pages/MapPage";
 import type { MapPageState, HeatmapCell } from "../types";
 
@@ -163,8 +163,9 @@ describe("Commute submission flow", () => {
     totalCommutes: 2,
   };
 
-  function mockFetchForCommute(mode: "success" | "fail") {
+  function mockFetchForCommute(mode: "success" | "fail" | "success-trend-fail") {
     const calls: { url: string; init?: RequestInit }[] = [];
+    let trendCallCount = 0;
     (globalThis.fetch as ReturnType<typeof vi.fn>).mockImplementation(
       async (url: string, init?: RequestInit) => {
         calls.push({ url, init });
@@ -175,10 +176,15 @@ describe("Commute submission flow", () => {
           return { ok: true, json: () => Promise.resolve(mockRouteComparison) };
         }
         if (url.includes("/commutes/trends")) {
+          trendCallCount++;
+          // success-trend-fail: 首次调用（mount）成功，后续调用（通勤后刷新）失败
+          if (mode === "success-trend-fail" && trendCallCount > 1) {
+            return { ok: false, status: 500, text: () => Promise.resolve("Internal Server Error") };
+          }
           return { ok: true, json: () => Promise.resolve(mockTrend) };
         }
         if (url.includes("/commutes/complete")) {
-          if (mode === "success") {
+          if (mode === "success" || mode === "success-trend-fail") {
             return {
               ok: true,
               json: () =>
@@ -280,6 +286,36 @@ describe("Commute submission flow", () => {
       const alert = screen.queryByRole("alert");
       expect(alert).not.toBeNull();
       expect(alert!.textContent).toMatch(/endStressLevel|通勤失败/);
+    });
+  });
+
+  it("shows warning but not error when POST succeeds and trend refresh fails", async () => {
+    mockFetchForCommute("success-trend-fail");
+    const { default: App } = await import("../App");
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText("完成本次通勤")).toBeInTheDocument();
+    });
+
+    // 用 act 确保所有状态更新（含异步 useEffect）被刷新
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "50" }));
+    });
+
+    // 确认按钮已启用（routeComparison 和 userStressLevel 均已设置）
+    await waitFor(() => {
+      const btn = screen.getByRole("button", { name: "完成本次通勤" });
+      expect(btn).not.toBeDisabled();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "完成本次通勤" }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/趋势数据刷新失败/)).toBeInTheDocument();
+      expect(screen.queryByRole("alert")).toBeNull();
     });
   });
 });
