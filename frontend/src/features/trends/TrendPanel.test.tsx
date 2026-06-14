@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { TrendPanel } from "./TrendPanel";
 import type { TrendResult } from "../../types";
 
@@ -11,6 +11,8 @@ const mockTrend: TrendResult = {
   recommendation: "建议尝试少心累路线",
   totalCommutes: 5,
 };
+
+const noop = () => {};
 
 describe("TrendPanel", () => {
   it("renders empty state message when trend is null", () => {
@@ -39,52 +41,111 @@ describe("TrendPanel", () => {
 
   it("displays recommendation when present", () => {
     render(<TrendPanel trend={mockTrend} />);
-    const rec = screen.getByRole("status");
-    expect(rec).toHaveTextContent("建议尝试少心累路线");
+    const statuses = screen.getAllByRole("status");
+    expect(statuses.some((el) => el.textContent?.includes("建议尝试少心累路线"))).toBe(true);
   });
 
   it("shows submitting text when completing is true", () => {
     render(
       <TrendPanel
         trend={null}
-        onCompleteCommute={() => {}}
+        onCompleteCommute={noop}
         completing={true}
+        userStressLevel={50}
+        onStressLevelChange={noop}
       />
     );
     expect(screen.getByText("提交中…")).toBeInTheDocument();
   });
 
-  it("disables button when completing", () => {
+  it("disables complete button when completing", () => {
     render(
       <TrendPanel
         trend={null}
-        onCompleteCommute={() => {}}
+        onCompleteCommute={noop}
         completing={true}
+        userStressLevel={50}
+        onStressLevelChange={noop}
       />
     );
-    expect(screen.getByRole("button")).toBeDisabled();
+    const btn = screen.getByRole("button", { name: "提交中…" });
+    expect(btn).toBeDisabled();
   });
 
-  it("disables button when disabled prop is true", () => {
+  it("disables complete button when disabled prop is true", () => {
     render(
       <TrendPanel
         trend={null}
-        onCompleteCommute={() => {}}
+        onCompleteCommute={noop}
         disabled={true}
+        userStressLevel={50}
+        onStressLevelChange={noop}
       />
     );
-    expect(screen.getByRole("button")).toBeDisabled();
+    const btn = screen.getByRole("button", { name: "完成本次通勤" });
+    expect(btn).toBeDisabled();
+  });
+
+  it("disables complete button when no stress level selected", () => {
+    render(
+      <TrendPanel
+        trend={null}
+        onCompleteCommute={noop}
+        onStressLevelChange={noop}
+        userStressLevel={null}
+      />
+    );
+    const btn = screen.getByRole("button", { name: "完成本次通勤" });
+    expect(btn).toBeDisabled();
   });
 
   it("displays error message with alert role when error prop provided", () => {
     render(
       <TrendPanel
         trend={null}
-        onCompleteCommute={() => {}}
+        onCompleteCommute={noop}
         error="endStressLevel must be one of 0, 25, 50, 75, 100"
       />
     );
     const alert = screen.getByRole("alert");
     expect(alert).toHaveTextContent("endStressLevel must be one of 0, 25, 50, 75, 100");
+  });
+
+  it("renders stress level selector when onStressLevelChange is provided", () => {
+    render(
+      <TrendPanel
+        trend={null}
+        onCompleteCommute={noop}
+        onStressLevelChange={noop}
+        userStressLevel={null}
+      />
+    );
+    expect(screen.getByTestId("stress-level-selector")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "50" })).toBeInTheDocument();
+  });
+
+  it("calls onStressLevelChange when a stress button is clicked", () => {
+    const onChange = vi.fn();
+    render(
+      <TrendPanel
+        trend={null}
+        onCompleteCommute={noop}
+        onStressLevelChange={onChange}
+        userStressLevel={null}
+      />
+    );
+    screen.getByRole("button", { name: "75" }).click();
+    expect(onChange).toHaveBeenCalledWith(75);
+  });
+
+  it("shows trend refresh warning when provided", () => {
+    render(
+      <TrendPanel
+        trend={mockTrend}
+        trendRefreshWarning="通勤已记录，但趋势数据刷新失败"
+      />
+    );
+    const warnings = screen.getAllByRole("status");
+    expect(warnings.some((el) => el.textContent?.includes("趋势数据刷新失败"))).toBe(true);
   });
 });

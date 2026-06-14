@@ -228,6 +228,8 @@ describe("Commute submission flow", () => {
       expect(screen.getByText("完成本次通勤")).toBeInTheDocument();
     });
 
+    // 先选择压力档位（用户真实感受）
+    fireEvent.click(screen.getByRole("button", { name: "50" }));
     fireEvent.click(screen.getByText("完成本次通勤"));
 
     await waitFor(() => {
@@ -237,6 +239,8 @@ describe("Commute submission flow", () => {
       expect(completeCall).toBeDefined();
       const body = JSON.parse(completeCall!.init!.body as string);
       expect([0, 25, 50, 75, 100]).toContain(body.endStressLevel);
+      // 应使用用户选择的档位，而非路线评分推导值
+      expect(body.endStressLevel).toBe(50);
     });
   });
 
@@ -249,6 +253,7 @@ describe("Commute submission flow", () => {
       expect(screen.getByText("完成本次通勤")).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "50" }));
     fireEvent.click(screen.getByText("完成本次通勤"));
 
     await waitFor(() => {
@@ -268,6 +273,7 @@ describe("Commute submission flow", () => {
       expect(screen.getByText("完成本次通勤")).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "50" }));
     fireEvent.click(screen.getByText("完成本次通勤"));
 
     await waitFor(() => {

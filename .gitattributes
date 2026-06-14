@@ -1,0 +1,2 @@
+# 强制所有文本文件使用 LF 行尾，避免跨平台 CRLF 噪声
+* text=auto eol=lf

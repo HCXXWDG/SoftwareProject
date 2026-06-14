@@ -46,8 +46,10 @@ export function snapStressLevel(score: number): number {
 function App() {
   const [mapState, setMapState] = useState<MapPageState>(initialMapState);
   const [selectedRouteId, setSelectedRouteId] = useState<string | undefined>();
+  const [userStressLevel, setUserStressLevel] = useState<number | null>(null);
   const [completingCommute, setCompletingCommute] = useState(false);
   const [completeCommuteError, setCompleteCommuteError] = useState<string | null>(null);
+  const [trendRefreshWarning, setTrendRefreshWarning] = useState<string | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -98,25 +100,28 @@ function App() {
     setSelectedRouteId(routeId);
   }, []);
 
-  /** 完成本次通勤：调用 completeCommute 后刷新趋势数据 */
+  /** 完成本次通勤：使用用户真实压力档位，分离 POST 与趋势刷新错误 */
   const handleCompleteCommute = useCallback(async () => {
     const comparison = mapState.routeComparison;
     if (!comparison) return;
+    if (userStressLevel == null) return; // 未选择压力档位时不提交
 
     const selectedId = selectedRouteId ?? comparison.fastestRouteId;
     const selected = comparison.routes.find((r) => r.id === selectedId);
     if (!selected) return;
 
     const fastest = comparison.routes.find((r) => r.id === comparison.fastestRouteId);
-    const alternative = comparison.routes.find((r) => r.id !== selectedId);
+    const alternative = comparison.routes.find((r) => r.id === comparison.leastStressfulRouteId);
 
     setCompletingCommute(true);
     setCompleteCommuteError(null);
+    setTrendRefreshWarning(null);
+    let postSucceeded = false;
     try {
       await completeCommute({
         routeId: selected.id,
         routeLabel: selected.label,
-        endStressLevel: snapStressLevel(selected.stressScore),
+        endStressLevel: userStressLevel,
         durationMinutes: Math.round(selected.durationSeconds / 60),
         selectedScore: selected.stressScore,
         fastestScore: fastest?.stressScore ?? selected.stressScore,
@@ -129,17 +134,23 @@ function App() {
         confidence: selected.confidence,
         completedAt: new Date().toISOString(),
       });
+      postSucceeded = true;
 
-      // 刷新趋势数据
-      const freshTrend = await fetchTrends();
-      setMapState((prev) => ({ ...prev, trend: freshTrend }));
+      // 刷新趋势数据（POST 已成功，刷新失败仅提示警告，不视为通勤失败）
+      try {
+        const freshTrend = await fetchTrends();
+        setMapState((prev) => ({ ...prev, trend: freshTrend }));
+      } catch {
+        setTrendRefreshWarning("通勤已记录，但趋势数据刷新失败，请稍后刷新页面查看");
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "完成通勤失败，请稍后重试";
       setCompleteCommuteError(msg);
     } finally {
       setCompletingCommute(false);
+      if (postSucceeded) setUserStressLevel(null);
     }
-  }, [mapState.routeComparison, selectedRouteId]);
+  }, [mapState.routeComparison, selectedRouteId, userStressLevel]);
 
   /** 首次加载：热力图 + 路线对比 + 通勤趋势 */
   useEffect(() => {
@@ -198,6 +209,9 @@ function App() {
         completing={completingCommute}
         error={completeCommuteError}
         disabled={!mapState.routeComparison}
+        userStressLevel={userStressLevel}
+        onStressLevelChange={setUserStressLevel}
+        trendRefreshWarning={trendRefreshWarning}
       />
     </>
   );

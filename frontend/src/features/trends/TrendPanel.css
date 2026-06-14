@@ -105,3 +105,66 @@
   color: #dc2626;
   font-size: 0.82rem;
 }
+
+.trend-panel__warning {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  background: #fffbeb;
+  border-radius: 6px;
+  color: #b45309;
+  font-size: 0.82rem;
+}
+
+.trend-panel__stress-selector {
+  border: none;
+  padding: 0;
+  margin: 10px 0 0;
+}
+
+.trend-panel__stress-legend {
+  font-size: 0.82rem;
+  color: #607888;
+  margin-bottom: 6px;
+}
+
+.trend-panel__stress-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.trend-panel__stress-btn {
+  flex: 1;
+  padding: 6px 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #1a3a4d;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.trend-panel__stress-btn:hover:not(:disabled) {
+  border-color: #2368ff;
+  color: #2368ff;
+}
+
+.trend-panel__stress-btn--active {
+  background: #2368ff;
+  border-color: #2368ff;
+  color: #fff;
+}
+
+.trend-panel__stress-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.trend-panel__stress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
