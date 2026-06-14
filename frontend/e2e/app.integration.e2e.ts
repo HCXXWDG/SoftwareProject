@@ -1,0 +1,127 @@
+import { expect, test, type APIResponse, type Page } from "@playwright/test";
+
+interface HeatmapResponse {
+  cellId: string;
+}
+
+interface RouteResponse {
+  id: string;
+  label: string;
+}
+
+interface RouteComparisonResponse {
+  routes: RouteResponse[];
+  fastestRouteId: string;
+}
+
+interface TrendResponse {
+  points: unknown[];
+  recommendation: string;
+  totalCommutes: number;
+}
+
+function isApiResponse(
+  response: APIResponse,
+  method: string,
+  pathname: string,
+): boolean {
+  const url = new URL(response.url());
+  return response.request().method() === method && url.pathname === pathname;
+}
+
+async function waitForInitialApiResponses(page: Page) {
+  const heatmapPromise = page.waitForResponse((response) =>
+    isApiResponse(response, "GET", "/api/v1/heatmap"),
+  );
+  const routesPromise = page.waitForResponse((response) =>
+    isApiResponse(response, "POST", "/api/v1/routes/compare"),
+  );
+  const trendsPromise = page.waitForResponse((response) =>
+    isApiResponse(response, "GET", "/api/v1/commutes/trends"),
+  );
+
+  await page.goto("/");
+
+  return Promise.all([heatmapPromise, routesPromise, trendsPromise]);
+}
+
+test.describe("Full-stack demo flow", () => {
+  test("uses the real API for map, routes, trends, and feedback", async ({
+    page,
+  }) => {
+    const [heatmapResponse, routesResponse, trendsResponse] =
+      await waitForInitialApiResponses(page);
+
+    expect(heatmapResponse.status()).toBe(200);
+    expect(routesResponse.status()).toBe(200);
+    expect(trendsResponse.status()).toBe(200);
+
+    const heatmap = (await heatmapResponse.json()) as HeatmapResponse[];
+    const comparison =
+      (await routesResponse.json()) as RouteComparisonResponse;
+    const trends = (await trendsResponse.json()) as TrendResponse;
+
+    expect(heatmap.length).toBeGreaterThan(0);
+    expect(comparison.routes.length).toBeGreaterThanOrEqual(2);
+    expect(
+      comparison.routes.some((route) => route.id === comparison.fastestRouteId),
+    ).toBe(true);
+    expect(Array.isArray(trends.points)).toBe(true);
+    expect(typeof trends.recommendation).toBe("string");
+    expect(typeof trends.totalCommutes).toBe("number");
+
+    await expect(page.locator("[data-map-mode]").first()).toHaveAttribute(
+      "data-map-mode",
+      /amap|offline/,
+    );
+    await expect(page.getByTestId("heatmap-point").first()).toBeVisible();
+
+    const routePanel = page.getByTestId("route-panel");
+    await expect(routePanel).toBeVisible();
+
+    const alternative = comparison.routes.find(
+      (route) => route.id !== comparison.fastestRouteId,
+    );
+    expect(alternative).toBeDefined();
+
+    const alternativeButton = routePanel.getByRole("button", {
+      name: `选择 ${alternative!.label}`,
+    });
+    await alternativeButton.click();
+    await expect(alternativeButton).toHaveAttribute("aria-pressed", "true");
+
+    const mapSection = page.locator("[aria-label='城市通勤情绪地图']");
+    const box = await mapSection.boundingBox();
+    expect(box).not.toBeNull();
+
+    const pointer = {
+      button: 0,
+      clientX: box!.x + box!.width / 2,
+      clientY: box!.y + box!.height / 2,
+      pointerId: 1,
+      pointerType: "mouse",
+    };
+    await mapSection.dispatchEvent("pointerdown", pointer);
+    await expect(page.getByTestId("feedback-panel")).toBeVisible({
+      timeout: 3000,
+    });
+    await mapSection.dispatchEvent("pointerup", pointer);
+
+    await page.getByRole("button", { name: /压力 50/ }).click();
+    await page.getByRole("button", { name: /原因 噪音/ }).click();
+
+    const reportPromise = page.waitForResponse((response) =>
+      isApiResponse(response, "POST", "/api/v1/reports"),
+    );
+    await page.getByRole("button", { name: "提交反馈" }).click();
+
+    const reportResponse = await reportPromise;
+    expect(reportResponse.status()).toBe(201);
+    expect(await reportResponse.json()).toMatchObject({
+      status: "created",
+    });
+    await expect(page.getByTestId("feedback-panel")).not.toBeVisible({
+      timeout: 5000,
+    });
+  });
+});
