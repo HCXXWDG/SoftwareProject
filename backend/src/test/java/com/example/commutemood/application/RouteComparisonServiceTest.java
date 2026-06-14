@@ -47,6 +47,9 @@ class RouteComparisonServiceTest {
         RouteComparison comparison = service.compare("demo-browser", origin, destination);
 
         assertThat(comparison.routes()).hasSize(3);
+        assertThat(comparison.fastestRouteId()).isEqualTo("route-fast");
+        assertThat(comparison.leastStressfulRouteId()).isEqualTo("route-calm");
+        assertThat(comparison.fastestRouteId()).isNotEqualTo(comparison.leastStressfulRouteId());
         verify(routeQueryRepository).save(
                 eq(identityService.hash("demo-browser")),
                 eq(origin),
