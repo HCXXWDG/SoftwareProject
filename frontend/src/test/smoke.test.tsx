@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { MapPage } from "../pages/MapPage";
 import type { MapPageState, HeatmapCell } from "../types";
 
@@ -119,6 +119,242 @@ describe("App API integration", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent("API 500");
+    });
+  });
+});
+
+describe("Commute submission flow", () => {
+  const mockRouteComparison = {
+    routes: [
+      {
+        id: "r1",
+        label: "路线 A",
+        distanceMeters: 3200,
+        durationSeconds: 720,
+        stressExposure: 0.4,
+        stressScore: 38,
+        confidence: 0.85,
+        fastest: true,
+        leastStressful: false,
+        polyline: [{ longitude: 116.395, latitude: 39.905 }],
+      },
+      {
+        id: "r2",
+        label: "路线 B",
+        distanceMeters: 3800,
+        durationSeconds: 900,
+        stressExposure: 0.2,
+        stressScore: 22,
+        confidence: 0.78,
+        fastest: false,
+        leastStressful: true,
+        polyline: [{ longitude: 116.395, latitude: 39.905 }],
+      },
+    ],
+    fastestRouteId: "r1",
+    leastStressfulRouteId: "r2",
+    recommendation: "推荐路线 B",
+    recommendAlternative: true,
+  };
+
+  const mockTrend = {
+    points: [{ date: "2025-06-10", averageStress: 40, commuteCount: 2 }],
+    recommendation: "保持好心情",
+    totalCommutes: 2,
+  };
+
+  function mockFetchForCommute(mode: "success" | "fail" | "success-trend-fail") {
+    const calls: { url: string; init?: RequestInit }[] = [];
+    let trendCallCount = 0;
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockImplementation(
+      async (url: string, init?: RequestInit) => {
+        calls.push({ url, init });
+        if (url.includes("/heatmap")) {
+          return { ok: true, json: () => Promise.resolve([]) };
+        }
+        if (url.includes("/routes/compare")) {
+          return { ok: true, json: () => Promise.resolve(mockRouteComparison) };
+        }
+        if (url.includes("/commutes/trends")) {
+          trendCallCount++;
+          // success-trend-fail: 首次调用（mount）成功，后续调用（通勤后刷新）失败
+          if (mode === "success-trend-fail" && trendCallCount > 1) {
+            return { ok: false, status: 500, text: () => Promise.resolve("Internal Server Error") };
+          }
+          return { ok: true, json: () => Promise.resolve(mockTrend) };
+        }
+        if (url.includes("/commutes/complete")) {
+          if (mode === "success" || mode === "success-trend-fail") {
+            return {
+              ok: true,
+              json: () =>
+                Promise.resolve({
+                  id: "c1",
+                  deviceHash: "h",
+                  routeId: "r1",
+                  routeLabel: "路线 A",
+                  endStressLevel: 50,
+                  durationMinutes: 12,
+                  selectedScore: 38,
+                  fastestScore: 38,
+                  alternativeLabel: "路线 B",
+                  alternativeScore: 22,
+                  alternativeDurationRatio: 1.25,
+                  confidence: 0.85,
+                  completedAt: "2025-06-10T09:00:00Z",
+                }),
+            };
+          }
+          return {
+            ok: false,
+            status: 400,
+            text: () => Promise.resolve("endStressLevel 必须为 0/25/50/75/100"),
+          };
+        }
+        return { ok: true, json: () => Promise.resolve([]) };
+      },
+    );
+    return calls;
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("sends valid endStressLevel when completing commute", async () => {
+    const calls = mockFetchForCommute("success");
+    const { default: App } = await import("../App");
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText("完成本次通勤")).toBeInTheDocument();
+    });
+
+    // 先选择压力档位（用户真实感受）
+    fireEvent.click(screen.getByRole("button", { name: "50" }));
+    fireEvent.click(screen.getByText("完成本次通勤"));
+
+    await waitFor(() => {
+      const completeCall = calls.find((c) =>
+        c.url.includes("/commutes/complete"),
+      );
+      expect(completeCall).toBeDefined();
+      const body = JSON.parse(completeCall!.init!.body as string);
+      expect([0, 25, 50, 75, 100]).toContain(body.endStressLevel);
+      // 应使用用户选择的档位，而非路线评分推导值
+      expect(body.endStressLevel).toBe(50);
+    });
+  });
+
+  it("refreshes trends after successful commute", async () => {
+    const calls = mockFetchForCommute("success");
+    const { default: App } = await import("../App");
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText("完成本次通勤")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "50" }));
+    fireEvent.click(screen.getByText("完成本次通勤"));
+
+    await waitFor(() => {
+      const trendsCalls = calls.filter((c) =>
+        c.url.includes("/commutes/trends"),
+      );
+      expect(trendsCalls.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  it("shows error message when commute submission fails", async () => {
+    mockFetchForCommute("fail");
+    const { default: App } = await import("../App");
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText("完成本次通勤")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "50" }));
+    fireEvent.click(screen.getByText("完成本次通勤"));
+
+    await waitFor(() => {
+      const alert = screen.queryByRole("alert");
+      expect(alert).not.toBeNull();
+      expect(alert!.textContent).toMatch(/endStressLevel|通勤失败/);
+    });
+  });
+
+  it("selecting least-stressful route sends correct routeId and alternative fallback", async () => {
+    const calls = mockFetchForCommute("success");
+    const { default: App } = await import("../App");
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText("完成本次通勤")).toBeInTheDocument();
+    });
+
+    // 选择压力档位
+    fireEvent.click(screen.getByRole("button", { name: "75" }));
+
+    // 选择路线 B（leastStressful, r2）
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "选择 路线 B" }));
+    });
+
+    await waitFor(() => {
+      const btn = screen.getByRole("button", { name: "完成本次通勤" });
+      expect(btn).not.toBeDisabled();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "完成本次通勤" }));
+    });
+
+    await waitFor(() => {
+      const completeCall = calls.find((c) =>
+        c.url.includes("/commutes/complete"),
+      );
+      expect(completeCall).toBeDefined();
+      const body = JSON.parse(completeCall!.init!.body as string);
+      // routeId 应为路线 B (r2)
+      expect(body.routeId).toBe("r2");
+      // 替代路线应回退到 fastest（路线 A），而非按数组顺序取
+      expect(body.alternativeLabel).toBe("路线 A");
+    });
+  });
+
+  it("shows warning but not error when POST succeeds and trend refresh fails", async () => {
+    mockFetchForCommute("success-trend-fail");
+    const { default: App } = await import("../App");
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText("完成本次通勤")).toBeInTheDocument();
+    });
+
+    // 用 act 确保所有状态更新（含异步 useEffect）被刷新
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "50" }));
+    });
+
+    // 确认按钮已启用（routeComparison 和 userStressLevel 均已设置）
+    await waitFor(() => {
+      const btn = screen.getByRole("button", { name: "完成本次通勤" });
+      expect(btn).not.toBeDisabled();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "完成本次通勤" }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/趋势数据刷新失败/)).toBeInTheDocument();
+      expect(screen.queryByRole("alert")).toBeNull();
     });
   });
 });
