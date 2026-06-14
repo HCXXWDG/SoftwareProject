@@ -5,13 +5,19 @@ const configDir = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "**/*.e2e.ts",
-  testIgnore: "**/*.integration.e2e.ts",
-  timeout: 30_000,
+  testMatch: "**/*.integration.e2e.ts",
+  outputDir: "test-results/integration",
+  timeout: 45_000,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1,
   reporter: process.env.CI
-    ? [["list"], ["html", { open: "never" }]]
+    ? [
+        ["list"],
+        [
+          "html",
+          { open: "never", outputFolder: "playwright-report/integration" },
+        ],
+      ]
     : "list",
   use: {
     baseURL: "http://localhost:5173",
