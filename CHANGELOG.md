@@ -4,6 +4,8 @@ All notable changes follow Semantic Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-06-14
+
 ### Added
 - PostGIS dev startup script at `scripts/start-postgis-dev.ps1`.
 - Integration smoke script for validating the frontend-to-backend API chain locally.
