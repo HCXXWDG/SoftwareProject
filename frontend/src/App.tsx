@@ -26,10 +26,28 @@ const DEMO_ORIGIN: GeoPoint = { longitude: 116.395, latitude: 39.905 };
 const DEMO_DESTINATION: GeoPoint = { longitude: 116.405, latitude: 39.910 };
 const DEBOUNCE_MS = 300;
 
+/** 后端允许的压力等级集合 */
+const VALID_STRESS_LEVELS = [0, 25, 50, 75, 100] as const;
+
+/** 将任意压力分数吸附到后端允许的五档值 */
+export function snapStressLevel(score: number): number {
+  let nearest: number = VALID_STRESS_LEVELS[0];
+  let minDist = Math.abs(score - nearest);
+  for (const level of VALID_STRESS_LEVELS) {
+    const dist = Math.abs(score - level);
+    if (dist < minDist) {
+      nearest = level;
+      minDist = dist;
+    }
+  }
+  return nearest;
+}
+
 function App() {
   const [mapState, setMapState] = useState<MapPageState>(initialMapState);
   const [selectedRouteId, setSelectedRouteId] = useState<string | undefined>();
   const [completingCommute, setCompletingCommute] = useState(false);
+  const [completeCommuteError, setCompleteCommuteError] = useState<string | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -93,11 +111,12 @@ function App() {
     const alternative = comparison.routes.find((r) => r.id !== selectedId);
 
     setCompletingCommute(true);
+    setCompleteCommuteError(null);
     try {
       await completeCommute({
         routeId: selected.id,
         routeLabel: selected.label,
-        endStressLevel: Math.round(selected.stressScore),
+        endStressLevel: snapStressLevel(selected.stressScore),
         durationMinutes: Math.round(selected.durationSeconds / 60),
         selectedScore: selected.stressScore,
         fastestScore: fastest?.stressScore ?? selected.stressScore,
@@ -114,8 +133,9 @@ function App() {
       // 刷新趋势数据
       const freshTrend = await fetchTrends();
       setMapState((prev) => ({ ...prev, trend: freshTrend }));
-    } catch {
-      // 后端不可用时静默降级
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "完成通勤失败，请稍后重试";
+      setCompleteCommuteError(msg);
     } finally {
       setCompletingCommute(false);
     }
@@ -176,6 +196,8 @@ function App() {
         trend={mapState.trend}
         onCompleteCommute={handleCompleteCommute}
         completing={completingCommute}
+        error={completeCommuteError}
+        disabled={!mapState.routeComparison}
       />
     </>
   );

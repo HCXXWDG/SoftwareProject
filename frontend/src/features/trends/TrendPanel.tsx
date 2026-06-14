@@ -7,6 +7,10 @@ interface TrendPanelProps {
   onCompleteCommute?: () => void;
   /** 按钮是否处于加载状态 */
   completing?: boolean;
+  /** 后端返回的错误信息 */
+  error?: string | null;
+  /** 外部控制按钮禁用状态（如路线未加载） */
+  disabled?: boolean;
 }
 
 function stressColor(stress: number | null): string {
@@ -20,15 +24,22 @@ export function TrendPanel({
   trend,
   onCompleteCommute,
   completing = false,
+  error = null,
+  disabled = false,
 }: TrendPanelProps) {
   if (!trend || !Array.isArray(trend.points)) {
     return (
       <div className="trend-panel trend-panel--empty" data-testid="trend-panel">
         <p className="trend-panel__empty-text">暂无通勤趋势数据</p>
+        {error && (
+          <p className="trend-panel__error" role="alert">
+            {error}
+          </p>
+        )}
         {onCompleteCommute && (
           <button
             className="trend-panel__complete-btn"
-            disabled={completing}
+            disabled={completing || disabled}
             onClick={onCompleteCommute}
             type="button"
           >
@@ -83,10 +94,16 @@ export function TrendPanel({
         </p>
       )}
 
+      {error && (
+        <p className="trend-panel__error" role="alert">
+          {error}
+        </p>
+      )}
+
       {onCompleteCommute && (
         <button
           className="trend-panel__complete-btn"
-          disabled={completing}
+          disabled={completing || disabled}
           onClick={onCompleteCommute}
           type="button"
         >
