@@ -13,7 +13,7 @@
 
     <groupId>com.example</groupId>
     <artifactId>commute-mood-api</artifactId>
-    <version>0.1.0</version>
+    <version>1.0.0</version>
     <name>commute-mood-api</name>
     <description>City commute mood map backend</description>
 

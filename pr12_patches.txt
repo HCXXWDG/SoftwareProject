@@ -1,0 +1,2522 @@
+﻿=== FILE: .github/workflows/e2e.yml ===
+@@ -0,0 +1,55 @@
++name: E2E CI
++
++on:
++  pull_request:
++    branches:
++      - develop
++  push:
++    branches:
++      - develop
++  workflow_dispatch:
++
++permissions:
++  contents: read
++
++concurrency:
++  group: e2e-ci-${{ github.workflow }}-${{ github.ref }}
++  cancel-in-progress: true
++
++jobs:
++  e2e:
++    name: E2E CI
++    runs-on: ubuntu-latest
++    timeout-minutes: 20
++    defaults:
++      run:
++        working-directory: frontend
++
++    steps:
++      - name: Checkout repository
++        uses: actions/checkout@v6
++
++      - name: Set up Node.js
++        uses: actions/setup-node@v6
++        with:
++          node-version: 22
++          cache: npm
++          cache-dependency-path: frontend/package-lock.json
++
++      - name: Install dependencies
++        run: npm ci
++
++      - name: Install Chromium
++        run: npx playwright install --with-deps chromium
++
++      - name: Run end-to-end tests
++        run: npm run test:e2e
++
++      - name: Upload Playwright report
++        if: always()
++        uses: actions/upload-artifact@v7
++        with:
++          name: playwright-report-${{ github.run_id }}
++          path: frontend/playwright-report/
++          if-no-files-found: ignore
++          retention-days: 14
+
+=== FILE: docs/测试/E2E测试说明.md ===
+@@ -0,0 +1,33 @@
++# E2E 测试说明
++
++## 覆盖范围
++
++Playwright 核心链路位于 `frontend/e2e`，使用浏览器级 API Mock 验证：
++
++- 地图启动和热力点渲染。
++- 热力点详情浮层。
++- 双路线覆盖层、图例和对比面板。
++- 路线选择联动。
++- 地图长按、反馈选择和提交。
++
++测试默认不读取高德 Key，也不依赖本地后端或数据库，因此在 CI 中稳定使用离线地图。
++
++## 本地运行
++
++```powershell
++cd frontend
++npm ci
++npx playwright install chromium
++npm run test:e2e
++```
++
++单元测试与 E2E 使用不同文件命名：
++
++- Vitest：`*.test.ts`、`*.test.tsx`。
++- Playwright：`*.e2e.ts`。
++
++## CI
++
++`.github/workflows/e2e.yml` 在指向 `develop` 的 Pull Request 和 `develop`
++推送时运行。检查名称固定为 `E2E CI`；失败时上传 Playwright HTML 报告、
++截图和首次重试 trace。
+
+=== FILE: frontend/e2e/app.e2e.ts ===
+@@ -0,0 +1,197 @@
++import { test, expect, type Page } from "@playwright/test";
++
++/** Mock heatmap cells matching the backend demo data format */
++const MOCK_HEATMAP = [
++  {
++    cellId: "16:129333:44333",
++    center: { longitude: 116.4, latitude: 39.91 },
++    score: 68.2,
++    confidence: 0.72,
++    count: 18,
++    dominantTag: "NOISE",
++  },
++  {
++    cellId: "16:129334:44334",
++    center: { longitude: 116.402, latitude: 39.908 },
++    score: 35.0,
++    confidence: 0.5,
++    count: 5,
++    dominantTag: "CROWD",
++  },
++];
++
++/** Mock route comparison matching the backend demo response */
++const MOCK_ROUTES = {
++  routes: [
++    {
++      id: "route-fast",
++      label: "最快路线 A",
++      distanceMeters: 2100,
++      durationSeconds: 720,
++      stressExposure: 67.2,
++      stressScore: 50.4,
++      confidence: 0.68,
++      fastest: true,
++      leastStressful: false,
++      polyline: [
++        { longitude: 116.395, latitude: 39.905 },
++        { longitude: 116.4, latitude: 39.908 },
++        { longitude: 116.405, latitude: 39.91 },
++      ],
++    },
++    {
++      id: "route-calm",
++      label: "少心累路线 B",
++      distanceMeters: 2800,
++      durationSeconds: 960,
++      stressExposure: 30.1,
++      stressScore: 25.0,
++      confidence: 0.72,
++      fastest: false,
++      leastStressful: true,
++      polyline: [
++        { longitude: 116.395, latitude: 39.905 },
++        { longitude: 116.398, latitude: 39.912 },
++        { longitude: 116.405, latitude: 39.91 },
++      ],
++    },
++  ],
++  fastestRouteId: "route-fast",
++  leastStressfulRouteId: "route-calm",
++  recommendation: "明天试少心累路线 B。",
++  recommendAlternative: true,
++};
++
++const MOCK_TRENDS = {
++  points: [
++    { date: "2026-06-10", averageStress: 55, commuteCount: 3 },
++  ],
++  recommendation: "继续保持",
++  totalCommutes: 3,
++};
++
++/** Intercept all backend API calls and return mock data */
++async function mockAPI(page: Page) {
++  await page.route("**/api/v1/heatmap*", (route) =>
++    route.fulfill({ json: MOCK_HEATMAP }),
++  );
++  await page.route("**/api/v1/routes/compare", (route) =>
++    route.fulfill({ json: MOCK_ROUTES }),
++  );
++  await page.route("**/api/v1/commutes/trends*", (route) =>
++    route.fulfill({ json: MOCK_TRENDS }),
++  );
++  await page.route("**/api/v1/reports", (route) =>
++    route.fulfill({ status: 201, json: { status: "ok", message: "created" } }),
++  );
++}
++
++/** Wait for the map surface to be ready (works for both amap and offline modes) */
++async function waitForMapReady(page: Page) {
++  await expect(page.locator("[data-map-mode]").first()).toBeVisible();
++}
++
++test.describe("Core user flow", () => {
++  test("loads map and displays heatmap", async ({ page }) => {
++    await mockAPI(page);
++    await page.goto("/");
++
++    // Map should load (either amap or offline)
++    await waitForMapReady(page);
++
++    // Heatmap cells should load
++    await expect(page.getByText(/个热力图单元格已加载/)).toBeVisible();
++
++    // Heat points should be rendered
++    await expect(page.getByRole("button", { name: /查看热力点/ }).first()).toBeVisible();
++  });
++
++  test("clicks heatmap cell and shows details", async ({ page }) => {
++    await mockAPI(page);
++    await page.goto("/");
++
++    // Wait for heatmap to load
++    await expect(page.getByText(/个热力图单元格已加载/)).toBeVisible();
++
++    // Click first heat point
++    const heatPoint = page.getByRole("button", { name: /查看热力点/ }).first();
++    await heatPoint.click();
++
++    // Cell details should appear
++    await expect(page.getByText("NOISE")).toBeVisible();
++  });
++
++  test("displays route overlay and comparison panel", async ({ page }) => {
++    await mockAPI(page);
++    await page.goto("/");
++
++    // Wait for route comparison to load
++    await expect(page.getByTestId("route-overlay")).toBeVisible();
++    await expect(page.getByTestId("route-panel")).toBeVisible();
++
++    // Route cards should appear (scope to route-panel to avoid strict mode)
++    const panel = page.getByTestId("route-panel");
++    await expect(panel.getByText("最快路线 A")).toBeVisible();
++    await expect(panel.getByText("少心累路线 B")).toBeVisible();
++
++    // Badges should appear
++    await expect(panel.getByText("最快", { exact: true })).toBeVisible();
++    await expect(panel.getByText("少心累", { exact: true })).toBeVisible();
++
++    // Legend should appear on the map
++    await expect(page.getByTestId("route-legend")).toBeVisible();
++  });
++
++  test("selects a different route from the panel", async ({ page }) => {
++    await mockAPI(page);
++    await page.goto("/");
++
++    // Wait for routes
++    await expect(page.getByTestId("route-panel")).toBeVisible();
++
++    const panel = page.getByTestId("route-panel");
++
++    // Initially the fast route should be selected
++    const fastCard = panel.getByRole("button", { name: /选择 最快路线 A/ });
++    await expect(fastCard).toHaveAttribute("aria-pressed", "true");
++
++    // Click the calm route
++    await panel.getByRole("button", { name: /选择 少心累路线 B/ }).click();
++
++    // Calm route should now be selected
++    const calmCard = panel.getByRole("button", { name: /选择 少心累路线 B/ });
++    await expect(calmCard).toHaveAttribute("aria-pressed", "true");
++  });
++
++  test("long-press opens feedback panel and submits", async ({ page }) => {
++    await mockAPI(page);
++    await page.goto("/");
++
++    // Wait for map to be ready
++    await waitForMapReady(page);
++
++    // Long-press on the map area
++    const mapSection = page.locator("[aria-label='城市通勤情绪地图']");
++    const box = await mapSection.boundingBox();
++    expect(box).not.toBeNull();
++
++    // Simulate long press (600ms hold)
++    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
++    await page.mouse.down();
++    await page.waitForTimeout(700);
++    await page.mouse.up();
++
++    // Feedback panel should appear
++    await expect(page.getByTestId("feedback-panel")).toBeVisible();
++
++    // Select stress level and tag
++    await page.getByRole("button", { name: /压力 50/ }).click();
++    await page.getByRole("button", { name: /原因 噪音/ }).click();
++
++    // Submit
++    await page.getByRole("button", { name: "提交反馈" }).click();
++
++    // Panel should close after successful submit
++    await expect(page.getByTestId("feedback-panel")).not.toBeVisible({ timeout: 5000 });
++  });
++});
+
+=== FILE: frontend/package-lock.json ===
+@@ -12,8 +12,10 @@
+         "react-dom": "^19.2.7"
+       },
+       "devDependencies": {
++        "@playwright/test": "^1.60.0",
+         "@testing-library/jest-dom": "^6.6.3",
+         "@testing-library/react": "^16.1.0",
++        "@types/node": "^22.19.21",
+         "@types/react": "^19.0.0",
+         "@types/react-dom": "^19.0.0",
+         "@vitejs/plugin-react": "^4.3.4",
+@@ -950,6 +952,22 @@
+         "@jridgewell/sourcemap-codec": "^1.4.14"
+       }
+     },
++    "node_modules/@playwright/test": {
++      "version": "1.60.0",
++      "resolved": "https://registry.npmjs.org/@playwright/test/-/test-1.60.0.tgz",
++      "integrity": "sha512-O71yZIbAh/PxDMNGns37GHBIfrVkEVyn+AXyIa5dOTfb4/xNvRWV+Vv/NMbNCtODB/pO7vLlF2OTmMVLhmr7Ag==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "dependencies": {
++        "playwright": "1.60.0"
++      },
++      "bin": {
++        "playwright": "cli.js"
++      },
++      "engines": {
++        "node": ">=18"
++      }
++    },
+     "node_modules/@rolldown/pluginutils": {
+       "version": "1.0.0-beta.27",
+       "resolved": "https://registry.npmjs.org/@rolldown/pluginutils/-/pluginutils-1.0.0-beta.27.tgz",
+@@ -1482,6 +1500,16 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/@types/node": {
++      "version": "22.19.21",
++      "resolved": "https://registry.npmjs.org/@types/node/-/node-22.19.21.tgz",
++      "integrity": "sha512-VMeFBSCKQKmm2swI2kW51SFusDqekC6q9trBCvJ/JliDchFSuoYYKN7yVNjPthP1HKZcx3U1gI/wTcEBjEFKTA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "undici-types": "~6.21.0"
++      }
++    },
+     "node_modules/@types/react": {
+       "version": "19.2.17",
+       "resolved": "https://registry.npmjs.org/@types/react/-/react-19.2.17.tgz",
+@@ -2568,6 +2596,53 @@
+         "url": "https://github.com/sponsors/jonschlinkert"
+       }
+     },
++    "node_modules/playwright": {
++      "version": "1.60.0",
++      "resolved": "https://registry.npmjs.org/playwright/-/playwright-1.60.0.tgz",
++      "integrity": "sha512-hheHdokM8cdqCb0lcE3s+zT4t4W+vvjpGxsZlDnikarzx8tSzMebh3UiFtgqwFwnTnjYQcsyMF8ei2mCO/tpeA==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "dependencies": {
++        "playwright-core": "1.60.0"
++      },
++      "bin": {
++        "playwright": "cli.js"
++      },
++      "engines": {
++        "node": ">=18"
++      },
++      "optionalDependencies": {
++        "fsevents": "2.3.2"
++      }
++    },
++    "node_modules/playwright-core": {
++      "version": "1.60.0",
++      "resolved": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.60.0.tgz",
++      "integrity": "sha512-9bW6zvX/m0lEbgTKJ6YppOKx8H3VOPBMOCFh2irXFOT4BbHgrx5hPjwJYLT40Lu+4qtD36qKc/Hn56StUW57IA==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "bin": {
++        "playwright-core": "cli.js"
++      },
++      "engines": {
++        "node": ">=18"
++      }
++    },
++    "node_modules/playwright/node_modules/fsevents": {
++      "version": "2.3.2",
++      "resolved": "https://registry.npmjs.org/fsevents/-/fsevents-2.3.2.tgz",
++      "integrity": "sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==",
++      "dev": true,
++      "hasInstallScript": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "darwin"
++      ],
++      "engines": {
++        "node": "^8.16.0 || ^10.6.0 || >=11.0.0"
++      }
++    },
+     "node_modules/postcss": {
+       "version": "8.5.15",
+       "resolved": "https://registry.npmjs.org/postcss/-/postcss-8.5.15.tgz",
+@@ -2936,6 +3011,13 @@
+         "node": ">=14.17"
+       }
+     },
++    "node_modules/undici-types": {
++      "version": "6.21.0",
++      "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-6.21.0.tgz",
++      "integrity": "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==",
++      "dev": true,
++      "license": "MIT"
++    },
+     "node_modules/update-browserslist-db": {
+       "version": "1.2.3",
+       "resolved": "https://registry.npmjs.org/update-browserslist-db/-/update-browserslist-db-1.2.3.tgz",
+
+=== FILE: frontend/package.json ===
+@@ -8,15 +8,18 @@
+     "build": "tsc --noEmit && vite build",
+     "preview": "vite preview",
+     "test": "vitest run",
+-    "test:watch": "vitest"
++    "test:watch": "vitest",
++    "test:e2e": "playwright test"
+   },
+   "dependencies": {
+     "react": "^19.2.7",
+     "react-dom": "^19.2.7"
+   },
+   "devDependencies": {
++    "@playwright/test": "^1.60.0",
+     "@testing-library/jest-dom": "^6.6.3",
+     "@testing-library/react": "^16.1.0",
++    "@types/node": "^22.19.21",
+     "@types/react": "^19.0.0",
+     "@types/react-dom": "^19.0.0",
+     "@vitejs/plugin-react": "^4.3.4",
+
+=== FILE: frontend/playwright.config.ts ===
+@@ -0,0 +1,25 @@
++import { defineConfig } from "@playwright/test";
++
++export default defineConfig({
++  testDir: "./e2e",
++  testMatch: "**/*.e2e.ts",
++  timeout: 30_000,
++  retries: process.env.CI ? 2 : 0,
++  workers: process.env.CI ? 1 : undefined,
++  reporter: process.env.CI
++    ? [["list"], ["html", { open: "never" }]]
++    : "list",
++  use: {
++    baseURL: "http://localhost:5173",
++    channel: "chromium",
++    headless: true,
++    screenshot: "only-on-failure",
++    trace: "on-first-retry",
++  },
++  webServer: {
++    command: "npm run dev -- --host 127.0.0.1",
++    url: "http://127.0.0.1:5173",
++    reuseExistingServer: !process.env.CI,
++    timeout: 30_000,
++  },
++});
+
+=== FILE: frontend/src/App.tsx ===
+@@ -1,10 +1,12 @@
+ import { useState, useEffect, useCallback, useRef } from "react";
+ import { MapPage } from "./pages/MapPage";
+ import { MapSurface } from "./features/map";
++import { RoutePanel } from "./features/routes";
+ import { fetchHeatmap } from "./services/heatmap";
+ import { compareRoutes } from "./services/route";
+ import { fetchTrends } from "./services/commute";
+-import type { MapPageState, HeatmapCell, GeoPoint } from "./types";
++import { submitReport } from "./services/report";
++import type { MapPageState, HeatmapCell, GeoPoint, MapFeedbackDraft } from "./types";
+ 
+ const initialMapState: MapPageState = {
+   heatmapCells: [],
+@@ -25,6 +27,7 @@ const DEBOUNCE_MS = 300;
+ 
+ function App() {
+   const [mapState, setMapState] = useState<MapPageState>(initialMapState);
++  const [selectedRouteId, setSelectedRouteId] = useState<string | undefined>();
+   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+   const abortRef = useRef<AbortController | null>(null);
+ 
+@@ -57,6 +60,24 @@ function App() {
+     [loadHeatmap],
+   );
+ 
++  /** 提交情绪反馈（由地图长按触发） */
++  const handleFeedbackSubmit = useCallback(
++    async (draft: MapFeedbackDraft) => {
++      await submitReport({
++        location: draft.location,
++        stressLevel: draft.stressLevel,
++        tag: draft.tag,
++        reportedAt: new Date().toISOString(),
++      });
++    },
++    [],
++  );
++
++  /** 路线选择（由地图路线或面板点击触发） */
++  const handleRouteSelect = useCallback((routeId: string) => {
++    setSelectedRouteId(routeId);
++  }, []);
++
+   /** 首次加载：热力图 + 路线对比 + 通勤趋势 */
+   useEffect(() => {
+     loadHeatmap(DEFAULT_BBOX);
+@@ -86,16 +107,29 @@ function App() {
+   }, [loadHeatmap]);
+ 
+   return (
+-    <MapPage
+-      state={mapState}
+-      mapSlot={
+-        <MapSurface
+-          heatmapCells={mapState.heatmapCells}
+-          loading={mapState.loading}
+-          onViewportChange={handleViewportChange}
++    <>
++      <MapPage
++        state={mapState}
++        mapSlot={
++          <MapSurface
++            heatmapCells={mapState.heatmapCells}
++            routes={mapState.routeComparison?.routes ?? []}
++            selectedRouteId={selectedRouteId ?? mapState.routeComparison?.fastestRouteId}
++            loading={mapState.loading}
++            onFeedbackSubmit={handleFeedbackSubmit}
++            onRouteSelect={handleRouteSelect}
++            onViewportChange={handleViewportChange}
++          />
++        }
++      />
++      {mapState.routeComparison && (
++        <RoutePanel
++          routes={mapState.routeComparison.routes}
++          selectedRouteId={selectedRouteId ?? mapState.routeComparison.fastestRouteId}
++          onSelectRoute={handleRouteSelect}
+         />
+-      }
+-    />
++      )}
++    </>
+   );
+ }
+ 
+
+=== FILE: frontend/src/features/map/EmojiFountain.test.tsx ===
+@@ -0,0 +1,45 @@
++import { render, screen } from "@testing-library/react";
++import { afterEach, describe, expect, it, vi } from "vitest";
++import { EmojiFountain } from "./EmojiFountain";
++
++afterEach(() => {
++  vi.useRealTimers();
++});
++
++describe("EmojiFountain", () => {
++  it("renders the correct number of particles", () => {
++    render(
++      <EmojiFountain
++        emoji="😊"
++        position={{ x: 100, y: 200 }}
++        onComplete={vi.fn()}
++      />,
++    );
++
++    const container = screen.getByTestId("emoji-fountain");
++    const particles = container.querySelectorAll(".map-surface__emoji-particle");
++    expect(particles).toHaveLength(7);
++    particles.forEach((p) => {
++      expect(p.textContent).toBe("😊");
++    });
++  });
++
++  it("calls onComplete after animation duration", async () => {
++    vi.useFakeTimers();
++    const onComplete = vi.fn();
++
++    render(
++      <EmojiFountain
++        emoji="😫"
++        position={{ x: 100, y: 200 }}
++        onComplete={onComplete}
++      />,
++    );
++
++    expect(onComplete).not.toHaveBeenCalled();
++
++    await vi.advanceTimersByTimeAsync(900);
++
++    expect(onComplete).toHaveBeenCalledTimes(1);
++  });
++});
+
+=== FILE: frontend/src/features/map/EmojiFountain.tsx ===
+@@ -0,0 +1,53 @@
++import { type CSSProperties, useEffect, useMemo } from "react";
++
++const PARTICLE_COUNT = 7;
++const ANIMATION_DURATION_MS = 800;
++
++interface EmojiFountainProps {
++  position: { x: number; y: number };
++  emoji: string;
++  onComplete: () => void;
++}
++
++export function EmojiFountain({
++  position,
++  emoji,
++  onComplete,
++}: EmojiFountainProps) {
++  const particles = useMemo(
++    () =>
++      Array.from({ length: PARTICLE_COUNT }, (_, index) => {
++        const angle = ((index - (PARTICLE_COUNT - 1) / 2) * 30) / PARTICLE_COUNT;
++        const delay = index * 40;
++        return { angle, delay, key: index };
++      }),
++    [],
++  );
++
++  useEffect(() => {
++    const timerId = setTimeout(onComplete, ANIMATION_DURATION_MS + 100);
++    return () => clearTimeout(timerId);
++  }, [onComplete]);
++
++  return (
++    <div
++      aria-hidden="true"
++      className="map-surface__emoji-fountain"
++      data-testid="emoji-fountain"
++      style={{ left: `${position.x}px`, top: `${position.y}px` }}
++    >
++      {particles.map(({ angle, delay, key }) => (
++        <span
++          className="map-surface__emoji-particle"
++          key={key}
++          style={{
++            "--particle-angle": `${angle}deg`,
++            "--particle-delay": `${delay}ms`,
++          } as CSSProperties}
++        >
++          {emoji}
++        </span>
++      ))}
++    </div>
++  );
++}
+
+=== FILE: frontend/src/features/map/FeedbackPanel.test.tsx ===
+@@ -0,0 +1,89 @@
++import { fireEvent, render, screen } from "@testing-library/react";
++import { describe, expect, it, vi } from "vitest";
++import { FeedbackPanel } from "./FeedbackPanel";
++
++describe("FeedbackPanel", () => {
++  it("renders stress levels and emotion tags", () => {
++    render(
++      <FeedbackPanel
++        position={{ x: 100, y: 200 }}
++        submitting={false}
++        onCancel={vi.fn()}
++        onSubmit={vi.fn()}
++      />,
++    );
++
++    expect(screen.getByText("这里感觉怎样？")).toBeInTheDocument();
++    expect(screen.getByRole("button", { name: /压力 50/ })).toBeInTheDocument();
++    expect(screen.getByRole("button", { name: /原因 噪音/ })).toBeInTheDocument();
++    expect(screen.getByRole("button", { name: "提交反馈" })).toBeDisabled();
++  });
++
++  it("enables submit only when both stress and tag are selected", () => {
++    render(
++      <FeedbackPanel
++        position={{ x: 100, y: 200 }}
++        submitting={false}
++        onCancel={vi.fn()}
++        onSubmit={vi.fn()}
++      />,
++    );
++
++    fireEvent.click(screen.getByRole("button", { name: /压力 75/ }));
++    // Still disabled — need tag
++    expect(screen.getByRole("button", { name: "提交反馈" })).toBeDisabled();
++
++    fireEvent.click(screen.getByRole("button", { name: /原因 拥挤/ }));
++    // Now enabled
++    expect(screen.getByRole("button", { name: "提交反馈" })).not.toBeDisabled();
++  });
++
++  it("calls onSubmit with selected values", () => {
++    const onSubmit = vi.fn();
++    render(
++      <FeedbackPanel
++        position={{ x: 100, y: 200 }}
++        submitting={false}
++        onCancel={vi.fn()}
++        onSubmit={onSubmit}
++      />,
++    );
++
++    fireEvent.click(screen.getByRole("button", { name: /压力 100/ }));
++    fireEvent.click(screen.getByRole("button", { name: /原因 暴晒/ }));
++    fireEvent.click(screen.getByRole("button", { name: "提交反馈" }));
++
++    expect(onSubmit).toHaveBeenCalledWith(100, "SUN");
++  });
++
++  it("disables all controls when submitting", () => {
++    render(
++      <FeedbackPanel
++        position={{ x: 100, y: 200 }}
++        submitting={true}
++        onCancel={vi.fn()}
++        onSubmit={vi.fn()}
++      />,
++    );
++
++    expect(screen.getByRole("button", { name: /压力 0/ })).toBeDisabled();
++    expect(screen.getByRole("button", { name: /原因 噪音/ })).toBeDisabled();
++    expect(screen.getByRole("button", { name: "提交反馈" })).toBeDisabled();
++    expect(screen.getByText("提交中…")).toBeInTheDocument();
++  });
++
++  it("calls onCancel when close button is clicked", () => {
++    const onCancel = vi.fn();
++    render(
++      <FeedbackPanel
++        position={{ x: 100, y: 200 }}
++        submitting={false}
++        onCancel={onCancel}
++        onSubmit={vi.fn()}
++      />,
++    );
++
++    fireEvent.click(screen.getByRole("button", { name: "关闭反馈面板" }));
++    expect(onCancel).toHaveBeenCalledTimes(1);
++  });
++});
+
+=== FILE: frontend/src/features/map/FeedbackPanel.tsx ===
+@@ -0,0 +1,116 @@
++import { useState } from "react";
++import type { EmotionTag } from "../../types";
++
++const STRESS_LEVELS = [
++  { value: 0, emoji: "😊", label: "轻松" },
++  { value: 25, emoji: "🙂", label: "还好" },
++  { value: 50, emoji: "😐", label: "一般" },
++  { value: 75, emoji: "😟", label: "烦躁" },
++  { value: 100, emoji: "😫", label: "崩溃" },
++] as const;
++
++const EMOTION_TAGS: { value: EmotionTag; emoji: string; label: string }[] = [
++  { value: "NOISE", emoji: "🔊", label: "噪音" },
++  { value: "CROWD", emoji: "👥", label: "拥挤" },
++  { value: "SUN", emoji: "☀️", label: "暴晒" },
++  { value: "ODOR", emoji: "👃", label: "异味" },
++  { value: "OTHER", emoji: "💭", label: "其他" },
++];
++
++interface FeedbackPanelProps {
++  position: { x: number; y: number };
++  onSubmit: (stressLevel: number, tag: EmotionTag) => void;
++  onCancel: () => void;
++  submitting: boolean;
++}
++
++export function FeedbackPanel({
++  position,
++  onSubmit,
++  onCancel,
++  submitting,
++}: FeedbackPanelProps) {
++  const [stressLevel, setStressLevel] = useState<number | null>(null);
++  const [tag, setTag] = useState<EmotionTag | null>(null);
++
++  const canSubmit = stressLevel !== null && tag !== null && !submitting;
++
++  const handleSubmit = () => {
++    if (canSubmit) {
++      onSubmit(stressLevel, tag);
++    }
++  };
++
++  return (
++    <div
++      aria-label="情绪反馈面板"
++      className="map-surface__feedback-panel"
++      data-testid="feedback-panel"
++      role="dialog"
++      style={{ left: `${position.x}px`, top: `${position.y}px` }}
++    >
++      <div className="map-surface__feedback-header">
++        <span>这里感觉怎样？</span>
++        <button
++          aria-label="关闭反馈面板"
++          className="map-surface__feedback-close"
++          disabled={submitting}
++          onClick={onCancel}
++          type="button"
++        >
++          ✕
++        </button>
++      </div>
++
++      <fieldset className="map-surface__feedback-group" disabled={submitting}>
++        <legend>压力等级</legend>
++        <div className="map-surface__feedback-buttons">
++          {STRESS_LEVELS.map(({ value, emoji, label }) => (
++            <button
++              aria-label={`压力 ${value} ${label}`}
++              aria-pressed={stressLevel === value}
++              className="map-surface__feedback-btn"
++              data-stress={value}
++              key={value}
++              onClick={() => setStressLevel(value)}
++              type="button"
++            >
++              <span className="map-surface__feedback-emoji">{emoji}</span>
++              <span className="map-surface__feedback-label">{label}</span>
++            </button>
++          ))}
++        </div>
++      </fieldset>
++
++      <fieldset className="map-surface__feedback-group" disabled={submitting}>
++        <legend>主要原因</legend>
++        <div className="map-surface__feedback-buttons">
++          {EMOTION_TAGS.map(({ value, emoji, label }) => (
++            <button
++              aria-label={`原因 ${label}`}
++              aria-pressed={tag === value}
++              className="map-surface__feedback-btn"
++              data-tag={value}
++              key={value}
++              onClick={() => setTag(value)}
++              type="button"
++            >
++              <span className="map-surface__feedback-emoji">{emoji}</span>
++              <span className="map-surface__feedback-label">{label}</span>
++            </button>
++          ))}
++        </div>
++      </fieldset>
++
++      <button
++        aria-label="提交反馈"
++        className="map-surface__feedback-submit"
++        disabled={!canSubmit}
++        onClick={handleSubmit}
++        type="button"
++      >
++        {submitting ? "提交中…" : "提交反馈"}
++      </button>
++    </div>
++  );
++}
+
+=== FILE: frontend/src/features/map/MapSurface.css ===
+@@ -222,3 +222,230 @@
+     transition: none;
+   }
+ }
++
++/* ── Feedback Panel ── */
++.map-surface__feedback-panel {
++  position: absolute;
++  z-index: 6;
++  display: grid;
++  min-width: 220px;
++  gap: 10px;
++  padding: 12px 14px;
++  border: 1px solid rgba(38, 73, 89, 0.16);
++  border-radius: 12px;
++  transform: translate(12px, calc(-100% - 12px));
++  color: #183848;
++  background: rgba(255, 255, 255, 0.97);
++  box-shadow: 0 10px 32px rgba(30, 58, 73, 0.24);
++  backdrop-filter: blur(10px);
++}
++
++.map-surface__feedback-header {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  font-size: 13px;
++  font-weight: 600;
++}
++
++.map-surface__feedback-close {
++  padding: 2px 6px;
++  border: 0;
++  border-radius: 4px;
++  color: #607888;
++  background: transparent;
++  cursor: pointer;
++  font-size: 14px;
++}
++
++.map-surface__feedback-close:hover {
++  background: #edf4f7;
++}
++
++.map-surface__feedback-group {
++  margin: 0;
++  padding: 0;
++  border: 0;
++}
++
++.map-surface__feedback-group legend {
++  margin-bottom: 4px;
++  color: #416170;
++  font-size: 11px;
++}
++
++.map-surface__feedback-buttons {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 4px;
++}
++
++.map-surface__feedback-btn {
++  display: flex;
++  flex-direction: column;
++  align-items: center;
++  gap: 1px;
++  padding: 4px 6px;
++  border: 1px solid transparent;
++  border-radius: 6px;
++  background: #f4f8fa;
++  cursor: pointer;
++  transition: background-color 120ms ease, border-color 120ms ease;
++}
++
++.map-surface__feedback-btn:hover {
++  background: #e4eff5;
++}
++
++.map-surface__feedback-btn[aria-pressed="true"] {
++  border-color: #2368ff;
++  background: #e8f0ff;
++}
++
++.map-surface__feedback-btn:disabled {
++  cursor: not-allowed;
++  opacity: 0.5;
++}
++
++.map-surface__feedback-emoji {
++  font-size: 18px;
++  line-height: 1;
++}
++
++.map-surface__feedback-label {
++  font-size: 10px;
++  color: #416170;
++}
++
++.map-surface__feedback-submit {
++  margin-top: 4px;
++  padding: 7px 12px;
++  border: 0;
++  border-radius: 8px;
++  color: #fff;
++  background: #2368ff;
++  cursor: pointer;
++  font-size: 12px;
++  font-weight: 600;
++  transition: background-color 120ms ease;
++}
++
++.map-surface__feedback-submit:hover:not(:disabled) {
++  background: #1a54d4;
++}
++
++.map-surface__feedback-submit:disabled {
++  cursor: not-allowed;
++  background: #a4bfde;
++}
++
++/* ── Emoji Fountain ── */
++.map-surface__emoji-fountain {
++  position: absolute;
++  z-index: 7;
++  pointer-events: none;
++  transform: translate(-50%, -50%);
++}
++
++.map-surface__emoji-particle {
++  position: absolute;
++  font-size: 22px;
++  line-height: 1;
++  animation: emoji-burst 800ms ease-out forwards;
++  animation-delay: var(--particle-delay, 0ms);
++  opacity: 0;
++}
++
++@keyframes emoji-burst {
++  0% {
++    opacity: 1;
++    transform: translate(0, 0) rotate(var(--particle-angle, 0deg)) scale(0.6);
++  }
++  50% {
++    opacity: 1;
++    transform: translate(
++        calc(sin(var(--particle-angle, 0deg)) * 60px),
++        calc(-40px - cos(var(--particle-angle, 0deg)) * 30px)
++      )
++      scale(1);
++  }
++  100% {
++    opacity: 0;
++    transform: translate(
++        calc(sin(var(--particle-angle, 0deg)) * 80px),
++        calc(-20px - cos(var(--particle-angle, 0deg)) * 50px)
++      )
++      scale(0.8);
++  }
++}
++
++@media (prefers-reduced-motion: reduce) {
++  .map-surface__emoji-particle {
++    animation: emoji-fade 400ms ease-out forwards;
++  }
++
++  @keyframes emoji-fade {
++    0% {
++      opacity: 1;
++    }
++    100% {
++      opacity: 0;
++    }
++  }
++}
++
++/* ── Route Overlay ── */
++.map-surface__route-overlay {
++  position: absolute;
++  inset: 0;
++  z-index: 2.5;
++  width: 100%;
++  height: 100%;
++  pointer-events: none;
++  overflow: visible;
++}
++
++.map-surface__route-line {
++  transition: all 250ms ease;
++  pointer-events: auto;
++}
++
++.map-surface__route-line:hover {
++  stroke-opacity: 0.9;
++  stroke-width: 5;
++}
++
++@media (prefers-reduced-motion: reduce) {
++  .map-surface__route-line {
++    transition: none;
++  }
++}
++
++/* ── Route Legend ── */
++.map-surface__route-legend {
++  position: absolute;
++  z-index: 5;
++  left: 12px;
++  bottom: 56px;
++  display: grid;
++  gap: 4px;
++  padding: 8px 10px;
++  border: 1px solid rgba(38, 73, 89, 0.12);
++  border-radius: 8px;
++  background: rgba(255, 255, 255, 0.94);
++  box-shadow: 0 3px 12px rgba(30, 58, 73, 0.12);
++  backdrop-filter: blur(8px);
++}
++
++.map-surface__route-legend-item {
++  display: flex;
++  align-items: center;
++  gap: 6px;
++  font-size: 11px;
++  color: #416170;
++}
++
++.map-surface__route-legend-item--selected {
++  font-weight: 700;
++  color: #183848;
++}
+
+=== FILE: frontend/src/features/map/MapSurface.test.tsx ===
+@@ -1,11 +1,11 @@
+-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
++import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+ import { afterEach, describe, expect, it, vi } from "vitest";
+-import type { HeatmapCell } from "../../types";
++import type { HeatmapCell, MapFeedbackDraft, ScoredRoute } from "../../types";
+ import {
+   resetAMapLoaderForTests,
+   type AMapNamespaceLike,
+ } from "./amapLoader";
+-import { MapSurface } from "./MapSurface";
++import { MapSurface, type MapSurfaceProps } from "./MapSurface";
+ 
+ const heatmapCell: HeatmapCell = {
+   cellId: "cell-1",
+@@ -19,6 +19,13 @@ const heatmapCell: HeatmapCell = {
+   dominantTag: "NOISE",
+ };
+ 
++const defaultProps: Omit<MapSurfaceProps, "heatmapCells" | "loading"> = {
++  routes: [],
++  onFeedbackSubmit: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
++  onRouteSelect: vi.fn(),
++  onViewportChange: vi.fn(),
++};
++
+ function lastCall(mock: ReturnType<typeof vi.fn>): unknown[] {
+   return mock.mock.calls[mock.mock.calls.length - 1] ?? [];
+ }
+@@ -35,6 +42,7 @@ describe("MapSurface", () => {
+ 
+     render(
+       <MapSurface
++        {...defaultProps}
+         heatmapCells={[heatmapCell]}
+         loading={false}
+         onViewportChange={onViewportChange}
+@@ -56,9 +64,9 @@ describe("MapSurface", () => {
+ 
+     render(
+       <MapSurface
++        {...defaultProps}
+         heatmapCells={[heatmapCell]}
+         loading={false}
+-        onViewportChange={vi.fn()}
+       />,
+     );
+ 
+@@ -84,6 +92,7 @@ describe("MapSurface", () => {
+ 
+     render(
+       <MapSurface
++        {...defaultProps}
+         heatmapCells={[]}
+         loading={false}
+         onViewportChange={onViewportChange}
+@@ -110,9 +119,9 @@ describe("MapSurface", () => {
+ 
+     render(
+       <MapSurface
++        {...defaultProps}
+         heatmapCells={[]}
+         loading={false}
+-        onViewportChange={vi.fn()}
+       />,
+     );
+     const script = document.querySelector<HTMLScriptElement>(
+@@ -147,6 +156,9 @@ describe("MapSurface", () => {
+         lngLatToContainer() {
+           return { x: 480, y: 300 };
+         }
++        containerToLngLat() {
++          return { getLng: () => 116.4, getLat: () => 39.91 };
++        }
+         off(eventName: string) {
+           listeners.delete(eventName);
+         }
+@@ -159,18 +171,18 @@ describe("MapSurface", () => {
+ 
+     const { rerender, unmount } = render(
+       <MapSurface
++        {...defaultProps}
+         heatmapCells={[]}
+         loading={false}
+-        onViewportChange={vi.fn()}
+       />,
+     );
+     expect(await screen.findByText("高德地图")).toBeInTheDocument();
+ 
+     rerender(
+       <MapSurface
++        {...defaultProps}
+         heatmapCells={[heatmapCell]}
+         loading={false}
+-        onViewportChange={vi.fn()}
+       />,
+     );
+ 
+@@ -188,13 +200,122 @@ describe("MapSurface", () => {
+ 
+     render(
+       <MapSurface
++        {...defaultProps}
+         heatmapCells={[]}
+         loading
+-        onViewportChange={vi.fn()}
+       />,
+     );
+ 
+     expect(await screen.findByText("正在更新情绪热力图")).toBeInTheDocument();
+     expect(screen.getByTestId("offline-map")).toBeInTheDocument();
+   });
++
++  it("shows feedback panel on long press and submits feedback", async () => {
++    vi.stubEnv("VITE_AMAP_JS_KEY", "");
++    vi.useFakeTimers();
++    const onFeedbackSubmit = vi
++      .fn<(draft: MapFeedbackDraft) => Promise<void>>()
++      .mockResolvedValue(undefined);
++
++    render(
++      <MapSurface
++        {...defaultProps}
++        heatmapCells={[]}
++        loading={false}
++        onFeedbackSubmit={onFeedbackSubmit}
++      />,
++    );
++
++    const section = screen.getByLabelText("城市通勤情绪地图");
++    const mapCanvas = screen.getByTestId("map-canvas");
++    vi.spyOn(mapCanvas, "getBoundingClientRect").mockReturnValue({
++      bottom: 650,
++      height: 600,
++      left: 100,
++      right: 1060,
++      top: 50,
++      width: 960,
++      x: 100,
++      y: 50,
++      toJSON: () => ({}),
++    });
++
++    // Simulate long press: pointer down then wait 650ms
++    act(() => {
++      const pointerDown = new MouseEvent("pointerdown", {
++        bubbles: true,
++        clientX: 480,
++        clientY: 300,
++      });
++      Object.defineProperty(pointerDown, "pointerId", { value: 1 });
++      fireEvent(section, pointerDown);
++    });
++
++    // Advance timer past 600ms threshold wrapped in act
++    await act(async () => {
++      await vi.advanceTimersByTimeAsync(700);
++    });
++
++    // Feedback panel should appear
++    const panel = screen.getByTestId("feedback-panel");
++    expect(panel).toBeInTheDocument();
++    expect(panel).toHaveStyle({ left: "380px", top: "250px" });
++
++    // Select stress level and tag
++    fireEvent.click(screen.getByRole("button", { name: /压力 75/ }));
++    fireEvent.click(screen.getByRole("button", { name: /原因 拥挤/ }));
++
++    // Submit
++    fireEvent.click(screen.getByRole("button", { name: "提交反馈" }));
++
++    // Allow async submit to resolve
++    await act(async () => {
++      await vi.advanceTimersByTimeAsync(100);
++    });
++
++    expect(onFeedbackSubmit).toHaveBeenCalledTimes(1);
++    const draft = onFeedbackSubmit.mock.calls[0][0];
++    expect(draft.stressLevel).toBe(75);
++    expect(draft.tag).toBe("CROWD");
++    expect(draft.location).toHaveProperty("longitude");
++    expect(draft.location).toHaveProperty("latitude");
++
++    vi.useRealTimers();
++  }, 10_000);
++
++  it("renders route overlay and legend when routes are provided", async () => {
++    vi.stubEnv("VITE_AMAP_JS_KEY", "");
++
++    const routes: ScoredRoute[] = [
++      {
++        id: "route-fast",
++        label: "最快路线",
++        distanceMeters: 2100,
++        durationSeconds: 720,
++        stressExposure: 67.2,
++        stressScore: 50.4,
++        confidence: 0.68,
++        fastest: true,
++        leastStressful: false,
++        polyline: [
++          { longitude: 116.392, latitude: 39.905 },
++          { longitude: 116.405, latitude: 39.912 },
++        ],
++      },
++    ];
++
++    render(
++      <MapSurface
++        {...defaultProps}
++        heatmapCells={[]}
++        loading={false}
++        routes={routes}
++        selectedRouteId="route-fast"
++      />,
++    );
++
++    expect(await screen.findByTestId("route-overlay")).toBeInTheDocument();
++    expect(screen.getByTestId("route-legend")).toBeInTheDocument();
++    expect(screen.getByText("最快路线")).toBeInTheDocument();
++  });
+ });
+
+=== FILE: frontend/src/features/map/MapSurface.tsx ===
+@@ -4,38 +4,75 @@ import {
+   useRef,
+   useState,
+ } from "react";
+-import type { GeoPoint, HeatmapCell } from "../../types";
++import type {
++  EmotionTag,
++  GeoPoint,
++  HeatmapCell,
++  MapFeedbackDraft,
++  ScoredRoute,
++} from "../../types";
++import { EmojiFountain } from "./EmojiFountain";
++import { FeedbackPanel } from "./FeedbackPanel";
+ import { HeatmapOverlay } from "./HeatmapOverlay";
++import { RouteLegend } from "./RouteLegend";
++import { RouteOverlay } from "./RouteOverlay";
+ import { loadAMap } from "./amapLoader";
+ import { createAMapAdapter, type MapAdapter } from "./mapAdapter";
+ import { OfflineMap } from "./OfflineMap";
++import { useLongPress, type LongPressPosition } from "./useLongPress";
+ import type { MapViewport, ProjectedPoint } from "./viewport";
+ import "./MapSurface.css";
+ 
+ export interface MapSurfaceProps {
+   heatmapCells: HeatmapCell[];
++  routes: ScoredRoute[];
++  selectedRouteId?: string;
+   loading: boolean;
++  onFeedbackSubmit: (draft: MapFeedbackDraft) => Promise<void>;
++  onRouteSelect: (routeId: string) => void;
+   onViewportChange: (bbox: string, zoom: number) => void;
+ }
+ 
+ type MapMode = "loading" | "amap" | "offline";
+ 
+ const unavailableProjector = (): ProjectedPoint => ({ x: -1_000, y: -1_000 });
++const unavailableUnprojector = (): GeoPoint => ({ longitude: 0, latitude: 0 });
+ 
+ export function MapSurface({
+   heatmapCells,
++  routes,
++  selectedRouteId,
+   loading,
++  onFeedbackSubmit,
++  onRouteSelect,
+   onViewportChange,
+ }: MapSurfaceProps) {
+   const mapHostRef = useRef<HTMLDivElement>(null);
+   const adapterRef = useRef<MapAdapter | null>(null);
+   const viewportCallbackRef = useRef(onViewportChange);
++  const feedbackSubmitRef = useRef(onFeedbackSubmit);
++  feedbackSubmitRef.current = onFeedbackSubmit;
++
+   const [mode, setMode] = useState<MapMode>("loading");
+-  const [projector, setProjector] = useState<(
+-    point: GeoPoint,
+-  ) => ProjectedPoint>(() => unavailableProjector);
++  const [projector, setProjector] = useState<
++    (point: GeoPoint) => ProjectedPoint
++  >(() => unavailableProjector);
++  const [unprojector, setUnprojector] = useState<
++    (point: ProjectedPoint) => GeoPoint
++  >(() => unavailableUnprojector);
+   const [viewportRevision, setViewportRevision] = useState(0);
+ 
++  // Feedback panel state
++  const [feedbackPosition, setFeedbackPosition] =
++    useState<LongPressPosition | null>(null);
++  const [feedbackGeoPoint, setFeedbackGeoPoint] = useState<GeoPoint | null>(null);
++  const [submitting, setSubmitting] = useState(false);
++
++  // Emoji fountain state
++  const [fountainPosition, setFountainPosition] =
++    useState<LongPressPosition | null>(null);
++  const [fountainEmoji, setFountainEmoji] = useState<string | null>(null);
++
+   useEffect(() => {
+     viewportCallbackRef.current = onViewportChange;
+   }, [onViewportChange]);
+@@ -76,6 +113,9 @@ export function MapSurface({
+         const adapter = createAMapAdapter(container, namespace);
+         adapterRef.current = adapter;
+         setProjector(() => (point: GeoPoint) => adapter.project(point));
++        setUnprojector(
++          () => (point: ProjectedPoint) => adapter.unproject(point),
++        );
+         unsubscribe = adapter.subscribe(() => publishAdapterViewport(adapter));
+         setMode("amap");
+         publishAdapterViewport(adapter);
+@@ -93,10 +133,12 @@ export function MapSurface({
+   const handleOfflineProjectorChange = useCallback(
+     (
+       nextProjector: (point: GeoPoint) => ProjectedPoint,
++      nextUnprojector: (point: ProjectedPoint) => GeoPoint,
+       viewport: MapViewport,
+       commitViewport: boolean,
+     ) => {
+       setProjector(() => nextProjector);
++      setUnprojector(() => nextUnprojector);
+       setViewportRevision((current) => current + 1);
+       if (commitViewport) {
+         viewportCallbackRef.current(viewport.bbox, viewport.zoom);
+@@ -105,11 +147,87 @@ export function MapSurface({
+     [],
+   );
+ 
++  // Long-press handler: screen position -> GeoPoint -> show feedback panel
++  const handleLongPress = useCallback(
++    (position: LongPressPosition) => {
++      const container = mapHostRef.current;
++      if (!container) {
++        return;
++      }
++      // Convert screen coords to container-relative coords
++      const rect = container.getBoundingClientRect();
++      const relativePoint: ProjectedPoint = {
++        x: position.x - rect.left,
++        y: position.y - rect.top,
++      };
++      const geoPoint = unprojector(relativePoint);
++      setFeedbackGeoPoint(geoPoint);
++      setFeedbackPosition(relativePoint);
++    },
++    [unprojector],
++  );
++
++  const {
++    longPressPosition: _lpPos,
++    clearLongPress,
++    handlePointerDown,
++    handlePointerMove,
++    handlePointerUp,
++  } = useLongPress(handleLongPress);
++
++  const handleFeedbackSubmit = useCallback(
++    async (stressLevel: number, tag: EmotionTag) => {
++      if (!feedbackGeoPoint || !feedbackPosition) {
++        return;
++      }
++      setSubmitting(true);
++      try {
++        await feedbackSubmitRef.current({
++          location: feedbackGeoPoint,
++          stressLevel: stressLevel as MapFeedbackDraft["stressLevel"],
++          tag,
++        });
++        // Show emoji fountain on success
++        const emojiMap: Record<number, string> = {
++          0: "😊",
++          25: "🙂",
++          50: "😐",
++          75: "😟",
++          100: "😫",
++        };
++        setFountainPosition(feedbackPosition);
++        setFountainEmoji(emojiMap[stressLevel] ?? "✨");
++      } finally {
++        setSubmitting(false);
++        setFeedbackPosition(null);
++        setFeedbackGeoPoint(null);
++        clearLongPress();
++      }
++    },
++    [feedbackGeoPoint, feedbackPosition, clearLongPress],
++  );
++
++  const handleFeedbackCancel = useCallback(() => {
++    setFeedbackPosition(null);
++    setFeedbackGeoPoint(null);
++    setSubmitting(false);
++    clearLongPress();
++  }, [clearLongPress]);
++
++  const handleFountainComplete = useCallback(() => {
++    setFountainPosition(null);
++    setFountainEmoji(null);
++  }, []);
++
+   return (
+     <section
+       aria-label="城市通勤情绪地图"
+       className="map-surface"
+       data-map-mode={mode}
++      onPointerCancel={handlePointerUp}
++      onPointerDown={handlePointerDown}
++      onPointerMove={handlePointerMove}
++      onPointerUp={handlePointerUp}
+     >
+       <div
+         className="map-surface__canvas"
+@@ -132,6 +250,37 @@ export function MapSurface({
+         />
+       )}
+ 
++      {mode !== "loading" && routes.length > 0 && (
++        <RouteOverlay
++          project={(point) => projector(point)}
++          routes={routes}
++          selectedRouteId={selectedRouteId}
++          viewportRevision={viewportRevision}
++          onRouteSelect={onRouteSelect}
++        />
++      )}
++
++      {feedbackPosition && (
++        <FeedbackPanel
++          position={feedbackPosition}
++          submitting={submitting}
++          onCancel={handleFeedbackCancel}
++          onSubmit={handleFeedbackSubmit}
++        />
++      )}
++
++      {fountainPosition && fountainEmoji && (
++        <EmojiFountain
++          emoji={fountainEmoji}
++          position={fountainPosition}
++          onComplete={handleFountainComplete}
++        />
++      )}
++
++      {routes.length > 0 && (
++        <RouteLegend routes={routes} selectedRouteId={selectedRouteId} />
++      )}
++
+       <div className="map-surface__mode-badge" role="status">
+         {mode === "loading" && "正在加载地图"}
+         {mode === "amap" && "高德地图"}
+
+=== FILE: frontend/src/features/map/OfflineMap.tsx ===
+@@ -16,6 +16,7 @@ import {
+   getMapSize,
+   panCenter,
+   projectGeoPoint,
++  unprojectGeoPoint,
+   type MapViewport,
+   type ProjectedPoint,
+ } from "./viewport";
+@@ -28,6 +29,7 @@ interface OfflineMapProps {
+   containerRef: RefObject<HTMLDivElement | null>;
+   onProjectorChange: (
+     project: (point: GeoPoint) => ProjectedPoint,
++    unproject: (point: ProjectedPoint) => GeoPoint,
+     viewport: MapViewport,
+     commitViewport: boolean,
+   ) => void;
+@@ -63,6 +65,7 @@ export function OfflineMap({
+     const size = getMapSize(container);
+     onProjectorChange(
+       (point) => projectGeoPoint(point, currentCenter, currentZoom, size),
++      (point) => unprojectGeoPoint(point, currentCenter, currentZoom, size),
+       calculateViewport(currentCenter, currentZoom, size),
+       commitViewport,
+     );
+
+=== FILE: frontend/src/features/map/RouteLegend.test.tsx ===
+@@ -0,0 +1,63 @@
++import { render, screen } from "@testing-library/react";
++import { describe, expect, it } from "vitest";
++import type { ScoredRoute } from "../../types";
++import { RouteLegend } from "./RouteLegend";
++
++const routeFast: ScoredRoute = {
++  id: "route-fast",
++  label: "最快路线 A",
++  distanceMeters: 2100,
++  durationSeconds: 720,
++  stressExposure: 67.2,
++  stressScore: 50.4,
++  confidence: 0.68,
++  fastest: true,
++  leastStressful: false,
++  polyline: [],
++};
++
++const routeCalm: ScoredRoute = {
++  id: "route-calm",
++  label: "少心累路线 B",
++  distanceMeters: 2800,
++  durationSeconds: 960,
++  stressExposure: 30.1,
++  stressScore: 25.0,
++  confidence: 0.72,
++  fastest: false,
++  leastStressful: true,
++  polyline: [],
++};
++
++describe("RouteLegend", () => {
++  it("renders nothing when routes are empty", () => {
++    const { container } = render(<RouteLegend routes={[]} />);
++    expect(container.firstChild).toBeNull();
++  });
++
++  it("displays labels for all routes", () => {
++    render(
++      <RouteLegend
++        routes={[routeFast, routeCalm]}
++        selectedRouteId="route-fast"
++      />,
++    );
++
++    expect(screen.getByText("最快路线 A")).toBeInTheDocument();
++    expect(screen.getByText("少心累路线 B")).toBeInTheDocument();
++  });
++
++  it("marks selected route with selected class", () => {
++    render(
++      <RouteLegend
++        routes={[routeFast, routeCalm]}
++        selectedRouteId="route-fast"
++      />,
++    );
++
++    const legend = screen.getByTestId("route-legend");
++    const selectedItem = legend.querySelector(".map-surface__route-legend-item--selected");
++    expect(selectedItem).not.toBeNull();
++    expect(selectedItem!.textContent).toContain("最快路线 A");
++  });
++});
+
+=== FILE: frontend/src/features/map/RouteLegend.tsx ===
+@@ -0,0 +1,44 @@
++import type { ScoredRoute } from "../../types";
++
++interface RouteLegendProps {
++  routes: ScoredRoute[];
++  selectedRouteId?: string;
++}
++
++export function RouteLegend({ routes, selectedRouteId }: RouteLegendProps) {
++  if (routes.length === 0) {
++    return null;
++  }
++
++  return (
++    <div
++      aria-label="路线图例"
++      className="map-surface__route-legend"
++      data-testid="route-legend"
++    >
++      {routes.map((route) => {
++        const isSelected = route.id === selectedRouteId;
++        return (
++          <div
++            className={`map-surface__route-legend-item ${isSelected ? "map-surface__route-legend-item--selected" : ""}`}
++            key={route.id}
++          >
++            <svg height="12" width="28">
++              <line
++                stroke={isSelected ? "#2368ff" : "#a0b4c0"}
++                strokeDasharray={isSelected ? "none" : "6 3"}
++                strokeLinecap="round"
++                strokeWidth={isSelected ? 3 : 2}
++                x1="0"
++                x2="28"
++                y1="6"
++                y2="6"
++              />
++            </svg>
++            <span>{route.label}</span>
++          </div>
++        );
++      })}
++    </div>
++  );
++}
+
+=== FILE: frontend/src/features/map/RouteOverlay.test.tsx ===
+@@ -0,0 +1,137 @@
++import { fireEvent, render, screen } from "@testing-library/react";
++import { describe, expect, it, vi } from "vitest";
++import type { ScoredRoute } from "../../types";
++import { RouteOverlay } from "./RouteOverlay";
++
++const mockProject = () => ({ x: 100, y: 200 });
++
++const routeFast: ScoredRoute = {
++  id: "route-fast",
++  label: "最快路线 A",
++  distanceMeters: 2100,
++  durationSeconds: 720,
++  stressExposure: 67.2,
++  stressScore: 50.4,
++  confidence: 0.68,
++  fastest: true,
++  leastStressful: false,
++  polyline: [
++    { longitude: 116.392, latitude: 39.905 },
++    { longitude: 116.400, latitude: 39.908 },
++    { longitude: 116.405, latitude: 39.912 },
++  ],
++};
++
++const routeCalm: ScoredRoute = {
++  id: "route-calm",
++  label: "少心累路线 B",
++  distanceMeters: 2800,
++  durationSeconds: 960,
++  stressExposure: 30.1,
++  stressScore: 25.0,
++  confidence: 0.72,
++  fastest: false,
++  leastStressful: true,
++  polyline: [
++    { longitude: 116.392, latitude: 39.905 },
++    { longitude: 116.395, latitude: 39.910 },
++    { longitude: 116.405, latitude: 39.912 },
++  ],
++};
++
++describe("RouteOverlay", () => {
++  it("renders nothing when routes are empty", () => {
++    const { container } = render(
++      <RouteOverlay
++        project={mockProject}
++        routes={[]}
++        viewportRevision={0}
++      />,
++    );
++    expect(container.firstChild).toBeNull();
++  });
++
++  it("renders polylines for each route", () => {
++    render(
++      <RouteOverlay
++        project={mockProject}
++        routes={[routeFast, routeCalm]}
++        selectedRouteId="route-fast"
++        viewportRevision={0}
++      />,
++    );
++
++    const overlay = screen.getByTestId("route-overlay");
++    const lines = overlay.querySelectorAll("polyline");
++    expect(lines).toHaveLength(2);
++  });
++
++  it("highlights selected route with solid stroke", () => {
++    render(
++      <RouteOverlay
++        project={mockProject}
++        routes={[routeFast, routeCalm]}
++        selectedRouteId="route-fast"
++        viewportRevision={0}
++      />,
++    );
++
++    const selectedLine = screen
++      .getByTestId("route-overlay")
++      .querySelector('[data-route-id="route-fast"]');
++    expect(selectedLine).toHaveAttribute("stroke", "#2368ff");
++    expect(selectedLine).toHaveAttribute("stroke-dasharray", "none");
++    expect(selectedLine).toHaveAttribute("stroke-width", "4");
++  });
++
++  it("renders non-selected route with dashed stroke", () => {
++    render(
++      <RouteOverlay
++        project={mockProject}
++        routes={[routeFast, routeCalm]}
++        selectedRouteId="route-fast"
++        viewportRevision={0}
++      />,
++    );
++
++    const calmLine = screen
++      .getByTestId("route-overlay")
++      .querySelector('[data-route-id="route-calm"]');
++    expect(calmLine).toHaveAttribute("stroke", "#a0b4c0");
++    expect(calmLine).toHaveAttribute("stroke-dasharray", "8 4");
++  });
++
++  it("calls onRouteSelect when a route is clicked", () => {
++    const onRouteSelect = vi.fn();
++    render(
++      <RouteOverlay
++        project={mockProject}
++        routes={[routeFast, routeCalm]}
++        selectedRouteId="route-fast"
++        viewportRevision={0}
++        onRouteSelect={onRouteSelect}
++      />,
++    );
++
++    const calmLine = screen
++      .getByTestId("route-overlay")
++      .querySelector('[data-route-id="route-calm"]');
++    fireEvent.click(calmLine!);
++    expect(onRouteSelect).toHaveBeenCalledWith("route-calm");
++  });
++
++  it("projects route polyline coordinates", () => {
++    const project = vi.fn(() => ({ x: 50, y: 75 }));
++    render(
++      <RouteOverlay
++        project={project}
++        routes={[routeFast]}
++        viewportRevision={0}
++      />,
++    );
++
++    // project should have been called for each polyline point
++    expect(project).toHaveBeenCalledTimes(3);
++    expect(project).toHaveBeenCalledWith({ longitude: 116.392, latitude: 39.905 });
++  });
++});
+
+=== FILE: frontend/src/features/map/RouteOverlay.tsx ===
+@@ -0,0 +1,72 @@
++import { useMemo } from "react";
++import type { GeoPoint, ScoredRoute } from "../../types";
++import type { ProjectedPoint } from "./viewport";
++
++interface RouteOverlayProps {
++  routes: ScoredRoute[];
++  selectedRouteId?: string;
++  project: (point: GeoPoint) => ProjectedPoint;
++  viewportRevision: number;
++  onRouteSelect?: (routeId: string) => void;
++}
++
++export function RouteOverlay({
++  routes,
++  selectedRouteId,
++  project,
++  viewportRevision,
++  onRouteSelect,
++}: RouteOverlayProps) {
++  if (routes.length === 0) {
++    return null;
++  }
++
++  const projectedRoutes = useMemo(
++    () =>
++      routes.map((route) => ({
++        route,
++        points: route.polyline.map((geo) => project(geo)),
++      })),
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++    [routes, project, viewportRevision],
++  );
++
++  const toPointsAttr = (points: ProjectedPoint[]) =>
++    points.map((p) => `${p.x},${p.y}`).join(" ");
++
++  // Render non-selected routes first, selected on top
++  const sorted = [...projectedRoutes].sort((a, b) => {
++    const aSelected = a.route.id === selectedRouteId ? 1 : 0;
++    const bSelected = b.route.id === selectedRouteId ? 1 : 0;
++    return aSelected - bSelected;
++  });
++
++  return (
++    <svg
++      aria-label="路线叠加层"
++      className="map-surface__route-overlay"
++      data-testid="route-overlay"
++    >
++      {sorted.map(({ route, points }) => {
++        const isSelected = route.id === selectedRouteId;
++        return (
++          <polyline
++            className={`map-surface__route-line ${isSelected ? "map-surface__route-line--selected" : ""}`}
++            data-route-id={route.id}
++            fill="none"
++            key={route.id}
++            onClick={() => onRouteSelect?.(route.id)}
++            points={toPointsAttr(points)}
++            stroke={isSelected ? "#2368ff" : "#a0b4c0"}
++            strokeDasharray={isSelected ? "none" : "8 4"}
++            strokeLinecap="round"
++            strokeLinejoin="round"
++            strokeOpacity={isSelected ? 1 : 0.6}
++            strokeWidth={isSelected ? 4 : 3}
++            style={{ cursor: onRouteSelect ? "pointer" : undefined }}
++          />
++        );
++      })}
++    </svg>
++  );
++}
+
+=== FILE: frontend/src/features/map/amapLoader.test.ts ===
+@@ -20,6 +20,9 @@ const namespace = {
+     lngLatToContainer() {
+       return { x: 0, y: 0 };
+     }
++    containerToLngLat() {
++      return { getLng: () => 116.4, getLat: () => 39.91 };
++    }
+     off() {}
+     on() {}
+   },
+
+=== FILE: frontend/src/features/map/amapLoader.ts ===
+@@ -25,6 +25,7 @@ export interface AMapInstanceLike {
+   getBounds: () => AMapBoundsLike;
+   getZoom: () => number;
+   lngLatToContainer: (point: [number, number]) => AMapPointLike;
++  containerToLngLat: (point: [number, number]) => AMapLngLatLike;
+   off: (eventName: string, listener: () => void) => void;
+   on: (eventName: string, listener: () => void) => void;
+   resize?: () => void;
+
+=== FILE: frontend/src/features/map/index.ts ===
+@@ -1,2 +1,3 @@
+ export { MapSurface } from "./MapSurface";
+ export type { MapSurfaceProps } from "./MapSurface";
++export type { MapFeedbackDraft } from "../../types";
+
+=== FILE: frontend/src/features/map/mapAdapter.ts ===
+@@ -16,6 +16,7 @@ export interface MapAdapter {
+   destroy: () => void;
+   getViewport: () => MapViewport;
+   project: (point: GeoPoint) => ProjectedPoint;
++  unproject: (point: ProjectedPoint) => GeoPoint;
+   subscribe: (listener: () => void) => () => void;
+ }
+ 
+@@ -111,6 +112,13 @@ export function createAMapAdapter(
+         y: readPixel(projected, "y"),
+       };
+     },
++    unproject: (point) => {
++      const lngLat = map.containerToLngLat([point.x, point.y]);
++      return {
++        longitude: readCoordinate(lngLat, "getLng", "lng"),
++        latitude: readCoordinate(lngLat, "getLat", "lat"),
++      };
++    },
+     subscribe: (listener) => {
+       listeners.add(listener);
+       return () => {
+
+=== FILE: frontend/src/features/map/useLongPress.test.ts ===
+@@ -0,0 +1,90 @@
++import { afterEach, describe, expect, it, vi } from "vitest";
++import { renderHook, act } from "@testing-library/react";
++import { useLongPress } from "./useLongPress";
++
++afterEach(() => {
++  vi.useRealTimers();
++});
++
++describe("useLongPress", () => {
++  it("fires callback after 600ms hold without movement", async () => {
++    vi.useFakeTimers();
++    const onLongPress = vi.fn();
++    const { result } = renderHook(() => useLongPress(onLongPress));
++
++    act(() => {
++      result.current.handlePointerDown({
++        pointerId: 1,
++        clientX: 200,
++        clientY: 300,
++      } as React.PointerEvent);
++    });
++
++    expect(onLongPress).not.toHaveBeenCalled();
++
++    await act(async () => {
++      await vi.advanceTimersByTimeAsync(600);
++    });
++
++    expect(onLongPress).toHaveBeenCalledTimes(1);
++    expect(onLongPress).toHaveBeenCalledWith({ x: 200, y: 300 });
++  });
++
++  it("cancels when pointer moves beyond threshold", async () => {
++    vi.useFakeTimers();
++    const onLongPress = vi.fn();
++    const { result } = renderHook(() => useLongPress(onLongPress));
++
++    act(() => {
++      result.current.handlePointerDown({
++        pointerId: 1,
++        clientX: 200,
++        clientY: 300,
++      } as React.PointerEvent);
++    });
++
++    // Move beyond 10px threshold
++    act(() => {
++      result.current.handlePointerMove({
++        pointerId: 1,
++        clientX: 215,
++        clientY: 300,
++      } as React.PointerEvent);
++    });
++
++    await act(async () => {
++      await vi.advanceTimersByTimeAsync(700);
++    });
++
++    expect(onLongPress).not.toHaveBeenCalled();
++  });
++
++  it("cancels when pointer is released before 600ms", async () => {
++    vi.useFakeTimers();
++    const onLongPress = vi.fn();
++    const { result } = renderHook(() => useLongPress(onLongPress));
++
++    act(() => {
++      result.current.handlePointerDown({
++        pointerId: 1,
++        clientX: 200,
++        clientY: 300,
++      } as React.PointerEvent);
++    });
++
++    // Release early
++    act(() => {
++      result.current.handlePointerUp({
++        pointerId: 1,
++        clientX: 200,
++        clientY: 300,
++      } as React.PointerEvent);
++    });
++
++    await act(async () => {
++      await vi.advanceTimersByTimeAsync(700);
++    });
++
++    expect(onLongPress).not.toHaveBeenCalled();
++  });
++});
+
+=== FILE: frontend/src/features/map/useLongPress.ts ===
+@@ -0,0 +1,101 @@
++import { useCallback, useRef, useState } from "react";
++
++const LONG_PRESS_MS = 600;
++const MOVE_THRESHOLD_PX = 10;
++
++export interface LongPressPosition {
++  x: number;
++  y: number;
++}
++
++export interface UseLongPressResult {
++  longPressPosition: LongPressPosition | null;
++  clearLongPress: () => void;
++  handlePointerDown: (event: React.PointerEvent) => void;
++  handlePointerMove: (event: React.PointerEvent) => void;
++  handlePointerUp: (event: React.PointerEvent) => void;
++}
++
++interface LongPressState {
++  pointerId: number;
++  startX: number;
++  startY: number;
++  timerId: ReturnType<typeof setTimeout>;
++}
++
++export function useLongPress(
++  onLongPress: (position: LongPressPosition) => void,
++): UseLongPressResult {
++  const stateRef = useRef<LongPressState | null>(null);
++  const onLongPressRef = useRef(onLongPress);
++  onLongPressRef.current = onLongPress;
++
++  const [longPressPosition, setLongPressPosition] =
++    useState<LongPressPosition | null>(null);
++
++  const cancel = useCallback(() => {
++    if (stateRef.current) {
++      clearTimeout(stateRef.current.timerId);
++      stateRef.current = null;
++    }
++  }, []);
++
++  const clearLongPress = useCallback(() => {
++    setLongPressPosition(null);
++  }, []);
++
++  const handlePointerDown = useCallback(
++    (event: React.PointerEvent) => {
++      cancel();
++      setLongPressPosition(null);
++
++      const { pointerId, clientX, clientY } = event;
++      const timerId = setTimeout(() => {
++        stateRef.current = null;
++        const position = { x: clientX, y: clientY };
++        setLongPressPosition(position);
++        onLongPressRef.current(position);
++      }, LONG_PRESS_MS);
++
++      stateRef.current = {
++        pointerId,
++        startX: clientX,
++        startY: clientY,
++        timerId,
++      };
++    },
++    [cancel],
++  );
++
++  const handlePointerMove = useCallback(
++    (event: React.PointerEvent) => {
++      const state = stateRef.current;
++      if (!state || state.pointerId !== event.pointerId) {
++        return;
++      }
++      const dx = Math.abs(event.clientX - state.startX);
++      const dy = Math.abs(event.clientY - state.startY);
++      if (dx > MOVE_THRESHOLD_PX || dy > MOVE_THRESHOLD_PX) {
++        cancel();
++      }
++    },
++    [cancel],
++  );
++
++  const handlePointerUp = useCallback(
++    (event: React.PointerEvent) => {
++      if (stateRef.current?.pointerId === event.pointerId) {
++        cancel();
++      }
++    },
++    [cancel],
++  );
++
++  return {
++    longPressPosition,
++    clearLongPress,
++    handlePointerDown,
++    handlePointerMove,
++    handlePointerUp,
++  };
++}
+
+=== FILE: frontend/src/features/map/viewport.test.ts ===
+@@ -5,6 +5,7 @@ import {
+   DEFAULT_MAP_CENTER,
+   projectGeoPoint,
+   scoreToColor,
++  unprojectGeoPoint,
+ } from "./viewport";
+ 
+ describe("map viewport helpers", () => {
+@@ -35,4 +36,14 @@ describe("map viewport helpers", () => {
+     expect(confidenceToOpacity(0)).toBe(0.18);
+     expect(confidenceToOpacity(2)).toBe(1);
+   });
++
++  it("round-trips project then unproject back to the original GeoPoint", () => {
++    const size = { width: 960, height: 600 };
++    const original = { longitude: 116.405, latitude: 39.915 };
++    const projected = projectGeoPoint(original, DEFAULT_MAP_CENTER, 14, size);
++    const recovered = unprojectGeoPoint(projected, DEFAULT_MAP_CENTER, 14, size);
++
++    expect(recovered.longitude).toBeCloseTo(original.longitude, 5);
++    expect(recovered.latitude).toBeCloseTo(original.latitude, 5);
++  });
+ });
+
+=== FILE: frontend/src/features/map/viewport.ts ===
+@@ -115,6 +115,22 @@ export function scoreToColor(score: number): string {
+   return `rgb(${mix(start.red, end.red)}, ${mix(start.green, end.green)}, ${mix(start.blue, end.blue)})`;
+ }
+ 
++export function unprojectGeoPoint(
++  point: ProjectedPoint,
++  center: GeoPoint,
++  zoom: number,
++  size: MapSize,
++): GeoPoint {
++  const centerX = longitudeToWorldX(center.longitude, zoom);
++  const centerY = latitudeToWorldY(center.latitude, zoom);
++  const worldX = point.x - size.width / 2 + centerX;
++  const worldY = point.y - size.height / 2 + centerY;
++  return {
++    longitude: worldXToLongitude(worldX, zoom),
++    latitude: worldYToLatitude(worldY, zoom),
++  };
++}
++
+ export function confidenceToOpacity(confidence: number): number {
+   return Math.max(0.18, Math.min(1, confidence));
+ }
+
+=== FILE: frontend/src/features/routes/RoutePanel.css ===
+@@ -0,0 +1,89 @@
++.route-panel {
++  display: flex;
++  gap: 10px;
++  padding: 12px;
++  overflow-x: auto;
++}
++
++.route-panel__card {
++  display: flex;
++  flex-direction: column;
++  flex: 1;
++  min-width: 160px;
++  gap: 8px;
++  padding: 12px 14px;
++  border: 2px solid rgba(38, 73, 89, 0.12);
++  border-radius: 12px;
++  color: #183848;
++  background: rgba(255, 255, 255, 0.96);
++  box-shadow: 0 2px 10px rgba(30, 58, 73, 0.1);
++  cursor: pointer;
++  text-align: left;
++  transition: border-color 150ms ease, box-shadow 150ms ease;
++}
++
++.route-panel__card:hover {
++  border-color: rgba(35, 104, 255, 0.3);
++  box-shadow: 0 4px 16px rgba(35, 104, 255, 0.12);
++}
++
++.route-panel__card--selected {
++  border-color: #2368ff;
++  box-shadow: 0 4px 16px rgba(35, 104, 255, 0.18);
++}
++
++.route-panel__header {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 6px;
++}
++
++.route-panel__label {
++  font-size: 13px;
++  font-weight: 600;
++}
++
++.route-panel__badges {
++  display: flex;
++  gap: 4px;
++}
++
++.route-panel__badge {
++  padding: 2px 6px;
++  border-radius: 4px;
++  font-size: 10px;
++  font-weight: 600;
++}
++
++.route-panel__badge--fast {
++  color: #1a6b3c;
++  background: #dcf5e7;
++}
++
++.route-panel__badge--calm {
++  color: #6b3fa0;
++  background: #ede4f7;
++}
++
++.route-panel__stats {
++  display: flex;
++  gap: 12px;
++}
++
++.route-panel__stat {
++  display: flex;
++  flex-direction: column;
++  gap: 1px;
++}
++
++.route-panel__stat-value {
++  font-size: 14px;
++  font-weight: 700;
++  color: #1a3a4d;
++}
++
++.route-panel__stat-label {
++  font-size: 10px;
++  color: #607888;
++}
+
+=== FILE: frontend/src/features/routes/RoutePanel.test.tsx ===
+@@ -0,0 +1,97 @@
++import { fireEvent, render, screen } from "@testing-library/react";
++import { describe, expect, it, vi } from "vitest";
++import type { ScoredRoute } from "../../types";
++import { RoutePanel } from "./RoutePanel";
++
++const routeFast: ScoredRoute = {
++  id: "route-fast",
++  label: "最快路线 A",
++  distanceMeters: 2100,
++  durationSeconds: 720,
++  stressExposure: 67.2,
++  stressScore: 50.4,
++  confidence: 0.68,
++  fastest: true,
++  leastStressful: false,
++  polyline: [],
++};
++
++const routeCalm: ScoredRoute = {
++  id: "route-calm",
++  label: "少心累路线 B",
++  distanceMeters: 2800,
++  durationSeconds: 960,
++  stressExposure: 30.1,
++  stressScore: 25.0,
++  confidence: 0.72,
++  fastest: false,
++  leastStressful: true,
++  polyline: [],
++};
++
++describe("RoutePanel", () => {
++  it("renders nothing when routes are empty", () => {
++    const { container } = render(
++      <RoutePanel routes={[]} onSelectRoute={vi.fn()} />,
++    );
++    expect(container.firstChild).toBeNull();
++  });
++
++  it("renders two route cards", () => {
++    render(
++      <RoutePanel
++        routes={[routeFast, routeCalm]}
++        selectedRouteId="route-fast"
++        onSelectRoute={vi.fn()}
++      />,
++    );
++
++    expect(screen.getByText("最快路线 A")).toBeInTheDocument();
++    expect(screen.getByText("少心累路线 B")).toBeInTheDocument();
++    expect(screen.getByText("最快")).toBeInTheDocument();
++    expect(screen.getByText("少心累")).toBeInTheDocument();
++  });
++
++  it("formats distance and duration", () => {
++    render(
++      <RoutePanel
++        routes={[routeFast, routeCalm]}
++        onSelectRoute={vi.fn()}
++      />,
++    );
++
++    expect(screen.getByText("2.1 km")).toBeInTheDocument();
++    expect(screen.getByText("12 分钟")).toBeInTheDocument();
++    expect(screen.getByText("2.8 km")).toBeInTheDocument();
++    expect(screen.getByText("16 分钟")).toBeInTheDocument();
++  });
++
++  it("calls onSelectRoute when a card is clicked", () => {
++    const onSelectRoute = vi.fn();
++    render(
++      <RoutePanel
++        routes={[routeFast, routeCalm]}
++        selectedRouteId="route-fast"
++        onSelectRoute={onSelectRoute}
++      />,
++    );
++
++    fireEvent.click(screen.getByRole("button", { name: /选择 少心累路线 B/ }));
++    expect(onSelectRoute).toHaveBeenCalledWith("route-calm");
++  });
++
++  it("marks selected card with aria-pressed", () => {
++    render(
++      <RoutePanel
++        routes={[routeFast, routeCalm]}
++        selectedRouteId="route-fast"
++        onSelectRoute={vi.fn()}
++      />,
++    );
++
++    const fastCard = screen.getByRole("button", { name: /选择 最快路线 A/ });
++    const calmCard = screen.getByRole("button", { name: /选择 少心累路线 B/ });
++    expect(fastCard).toHaveAttribute("aria-pressed", "true");
++    expect(calmCard).toHaveAttribute("aria-pressed", "false");
++  });
++});
+
+=== FILE: frontend/src/features/routes/RoutePanel.tsx ===
+@@ -0,0 +1,83 @@
++import type { ScoredRoute } from "../../types";
++import "./RoutePanel.css";
++
++interface RoutePanelProps {
++  routes: ScoredRoute[];
++  selectedRouteId?: string;
++  onSelectRoute: (routeId: string) => void;
++}
++
++function formatDistance(meters: number): string {
++  return meters >= 1000
++    ? `${(meters / 1000).toFixed(1)} km`
++    : `${Math.round(meters)} m`;
++}
++
++function formatDuration(seconds: number): string {
++  const minutes = Math.round(seconds / 60);
++  return `${minutes} 分钟`;
++}
++
++export function RoutePanel({
++  routes,
++  selectedRouteId,
++  onSelectRoute,
++}: RoutePanelProps) {
++  if (!routes || routes.length === 0) {
++    return null;
++  }
++
++  return (
++    <div aria-label="路线对比" className="route-panel" data-testid="route-panel">
++      {routes.map((route) => {
++        const isSelected = route.id === selectedRouteId;
++        return (
++          <button
++            aria-label={`选择 ${route.label}`}
++            aria-pressed={isSelected}
++            className={`route-panel__card ${isSelected ? "route-panel__card--selected" : ""}`}
++            key={route.id}
++            onClick={() => onSelectRoute(route.id)}
++            type="button"
++          >
++            <div className="route-panel__header">
++              <span className="route-panel__label">{route.label}</span>
++              <div className="route-panel__badges">
++                {route.fastest && (
++                  <span className="route-panel__badge route-panel__badge--fast">
++                    最快
++                  </span>
++                )}
++                {route.leastStressful && (
++                  <span className="route-panel__badge route-panel__badge--calm">
++                    少心累
++                  </span>
++                )}
++              </div>
++            </div>
++            <div className="route-panel__stats">
++              <div className="route-panel__stat">
++                <span className="route-panel__stat-value">
++                  {formatDistance(route.distanceMeters)}
++                </span>
++                <span className="route-panel__stat-label">距离</span>
++              </div>
++              <div className="route-panel__stat">
++                <span className="route-panel__stat-value">
++                  {formatDuration(route.durationSeconds)}
++                </span>
++                <span className="route-panel__stat-label">时间</span>
++              </div>
++              <div className="route-panel__stat">
++                <span className="route-panel__stat-value">
++                  {Math.round(route.stressScore)}
++                </span>
++                <span className="route-panel__stat-label">压力</span>
++              </div>
++            </div>
++          </button>
++        );
++      })}
++    </div>
++  );
++}
+
+=== FILE: frontend/src/features/routes/index.ts ===
+@@ -1,14 +1 @@
+-/**
+- * features/routes — 路线面板占位。
+- * 业务代码由成员 C 在 feature/map-interaction 分支中实现。
+- * 此处仅导出 Props 类型以保证 A 的页面可编译。
+- */
+-
+-export interface RoutePanelProps {
+-  routes?: unknown[];
+-  fastestRouteId?: string;
+-  leastStressfulRouteId?: string;
+-  onSelectRoute?: (routeId: string) => void;
+-}
+-
+-// 成员 C 将在此实现"最快"与"少心累"双路线对比面板
++export { RoutePanel } from "./RoutePanel";
+
+=== FILE: frontend/src/types/index.ts ===
+@@ -100,6 +100,13 @@ export interface RouteCompareRequest {
+   destination: GeoPoint;
+ }
+ 
++/** 地图反馈草稿（由 C 的地图组件生成，通过回调传给 A） */
++export interface MapFeedbackDraft {
++  location: GeoPoint;
++  stressLevel: 0 | 25 | 50 | 75 | 100;
++  tag: EmotionTag;
++}
++
+ /** 地图页面状态，通过 Props 传入 */
+ export interface MapPageState {
+   heatmapCells: HeatmapCell[];
+
+

@@ -8,6 +8,7 @@
 - 地图长按 600ms 的 emoji 反馈
 - “最快”与“少心累”双路线对比
 - 七日通勤情绪趋势与次日路线建议
+- 预设 Demo 起终点（北京西直门），无需手动选择
 - 无 Key、无数据库时仍可完成课堂演示
 
 ## 技术栈
@@ -36,12 +37,22 @@ npm run dev
 
 ## 生产式启动
 
+PostGIS/API 容器 + 前端本地启动。
+
 1. 安装 Docker Desktop。
 2. 复制 `.env.example` 为 `.env` 并填写高德 Key 和随机盐。
-3. 执行：
+3. 启动 PostGIS 和后端 API 容器：
 
 ```powershell
 docker compose -f infra/compose.yml --env-file .env up --build
+```
+
+4. 另开终端，启动前端开发服务器：
+
+```powershell
+cd frontend
+npm install
+npm run dev
 ```
 
 访问 `http://localhost:5173`。
