@@ -22,8 +22,8 @@ export const MOCK_ROUTE_COMPARISON: RouteComparison = {
       leastStressful: false,
       polyline: [
         CAMPUS.origin,
-        { longitude: 120.336, latitude: 31.49 },
-        { longitude: 120.3395, latitude: 31.4865 },
+        { longitude: 120.2738, latitude: 31.478 },
+        { longitude: 120.2741, latitude: 31.481 },
         CAMPUS.destination,
       ],
     },
@@ -39,8 +39,8 @@ export const MOCK_ROUTE_COMPARISON: RouteComparison = {
       leastStressful: true,
       polyline: [
         CAMPUS.origin,
-        { longitude: 120.333, latitude: 31.487 },
-        { longitude: 120.338, latitude: 31.484 },
+        { longitude: 120.2732, latitude: 31.477 },
+        { longitude: 120.2745, latitude: 31.481 },
         CAMPUS.destination,
       ],
     },

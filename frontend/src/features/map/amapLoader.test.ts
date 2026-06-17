@@ -4,21 +4,22 @@ import {
   resetAMapLoaderForTests,
   type AMapNamespaceLike,
 } from "./amapLoader";
+import { CAMPUS } from "../../config/campus";
 
 const namespace = {
   Map: class {
     destroy() {}
     getBounds() {
       return {
-        getNorthEast: () => ({ lng: 120.352, lat: 31.498 }),
-        getSouthWest: () => ({ lng: 120.324, lat: 31.478 }),
+        getNorthEast: () => ({ lng: CAMPUS.bounds.east, lat: CAMPUS.bounds.north }),
+        getSouthWest: () => ({ lng: CAMPUS.bounds.west, lat: CAMPUS.bounds.south }),
       };
     }
     getZoom() {
       return 16;
     }
     getCenter() {
-      return { lng: 120.338, lat: 31.488 };
+      return { lng: CAMPUS.center.longitude, lat: CAMPUS.center.latitude };
     }
     setCenter() {}
     setZoom() {}
@@ -26,7 +27,7 @@ const namespace = {
       return { x: 0, y: 0 };
     }
     containerToLngLat() {
-      return { lng: 120.338, lat: 31.488 };
+      return { lng: CAMPUS.center.longitude, lat: CAMPUS.center.latitude };
     }
     off() {}
     on() {}

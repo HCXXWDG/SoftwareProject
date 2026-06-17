@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { RoutePreviewPage } from "./RoutePreviewPage";
+import { CAMPUS } from "../config/campus";
 
 const mockRouteComparison = {
   routes: [
@@ -14,7 +15,7 @@ const mockRouteComparison = {
       confidence: 0.85,
       fastest: true,
       leastStressful: false,
-      polyline: [{ longitude: 120.3345, latitude: 31.492 }],
+      polyline: [{ longitude: CAMPUS.origin.longitude, latitude: CAMPUS.origin.latitude }],
     },
     {
       id: "r2",
@@ -26,7 +27,7 @@ const mockRouteComparison = {
       confidence: 0.78,
       fastest: false,
       leastStressful: true,
-      polyline: [{ longitude: 120.333, latitude: 31.487 }],
+      polyline: [{ longitude: CAMPUS.destination.longitude, latitude: CAMPUS.destination.latitude }],
     },
   ],
   fastestRouteId: "r1",
@@ -97,6 +98,28 @@ describe("RoutePreviewPage", () => {
     expect(
       screen.getByRole("button", { name: "进入离线地图" }),
     ).toBeInTheDocument();
+  });
+
+  it("sends compareRoutes request with fixed campus endpoints", async () => {
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockRouteComparison),
+    });
+
+    const onEnterMap = vi.fn();
+    render(<RoutePreviewPage onEnterMap={onEnterMap} />);
+
+    await waitFor(() => {
+      const compareCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
+        (c: unknown[]) => typeof c[0] === "string" && (c[0] as string).includes("/routes/compare"),
+      );
+      expect(compareCall).toBeDefined();
+      const body = JSON.parse((compareCall![1] as RequestInit).body as string);
+      expect(body.origin.longitude).toBe(CAMPUS.origin.longitude);
+      expect(body.origin.latitude).toBe(CAMPUS.origin.latitude);
+      expect(body.destination.longitude).toBe(CAMPUS.destination.longitude);
+      expect(body.destination.latitude).toBe(CAMPUS.destination.latitude);
+    });
   });
 
   it("enters offline map when clicking the offline button", async () => {

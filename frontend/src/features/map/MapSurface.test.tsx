@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HeatmapCell, MapFeedbackDraft, ScoredRoute } from "../../types";
+import { CAMPUS } from "../../config/campus";
 import {
   resetAMapLoaderForTests,
   type AMapNamespaceLike,
@@ -10,8 +11,8 @@ import { MapSurface, type MapSurfaceProps } from "./MapSurface";
 const heatmapCell: HeatmapCell = {
   cellId: "cell-1",
   center: {
-    longitude: 120.338,
-    latitude: 31.488,
+    longitude: CAMPUS.center.longitude,
+    latitude: CAMPUS.center.latitude,
   },
   score: 100,
   confidence: 0.05,
@@ -148,15 +149,15 @@ describe("MapSurface", () => {
         destroy = destroySpy;
         getBounds() {
           return {
-            getNorthEast: () => ({ lng: 120.352, lat: 31.498 }),
-            getSouthWest: () => ({ lng: 120.324, lat: 31.478 }),
+            getNorthEast: () => ({ lng: CAMPUS.bounds.east, lat: CAMPUS.bounds.north }),
+            getSouthWest: () => ({ lng: CAMPUS.bounds.west, lat: CAMPUS.bounds.south }),
           };
         }
         getZoom() {
           return 16;
         }
         getCenter() {
-          return { lng: 120.338, lat: 31.488 };
+          return { lng: CAMPUS.center.longitude, lat: CAMPUS.center.latitude };
         }
         setCenter() {}
         setZoom() {}
@@ -164,7 +165,7 @@ describe("MapSurface", () => {
           return { x: 480, y: 300 };
         }
         containerToLngLat() {
-          return { getLng: () => 120.338, getLat: () => 31.488 };
+          return { getLng: () => CAMPUS.center.longitude, getLat: () => CAMPUS.center.latitude };
         }
         off(eventName: string) {
           listeners.delete(eventName);
@@ -241,18 +242,18 @@ describe("MapSurface", () => {
         destroy() {}
         getBounds() {
           return {
-            getNorthEast: () => ({ lng: 120.352, lat: 31.498 }),
-            getSouthWest: () => ({ lng: 120.324, lat: 31.478 }),
+            getNorthEast: () => ({ lng: CAMPUS.bounds.east, lat: CAMPUS.bounds.north }),
+            getSouthWest: () => ({ lng: CAMPUS.bounds.west, lat: CAMPUS.bounds.south }),
           };
         }
         getZoom() { return 16; }
-        getCenter() { return { lng: 120.338, lat: 31.488 }; }
+        getCenter() { return { lng: CAMPUS.center.longitude, lat: CAMPUS.center.latitude }; }
         setCenter() {}
         setZoom() {}
         lngLatToContainer() { return { x: 380, y: 250 }; }
         containerToLngLat() {
           // Return a point inside campus bounds
-          return { getLng: () => 120.338, getLat: () => 31.488 };
+          return { getLng: () => CAMPUS.center.longitude, getLat: () => CAMPUS.center.latitude };
         }
         off(eventName: string) { listeners.delete(eventName); }
         on(eventName: string, listener: () => void) { listeners.set(eventName, listener); }
@@ -352,8 +353,8 @@ describe("MapSurface", () => {
         fastest: true,
         leastStressful: false,
         polyline: [
-          { longitude: 120.3345, latitude: 31.492 },
-          { longitude: 120.3415, latitude: 31.4845 },
+          { longitude: CAMPUS.origin.longitude, latitude: CAMPUS.origin.latitude },
+          { longitude: CAMPUS.destination.longitude, latitude: CAMPUS.destination.latitude },
         ],
       },
     ];
