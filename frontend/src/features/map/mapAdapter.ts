@@ -1,4 +1,6 @@
 import type { GeoPoint } from "../../types";
+import { CAMPUS } from "../../config/campus";
+import { clampCenter } from "./boundsClamp";
 import type {
   AMapInstanceLike,
   AMapLngLatLike,
@@ -6,8 +8,6 @@ import type {
   AMapPointLike,
 } from "./amapLoader";
 import {
-  DEFAULT_MAP_CENTER,
-  DEFAULT_MAP_ZOOM,
   type MapViewport,
   type ProjectedPoint,
 } from "./viewport";
@@ -16,6 +16,7 @@ export interface MapAdapter {
   destroy: () => void;
   getViewport: () => MapViewport;
   project: (point: GeoPoint) => ProjectedPoint;
+  unproject: (point: ProjectedPoint) => GeoPoint;
   subscribe: (listener: () => void) => () => void;
 }
 
@@ -51,11 +52,20 @@ export function createAMapAdapter(
   container: HTMLElement,
   namespace: AMapNamespaceLike,
 ): MapAdapter {
+  /** 构建校园边界约束对象 */
+  const campusBounds = new namespace.Bounds(
+    [CAMPUS.bounds.west, CAMPUS.bounds.south],
+    [CAMPUS.bounds.east, CAMPUS.bounds.north],
+  );
+
   const map: AMapInstanceLike = new namespace.Map(container, {
-    center: [DEFAULT_MAP_CENTER.longitude, DEFAULT_MAP_CENTER.latitude],
+    center: [CAMPUS.center.longitude, CAMPUS.center.latitude],
     resizeEnable: true,
     viewMode: "2D",
-    zoom: DEFAULT_MAP_ZOOM,
+    zoom: CAMPUS.minZoom + 1,
+    minZoom: CAMPUS.minZoom,
+    maxZoom: CAMPUS.maxZoom,
+    limitBounds: campusBounds,
   });
   const listeners = new Set<() => void>();
   let destroyed = false;
@@ -63,7 +73,20 @@ export function createAMapAdapter(
   const notify = () => {
     listeners.forEach((listener) => listener());
   };
-  map.on("moveend", notify);
+
+  /** moveend 时检查中心，超出校园边界则自动回弹 */
+  const handleMoveEnd = () => {
+    const center = map.getCenter();
+    const lng = readCoordinate(center, "getLng", "lng");
+    const lat = readCoordinate(center, "getLat", "lat");
+    const clamped = clampCenter({ longitude: lng, latitude: lat });
+    if (clamped.longitude !== lng || clamped.latitude !== lat) {
+      map.setCenter([clamped.longitude, clamped.latitude]);
+    }
+    notify();
+  };
+
+  map.on("moveend", handleMoveEnd);
   map.on("zoomend", notify);
 
   const resizeObserver = typeof ResizeObserver === "undefined"
@@ -81,7 +104,7 @@ export function createAMapAdapter(
       }
       destroyed = true;
       resizeObserver?.disconnect();
-      map.off("moveend", notify);
+      map.off("moveend", handleMoveEnd);
       map.off("zoomend", notify);
       listeners.clear();
       map.destroy();
@@ -109,6 +132,13 @@ export function createAMapAdapter(
       return {
         x: readPixel(projected, "x"),
         y: readPixel(projected, "y"),
+      };
+    },
+    unproject: (point) => {
+      const lngLat = map.containerToLngLat([point.x, point.y]);
+      return {
+        longitude: readCoordinate(lngLat, "getLng", "lng"),
+        latitude: readCoordinate(lngLat, "getLat", "lat"),
       };
     },
     subscribe: (listener) => {

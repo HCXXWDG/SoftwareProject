@@ -24,7 +24,11 @@ export interface AMapInstanceLike {
   destroy: () => void;
   getBounds: () => AMapBoundsLike;
   getZoom: () => number;
+  getCenter: () => AMapLngLatLike;
+  setCenter: (center: [number, number]) => void;
+  setZoom: (zoom: number) => void;
   lngLatToContainer: (point: [number, number]) => AMapPointLike;
+  containerToLngLat: (point: [number, number]) => AMapLngLatLike;
   off: (eventName: string, listener: () => void) => void;
   on: (eventName: string, listener: () => void) => void;
   resize?: () => void;
@@ -38,8 +42,15 @@ export interface AMapNamespaceLike {
       resizeEnable: boolean;
       viewMode: "2D";
       zoom: number;
+      minZoom?: number;
+      maxZoom?: number;
+      limitBounds?: AMapBoundsLike;
     },
   ) => AMapInstanceLike;
+  Bounds: new (
+    southWest: [number, number],
+    northEast: [number, number],
+  ) => AMapBoundsLike;
 }
 
 declare global {

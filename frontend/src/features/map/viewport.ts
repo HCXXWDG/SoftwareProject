@@ -1,10 +1,10 @@
 import type { GeoPoint } from "../../types";
 
 export const DEFAULT_MAP_CENTER: GeoPoint = {
-  longitude: 116.4,
-  latitude: 39.91,
+  longitude: 120.338,
+  latitude: 31.488,
 };
-export const DEFAULT_MAP_ZOOM = 14;
+export const DEFAULT_MAP_ZOOM = 16;
 
 const TILE_SIZE = 256;
 const MAX_LATITUDE = 85.05112878;

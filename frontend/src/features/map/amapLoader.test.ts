@@ -10,18 +10,38 @@ const namespace = {
     destroy() {}
     getBounds() {
       return {
-        getNorthEast: () => ({ lng: 116.41, lat: 39.92 }),
-        getSouthWest: () => ({ lng: 116.39, lat: 39.9 }),
+        getNorthEast: () => ({ lng: 120.352, lat: 31.498 }),
+        getSouthWest: () => ({ lng: 120.324, lat: 31.478 }),
       };
     }
     getZoom() {
-      return 14;
+      return 16;
     }
+    getCenter() {
+      return { lng: 120.338, lat: 31.488 };
+    }
+    setCenter() {}
+    setZoom() {}
     lngLatToContainer() {
       return { x: 0, y: 0 };
     }
+    containerToLngLat() {
+      return { lng: 120.338, lat: 31.488 };
+    }
     off() {}
     on() {}
+  },
+  Bounds: class {
+    constructor(
+      public sw: [number, number],
+      public ne: [number, number],
+    ) {}
+    getSouthWest() {
+      return { lng: this.sw[0], lat: this.sw[1] };
+    }
+    getNorthEast() {
+      return { lng: this.ne[0], lat: this.ne[1] };
+    }
   },
 } satisfies AMapNamespaceLike;
 

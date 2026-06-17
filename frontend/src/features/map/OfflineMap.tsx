@@ -9,10 +9,10 @@ import {
   type WheelEvent,
 } from "react";
 import type { GeoPoint } from "../../types";
+import { CAMPUS } from "../../config/campus";
+import { clampCenter, clampZoom } from "./boundsClamp";
 import {
   calculateViewport,
-  DEFAULT_MAP_CENTER,
-  DEFAULT_MAP_ZOOM,
   getMapSize,
   panCenter,
   projectGeoPoint,
@@ -20,8 +20,6 @@ import {
   type ProjectedPoint,
 } from "./viewport";
 
-const MIN_ZOOM = 11;
-const MAX_ZOOM = 18;
 const KEYBOARD_PAN_PIXELS = 80;
 
 interface OfflineMapProps {
@@ -44,8 +42,8 @@ export function OfflineMap({
   containerRef,
   onProjectorChange,
 }: OfflineMapProps) {
-  const [center, setCenter] = useState(DEFAULT_MAP_CENTER);
-  const [zoom, setZoom] = useState(DEFAULT_MAP_ZOOM);
+  const [center, setCenter] = useState(CAMPUS.center);
+  const [zoom, setZoom] = useState(CAMPUS.minZoom + 1);
   const dragRef = useRef<DragState | null>(null);
   const centerRef = useRef(center);
   const zoomRef = useRef(zoom);
@@ -58,8 +56,8 @@ export function OfflineMap({
     if (!container) {
       return;
     }
-    const currentCenter = centerRef.current;
-    const currentZoom = zoomRef.current;
+    const currentCenter = clampCenter(centerRef.current);
+    const currentZoom = clampZoom(zoomRef.current);
     const size = getMapSize(container);
     onProjectorChange(
       (point) => projectGeoPoint(point, currentCenter, currentZoom, size),
@@ -84,7 +82,7 @@ export function OfflineMap({
 
   const changeZoom = (delta: number) => {
     commitViewportRef.current = true;
-    setZoom((current) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, current + delta)));
+    setZoom((current) => clampZoom(current + delta));
   };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -103,14 +101,13 @@ export function OfflineMap({
       return;
     }
     commitViewportRef.current = false;
-    setCenter(
-      panCenter(
-        drag.center,
-        zoom,
-        event.clientX - drag.startX,
-        event.clientY - drag.startY,
-      ),
+    const newCenter = panCenter(
+      drag.center,
+      zoom,
+      event.clientX - drag.startX,
+      event.clientY - drag.startY,
     );
+    setCenter(clampCenter(newCenter));
   };
 
   const stopDragging = (event: PointerEvent<HTMLDivElement>) => {
@@ -150,7 +147,9 @@ export function OfflineMap({
     if (delta) {
       event.preventDefault();
       commitViewportRef.current = true;
-      setCenter((current) => panCenter(current, zoom, delta[0], delta[1]));
+      setCenter((current) =>
+        clampCenter(panCenter(current, zoom, delta[0], delta[1])),
+      );
     }
   };
 
@@ -173,10 +172,10 @@ export function OfflineMap({
       <div className="map-surface__offline-road map-surface__offline-road--two" />
       <div className="map-surface__offline-road map-surface__offline-road--three" />
       <span className="map-surface__offline-place map-surface__offline-place--one">
-        通勤站
+        学生公寓区
       </span>
       <span className="map-surface__offline-place map-surface__offline-place--two">
-        城市公园
+        第一教学楼
       </span>
 
       <div aria-label="地图缩放" className="map-surface__zoom-controls">

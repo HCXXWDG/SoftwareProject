@@ -1,22 +1,29 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { HeatmapCell } from "../../types";
+import type { HeatmapCell, MapFeedbackDraft, ScoredRoute } from "../../types";
 import {
   resetAMapLoaderForTests,
   type AMapNamespaceLike,
 } from "./amapLoader";
-import { MapSurface } from "./MapSurface";
+import { MapSurface, type MapSurfaceProps } from "./MapSurface";
 
 const heatmapCell: HeatmapCell = {
   cellId: "cell-1",
   center: {
-    longitude: 116.4,
-    latitude: 39.91,
+    longitude: 120.338,
+    latitude: 31.488,
   },
   score: 100,
   confidence: 0.05,
   count: 18,
   dominantTag: "NOISE",
+};
+
+const defaultProps: Omit<MapSurfaceProps, "heatmapCells" | "loading"> = {
+  routes: [],
+  onFeedbackSubmit: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  onRouteSelect: vi.fn(),
+  onViewportChange: vi.fn(),
 };
 
 function lastCall(mock: ReturnType<typeof vi.fn>): unknown[] {
@@ -35,6 +42,7 @@ describe("MapSurface", () => {
 
     render(
       <MapSurface
+        {...defaultProps}
         heatmapCells={[heatmapCell]}
         loading={false}
         onViewportChange={onViewportChange}
@@ -48,7 +56,7 @@ describe("MapSurface", () => {
     const [west, south, east, north] = String(bbox).split(",").map(Number);
     expect(west).toBeLessThan(east);
     expect(south).toBeLessThan(north);
-    expect(zoom).toBe(14);
+    expect(zoom).toBe(16);
   });
 
   it("renders heatmap visuals and opens cell details", async () => {
@@ -56,15 +64,16 @@ describe("MapSurface", () => {
 
     render(
       <MapSurface
+        {...defaultProps}
         heatmapCells={[heatmapCell]}
         loading={false}
-        onViewportChange={vi.fn()}
       />,
     );
 
     const point = await screen.findByRole("button", {
       name: "查看热力点 cell-1",
     });
+    expect(point).toHaveAttribute("data-testid", "heatmap-point");
     expect(point).toHaveStyle({
       backgroundColor: "rgb(239, 68, 68)",
       opacity: "0.18",
@@ -72,6 +81,7 @@ describe("MapSurface", () => {
 
     fireEvent.click(point);
 
+    expect(screen.getByTestId("heatmap-cell-details")).toBeInTheDocument();
     expect(screen.getByText("NOISE")).toBeInTheDocument();
     expect(screen.getByText("压力 100")).toBeInTheDocument();
     expect(screen.getByText("置信度 5%")).toBeInTheDocument();
@@ -84,6 +94,7 @@ describe("MapSurface", () => {
 
     render(
       <MapSurface
+        {...defaultProps}
         heatmapCells={[]}
         loading={false}
         onViewportChange={onViewportChange}
@@ -96,7 +107,7 @@ describe("MapSurface", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "放大地图" }));
     await waitFor(() =>
-      expect(lastCall(onViewportChange)[1]).toBe(15),
+      expect(lastCall(onViewportChange)[1]).toBe(17),
     );
 
     fireEvent.keyDown(offlineMap, { key: "ArrowRight" });
@@ -110,9 +121,9 @@ describe("MapSurface", () => {
 
     render(
       <MapSurface
+        {...defaultProps}
         heatmapCells={[]}
         loading={false}
-        onViewportChange={vi.fn()}
       />,
     );
     const script = document.querySelector<HTMLScriptElement>(
@@ -137,15 +148,23 @@ describe("MapSurface", () => {
         destroy = destroySpy;
         getBounds() {
           return {
-            getNorthEast: () => ({ lng: 116.41, lat: 39.92 }),
-            getSouthWest: () => ({ lng: 116.39, lat: 39.9 }),
+            getNorthEast: () => ({ lng: 120.352, lat: 31.498 }),
+            getSouthWest: () => ({ lng: 120.324, lat: 31.478 }),
           };
         }
         getZoom() {
-          return 14;
+          return 16;
         }
+        getCenter() {
+          return { lng: 120.338, lat: 31.488 };
+        }
+        setCenter() {}
+        setZoom() {}
         lngLatToContainer() {
           return { x: 480, y: 300 };
+        }
+        containerToLngLat() {
+          return { getLng: () => 120.338, getLat: () => 31.488 };
         }
         off(eventName: string) {
           listeners.delete(eventName);
@@ -154,23 +173,35 @@ describe("MapSurface", () => {
           listeners.set(eventName, listener);
         }
       },
+      Bounds: class {
+        constructor(
+          public sw: [number, number],
+          public ne: [number, number],
+        ) {}
+        getSouthWest() {
+          return { lng: this.sw[0], lat: this.sw[1] };
+        }
+        getNorthEast() {
+          return { lng: this.ne[0], lat: this.ne[1] };
+        }
+      },
     };
     window.AMap = namespace;
 
     const { rerender, unmount } = render(
       <MapSurface
+        {...defaultProps}
         heatmapCells={[]}
         loading={false}
-        onViewportChange={vi.fn()}
       />,
     );
     expect(await screen.findByText("高德地图")).toBeInTheDocument();
 
     rerender(
       <MapSurface
+        {...defaultProps}
         heatmapCells={[heatmapCell]}
         loading={false}
-        onViewportChange={vi.fn()}
       />,
     );
 
@@ -188,13 +219,157 @@ describe("MapSurface", () => {
 
     render(
       <MapSurface
+        {...defaultProps}
         heatmapCells={[]}
         loading
-        onViewportChange={vi.fn()}
       />,
     );
 
     expect(await screen.findByText("正在更新情绪热力图")).toBeInTheDocument();
     expect(screen.getByTestId("offline-map")).toBeInTheDocument();
   });
+
+  it("shows feedback panel on long press via AMap and submits feedback", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "browser-key");
+    const onFeedbackSubmit = vi
+      .fn<(draft: MapFeedbackDraft) => Promise<void>>()
+      .mockResolvedValue(undefined);
+
+    const listeners = new Map<string, () => void>();
+    const namespace: AMapNamespaceLike = {
+      Map: class {
+        destroy() {}
+        getBounds() {
+          return {
+            getNorthEast: () => ({ lng: 120.352, lat: 31.498 }),
+            getSouthWest: () => ({ lng: 120.324, lat: 31.478 }),
+          };
+        }
+        getZoom() { return 16; }
+        getCenter() { return { lng: 120.338, lat: 31.488 }; }
+        setCenter() {}
+        setZoom() {}
+        lngLatToContainer() { return { x: 380, y: 250 }; }
+        containerToLngLat() {
+          // Return a point inside campus bounds
+          return { getLng: () => 120.338, getLat: () => 31.488 };
+        }
+        off(eventName: string) { listeners.delete(eventName); }
+        on(eventName: string, listener: () => void) { listeners.set(eventName, listener); }
+      },
+      Bounds: class {
+        constructor(public sw: [number, number], public ne: [number, number]) {}
+        getSouthWest() { return { lng: this.sw[0], lat: this.sw[1] }; }
+        getNorthEast() { return { lng: this.ne[0], lat: this.ne[1] }; }
+      },
+    };
+    window.AMap = namespace;
+
+    render(
+      <MapSurface
+        {...defaultProps}
+        heatmapCells={[]}
+        loading={false}
+        onFeedbackSubmit={onFeedbackSubmit}
+      />,
+    );
+
+    // Wait for AMap adapter to initialize with real timers
+    expect(await screen.findByText("高德地图")).toBeInTheDocument();
+
+    // Now switch to fake timers for long press simulation
+    vi.useFakeTimers();
+
+    const section = screen.getByLabelText("校园通勤情绪地图");
+    const mapCanvas = screen.getByTestId("map-canvas");
+    vi.spyOn(mapCanvas, "getBoundingClientRect").mockReturnValue({
+      bottom: 650,
+      height: 600,
+      left: 100,
+      right: 1060,
+      top: 50,
+      width: 960,
+      x: 100,
+      y: 50,
+      toJSON: () => ({}),
+    });
+
+    // Simulate long press: pointer down then wait 650ms
+    await act(async () => {
+      const pointerDown = new MouseEvent("pointerdown", {
+        bubbles: true,
+        clientX: 480,
+        clientY: 300,
+      });
+      Object.defineProperty(pointerDown, "pointerId", { value: 1 });
+      fireEvent(section, pointerDown);
+    });
+
+    // Advance timer past 600ms threshold wrapped in act
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(700);
+    });
+
+    // Feedback panel should appear
+    const panel = screen.getByTestId("feedback-panel");
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveStyle({ left: "380px", top: "250px" });
+
+    // Select stress level and tag
+    fireEvent.click(screen.getByRole("button", { name: /压力 75/ }));
+    fireEvent.click(screen.getByRole("button", { name: /原因 拥挤/ }));
+
+    // Submit
+    fireEvent.click(screen.getByRole("button", { name: "提交反馈" }));
+
+    // Allow async submit to resolve
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    expect(onFeedbackSubmit).toHaveBeenCalledTimes(1);
+    const draft = onFeedbackSubmit.mock.calls[0][0];
+    expect(draft.stressLevel).toBe(75);
+    expect(draft.tag).toBe("CROWD");
+    expect(draft.location).toHaveProperty("longitude");
+    expect(draft.location).toHaveProperty("latitude");
+
+    vi.useRealTimers();
+  }, 10_000);
+
+  it("renders route overlay and legend when routes are provided", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+
+    const routes: ScoredRoute[] = [
+      {
+        id: "route-fast",
+        label: "最快路线",
+        distanceMeters: 850,
+        durationSeconds: 600,
+        stressExposure: 45.2,
+        stressScore: 38.4,
+        confidence: 0.72,
+        fastest: true,
+        leastStressful: false,
+        polyline: [
+          { longitude: 120.3345, latitude: 31.492 },
+          { longitude: 120.3415, latitude: 31.4845 },
+        ],
+      },
+    ];
+
+    render(
+      <MapSurface
+        {...defaultProps}
+        heatmapCells={[]}
+        loading={false}
+        routes={routes}
+        selectedRouteId="route-fast"
+      />,
+    );
+
+    expect(await screen.findByTestId("route-overlay")).toBeInTheDocument();
+    expect(screen.getByTestId("route-legend")).toBeInTheDocument();
+    expect(screen.getByText("最快路线")).toBeInTheDocument();
+  }, 15_000);
 });

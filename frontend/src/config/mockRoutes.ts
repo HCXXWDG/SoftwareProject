@@ -1,0 +1,52 @@
+import { CAMPUS } from "./campus";
+import type { RouteComparison } from "../types";
+
+/**
+ * 后端不可用时的 Mock 路线对比数据。
+ *
+ * 注意：stressScore / confidence / stressExposure 均为 0。
+ * RoutePreviewPage 应检测 isOfflineFallback 并隐藏评分展示，
+ * 避免伪造后端评分。
+ */
+export const MOCK_ROUTE_COMPARISON: RouteComparison = {
+  routes: [
+    {
+      id: "mock-via-east",
+      label: "路线 A（东侧步道）",
+      distanceMeters: 850,
+      durationSeconds: 600,
+      stressExposure: 0,
+      stressScore: 0,
+      confidence: 0,
+      fastest: true,
+      leastStressful: false,
+      polyline: [
+        CAMPUS.origin,
+        { longitude: 120.336, latitude: 31.49 },
+        { longitude: 120.3395, latitude: 31.4865 },
+        CAMPUS.destination,
+      ],
+    },
+    {
+      id: "mock-via-lake",
+      label: "路线 B（蠡湖环路）",
+      distanceMeters: 1100,
+      durationSeconds: 780,
+      stressExposure: 0,
+      stressScore: 0,
+      confidence: 0,
+      fastest: false,
+      leastStressful: true,
+      polyline: [
+        CAMPUS.origin,
+        { longitude: 120.333, latitude: 31.487 },
+        { longitude: 120.338, latitude: 31.484 },
+        CAMPUS.destination,
+      ],
+    },
+  ],
+  fastestRouteId: "mock-via-east",
+  leastStressfulRouteId: "mock-via-lake",
+  recommendation: "后端暂不可用，仅显示路线走向",
+  recommendAlternative: false,
+};

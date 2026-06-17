@@ -100,6 +100,13 @@ export interface RouteCompareRequest {
   destination: GeoPoint;
 }
 
+/** 地图反馈草稿（由 C 的地图组件生成，通过回调传给 A） */
+export interface MapFeedbackDraft {
+  location: GeoPoint;
+  stressLevel: 0 | 25 | 50 | 75 | 100;
+  tag: EmotionTag;
+}
+
 /** 地图页面状态，通过 Props 传入 */
 export interface MapPageState {
   heatmapCells: HeatmapCell[];
@@ -107,6 +114,16 @@ export interface MapPageState {
   error: string | null;
   routeComparison: RouteComparison | null;
   trend: TrendResult | null;
-  selectedOrigin: GeoPoint | null;
-  selectedDestination: GeoPoint | null;
+}
+
+/** 应用三阶段状态 */
+export type AppStage = "welcome" | "route-preview" | "map";
+
+/** 路线预览页状态 */
+export interface RoutePreviewState {
+  loading: boolean;
+  error: string | null;
+  routeComparison: RouteComparison | null;
+  /** 后端不可用时使用 Mock 路线数据（不伪造评分） */
+  isOfflineFallback: boolean;
 }
