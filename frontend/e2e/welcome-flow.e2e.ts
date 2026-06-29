@@ -106,7 +106,7 @@ test.describe("Welcome flow & 3-stage navigation", () => {
 
     // Badges should appear
     await expect(page.getByText("最快", { exact: true })).toBeVisible();
-    await expect(page.getByText("少心累", { exact: true })).toBeVisible();
+    await expect(page.getByText("最少心累", { exact: true })).toBeVisible();
 
     // Map should still NOT be visible
     await expect(page.locator("[data-map-mode]")).not.toBeVisible();
