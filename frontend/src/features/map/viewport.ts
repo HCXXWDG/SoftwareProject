@@ -115,6 +115,22 @@ export function scoreToColor(score: number): string {
   return `rgb(${mix(start.red, end.red)}, ${mix(start.green, end.green)}, ${mix(start.blue, end.blue)})`;
 }
 
+export function unprojectGeoPoint(
+  point: ProjectedPoint,
+  center: GeoPoint,
+  zoom: number,
+  size: MapSize,
+): GeoPoint {
+  const centerX = longitudeToWorldX(center.longitude, zoom);
+  const centerY = latitudeToWorldY(center.latitude, zoom);
+  const worldX = point.x - size.width / 2 + centerX;
+  const worldY = point.y - size.height / 2 + centerY;
+  return {
+    longitude: worldXToLongitude(worldX, zoom),
+    latitude: worldYToLatitude(worldY, zoom),
+  };
+}
+
 export function confidenceToOpacity(confidence: number): number {
   return Math.max(0.18, Math.min(1, confidence));
 }

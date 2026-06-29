@@ -1,0 +1,88 @@
+name: Full-stack E2E
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+  push:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fullstack-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fullstack-e2e:
+    name: Full-stack E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Start demo backend
+        working-directory: backend
+        run: |
+          chmod +x mvnw
+          nohup ./mvnw --batch-mode --no-transfer-progress spring-boot:run \
+            > ../backend-demo.log 2>&1 &
+          echo $! > ../backend-demo.pid
+
+      - name: Wait for backend health
+        run: |
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:8080/actuator/health \
+              | grep --quiet '"status":"UP"'; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat backend-demo.log
+          exit 1
+
+      - name: Run full-stack end-to-end tests
+        working-directory: frontend
+        run: npm run test:e2e:integration
+
+      - name: Upload full-stack diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fullstack-e2e-${{ github.run_id }}
+          path: |
+            frontend/playwright-report/integration/
+            frontend/test-results/integration/
+            backend-demo.log
+          if-no-files-found: warn
+          retention-days: 14

@@ -25,6 +25,7 @@ const initialMapState: MapPageState = {
   trend: null,
 };
 
+
 const DEBOUNCE_MS = 300;
 
 function App() {
@@ -80,22 +81,23 @@ function App() {
     [],
   );
 
-  /** 路线选择 */
+  /** 路线选择（由地图路线或面板点击触发） */
   const handleRouteSelect = useCallback((routeId: string) => {
     setSelectedRouteId(routeId);
   }, []);
 
-  /** 完成本次通勤 */
+  /** 完成本次通勤：使用用户真实压力档位，分离 POST 与趋势刷新错误 */
   const handleCompleteCommute = useCallback(async () => {
     const comparison = mapState.routeComparison;
     if (!comparison) return;
-    if (userStressLevel == null) return;
+    if (userStressLevel == null) return; // 未选择压力档位时不提交
 
     const selectedId = selectedRouteId ?? comparison.fastestRouteId;
     const selected = comparison.routes.find((r) => r.id === selectedId);
     if (!selected) return;
 
     const fastest = comparison.routes.find((r) => r.id === comparison.fastestRouteId);
+    // 替代路线：优先取 leastStressful；若与已选相同，显式回退到 fastestRouteId
     const leastStressful = comparison.routes.find((r) => r.id === comparison.leastStressfulRouteId);
     const alternative =
       leastStressful && leastStressful.id !== selectedId
@@ -126,6 +128,7 @@ function App() {
       });
       postSucceeded = true;
 
+      // 刷新趋势数据（POST 已成功，刷新失败仅提示警告，不视为通勤失败）
       try {
         const freshTrend = await fetchTrends();
         setMapState((prev) => ({ ...prev, trend: freshTrend }));

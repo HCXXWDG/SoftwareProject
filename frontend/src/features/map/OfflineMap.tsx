@@ -16,6 +16,7 @@ import {
   getMapSize,
   panCenter,
   projectGeoPoint,
+  unprojectGeoPoint,
   type MapViewport,
   type ProjectedPoint,
 } from "./viewport";
@@ -26,6 +27,7 @@ interface OfflineMapProps {
   containerRef: RefObject<HTMLDivElement | null>;
   onProjectorChange: (
     project: (point: GeoPoint) => ProjectedPoint,
+    unproject: (point: ProjectedPoint) => GeoPoint,
     viewport: MapViewport,
     commitViewport: boolean,
   ) => void;
@@ -61,6 +63,7 @@ export function OfflineMap({
     const size = getMapSize(container);
     onProjectorChange(
       (point) => projectGeoPoint(point, currentCenter, currentZoom, size),
+      (point) => unprojectGeoPoint(point, currentCenter, currentZoom, size),
       calculateViewport(currentCenter, currentZoom, size),
       commitViewport,
     );

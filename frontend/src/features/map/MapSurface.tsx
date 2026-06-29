@@ -135,6 +135,7 @@ export function MapSurface({
   const handleOfflineProjectorChange = useCallback(
     (
       nextProjector: (point: GeoPoint) => ProjectedPoint,
+      _nextUnprojector: (point: ProjectedPoint) => GeoPoint,
       viewport: MapViewport,
       commitViewport: boolean,
     ) => {

@@ -16,6 +16,19 @@ class WeightedStressRouteScoringStrategyTest {
             new WeightedStressRouteScoringStrategy();
 
     @Test
+    void usesDemoExposureOverrideWhenProvided() {
+        RouteCandidate route = new RouteCandidate(
+                "route-calm", "Calm", 1000, 660,
+                List.of(new GeoPoint(116.4, 39.9), new GeoPoint(116.405, 39.905)),
+                28.0);
+
+        ScoredRoute scored = strategy.score(route, 600, List.of(), false);
+
+        assertThat(scored.stressExposure()).isEqualTo(28.0);
+        assertThat(scored.confidence()).isEqualTo(0.72);
+    }
+
+    @Test
     void lowerStressCanBeatSmallTimePenalty() {
         RouteCandidate route = new RouteCandidate(
                 "calm", "Calm", 1000, 660,
