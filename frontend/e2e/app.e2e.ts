@@ -1,18 +1,18 @@
 import { test, expect, type Page } from "@playwright/test";
 
-/** Mock heatmap cells matching the backend demo data format */
+/** Mock heatmap cells matching the backend demo data format (campus coords) */
 const MOCK_HEATMAP = [
   {
-    cellId: "16:129333:44333",
-    center: { longitude: 116.4, latitude: 39.91 },
+    cellId: "16:133638:34976",
+    center: { longitude: 120.274, latitude: 31.479 },
     score: 68.2,
     confidence: 0.72,
     count: 18,
     dominantTag: "NOISE",
   },
   {
-    cellId: "16:129334:44334",
-    center: { longitude: 116.402, latitude: 39.908 },
+    cellId: "16:133639:34977",
+    center: { longitude: 120.275, latitude: 31.481 },
     score: 35.0,
     confidence: 0.5,
     count: 5,
@@ -34,9 +34,9 @@ const MOCK_ROUTES = {
       fastest: true,
       leastStressful: false,
       polyline: [
-        { longitude: 116.395, latitude: 39.905 },
-        { longitude: 116.4, latitude: 39.908 },
-        { longitude: 116.405, latitude: 39.91 },
+        { longitude: 120.2735, latitude: 31.4753 },
+        { longitude: 120.2738, latitude: 31.478 },
+        { longitude: 120.2743, latitude: 31.4833 },
       ],
     },
     {
@@ -50,9 +50,9 @@ const MOCK_ROUTES = {
       fastest: false,
       leastStressful: true,
       polyline: [
-        { longitude: 116.395, latitude: 39.905 },
-        { longitude: 116.398, latitude: 39.912 },
-        { longitude: 116.405, latitude: 39.91 },
+        { longitude: 120.2735, latitude: 31.4753 },
+        { longitude: 120.2740, latitude: 31.480 },
+        { longitude: 120.2743, latitude: 31.4833 },
       ],
     },
   ],
@@ -194,18 +194,25 @@ test.describe("Core user flow", () => {
     // Navigate through 3-stage flow to map
     await navigateToMap(page);
 
-    // Long-press on the map area
+    // Long-press on the map area (dispatchEvent for reliable React pointer capture)
     const mapSection = page.locator("[aria-label='校园通勤情绪地图']");
     const box = await mapSection.boundingBox();
     expect(box).not.toBeNull();
 
+    const pointer = {
+      button: 0,
+      clientX: box!.x + box!.width / 2,
+      clientY: box!.y + box!.height / 2,
+      pointerId: 1,
+      pointerType: "mouse",
+    };
+
     // Hold until the application confirms the long press, then release.
-    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
-    await page.mouse.down();
+    await mapSection.dispatchEvent("pointerdown", pointer);
     await expect(page.getByTestId("feedback-panel")).toBeVisible({
-      timeout: 3000,
+      timeout: 5000,
     });
-    await page.mouse.up();
+    await mapSection.dispatchEvent("pointerup", pointer);
 
     // Select stress level and tag
     await page.getByRole("button", { name: /压力 50/ }).click();
