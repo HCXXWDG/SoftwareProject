@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="960" viewBox="0 0 1300 960">
+<defs>
+  <marker id="gH" viewBox="0 0 14 10" refX="14" refY="5" markerWidth="14" markerHeight="10" orient="auto">
+    <polygon points="0,0 14,5 0,10" fill="#fff" stroke="#333" stroke-width="1.2"/>
+  </marker>
+  <marker id="aD" viewBox="0 0 16 10" refX="0" refY="5" markerWidth="16" markerHeight="10" orient="auto">
+    <polygon points="0,5 8,0 16,5 8,10" fill="#fff" stroke="#555" stroke-width="1.2"/>
+  </marker>
+  <marker id="dep" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="10" markerHeight="7" orient="auto">
+    <polygon points="0,0 10,3.5 0,7" fill="none" stroke="#b07d2e" stroke-width="1"/>
+  </marker>
+</defs>
+<style>
+  text { font-family: 'Segoe UI','Microsoft YaHei','SimHei',sans-serif; }
+  .title { font: bold 18px sans-serif; fill: #1a1a2e; }
+  .sub   { font: 12px sans-serif; fill: #888; }
+  .box   { stroke: #444; stroke-width: 1.5; fill: #fff; }
+  .hdr   { fill: #dce4ef; stroke: #444; stroke-width: 1.5; }
+  .hdrS  { fill: #d4e8c8; stroke: #444; stroke-width: 1.5; }
+  .nm    { font: bold 13px sans-serif; fill: #1a1a2e; }
+  .st    { font: italic 10px sans-serif; fill: #556b2f; }
+  .at    { font: 11px Consolas,monospace; fill: #333; }
+  .mt    { font: 11px Consolas,monospace; fill: #333; }
+  .ln    { stroke: #999; stroke-width: 0.8; }
+  .gen   { stroke: #333; stroke-width: 1.5; fill: none; marker-end: url(#gH); }
+  .asc   { stroke: #555; stroke-width: 1.3; fill: none; }
+  .agg   { stroke: #555; stroke-width: 1.3; fill: none; marker-start: url(#aD); }
+  .dep   { stroke: #b07d2e; stroke-width: 1.3; fill: none; stroke-dasharray: 7,4; marker-end: url(#dep); }
+  .mul   { font: 10px sans-serif; fill: #666; }
+  .rl    { font: italic 10px sans-serif; fill: #888; }
+  .nt    { font: 11px sans-serif; fill: #666; }
+  .ntT   { font: bold 12px sans-serif; fill: #8b6914; }
+</style>
+
+<rect width="1300" height="960" fill="#fff" rx="10"/>
+<text class="title" x="650" y="34" text-anchor="middle">机票预订系统 — 类图 (Class Diagram)</text>
+<text class="sub"   x="650" y="54" text-anchor="middle">Airline Ticket Booking System — UML Class Diagram</text>
+
+<!-- User (abstract) -->
+<g transform="translate(490,78)">
+  <rect class="box" width="240" height="148" rx="4"/>
+  <rect class="hdrS" width="240" height="42" rx="4"/>
+  <text class="st" x="120" y="16" text-anchor="middle">&lt;&lt;abstract&gt;&gt;</text>
+  <text class="nm" x="120" y="34" text-anchor="middle">用户 (User)</text>
+  <line class="ln" x1="0" y1="42" x2="240" y2="42"/>
+  <text class="at" x="8" y="58">- userId: String</text>
+  <text class="at" x="8" y="72">- username: String</text>
+  <text class="at" x="8" y="86">- password: String</text>
+  <line class="ln" x1="0" y1="94" x2="240" y2="94"/>
+  <text class="mt" x="8" y="110">+ login(): boolean</text>
+  <text class="mt" x="8" y="124">+ logout(): void</text>
+  <text class="mt" x="8" y="138">+ queryFlights(criteria): List&lt;Flight&gt;</text>
+</g>
+
+<!-- Guest -->
+<g transform="translate(120,296)">
+  <rect class="box" width="200" height="96" rx="4"/>
+  <rect class="hdr" width="200" height="28" rx="4"/>
+  <text class="nm" x="100" y="20" text-anchor="middle">游客 (Guest)</text>
+  <line class="ln" x1="0" y1="28" x2="200" y2="28"/>
+  <text class="at" x="8" y="44">- sessionId: String</text>
+  <line class="ln" x1="0" y1="52" x2="200" y2="52"/>
+  <text class="mt" x="8" y="68">+ queryFlights(criteria): List&lt;Flight&gt;</text>
+  <text class="mt" x="8" y="82">+ register(): RegisteredUser</text>
+</g>
+
+<!-- RegisteredUser -->
+<g transform="translate(440,296)">
+  <rect class="box" width="260" height="182" rx="4"/>
+  <rect class="hdr" width="260" height="28" rx="4"/>
+  <text class="nm" x="130" y="20" text-anchor="middle">注册用户 (RegisteredUser)</text>
+  <line class="ln" x1="0" y1="28" x2="260" y2="28"/>
+  <text class="at" x="8" y="44">- email: String</text>
+  <text class="at" x="8" y="58">- phone: String</text>
+  <text class="at" x="8" y="72">- ticketHistory: List&lt;Ticket&gt;</text>
+  <text class="at" x="8" y="86">- monthlyCancelCount: int</text>
+  <line class="ln" x1="0" y1="94" x2="260" y2="94"/>
+  <text class="mt" x="8" y="110">+ purchaseTicket(flight: Flight): Ticket</text>
+  <text class="mt" x="8" y="124">+ viewTickets(): List&lt;Ticket&gt;</text>
+  <text class="mt" x="8" y="138">+ cancelTicket(ticket: Ticket): boolean</text>
+  <text class="mt" x="8" y="152">+ checkPurchaseEligibility(): boolean</text>
+  <text class="mt" x="8" y="166">+ getMonthlyCancelCount(): int</text>
+</g>
+
+<!-- Administrator -->
+<g transform="translate(860,296)">
+  <rect class="box" width="240" height="140" rx="4"/>
+  <rect class="hdr" width="240" height="28" rx="4"/>
+  <text class="nm" x="120" y="20" text-anchor="middle">系统管理员 (Administrator)</text>
+  <line class="ln" x1="0" y1="28" x2="240" y2="28"/>
+  <text class="at" x="8" y="44">- adminLevel: int</text>
+  <text class="at" x="8" y="58">- department: String</text>
+  <line class="ln" x1="0" y1="66" x2="240" y2="66"/>
+  <text class="mt" x="8" y="82">+ addFlight(flight: Flight): boolean</text>
+  <text class="mt" x="8" y="96">+ removeFlight(flightId: String): boolean</text>
+  <text class="mt" x="8" y="110">+ updateFlight(flight: Flight): boolean</text>
+  <text class="mt" x="8" y="124">+ viewAllFlights(): List&lt;Flight&gt;</text>
+</g>
+
+<!-- Generalization arrows -->
+<line class="gen" x1="220" y1="296" x2="550" y2="226"/>
+<line class="gen" x1="570" y1="296" x2="590" y2="226"/>
+<line class="gen" x1="940" y1="296" x2="670" y2="226"/>
+
+<!-- Flight -->
+<g transform="translate(60,570)">
+  <rect class="box" width="270" height="218" rx="4"/>
+  <rect class="hdr" width="270" height="28" rx="4"/>
+  <text class="nm" x="135" y="20" text-anchor="middle">航班 (Flight)</text>
+  <line class="ln" x1="0" y1="28" x2="270" y2="28"/>
+  <text class="at" x="8" y="44">- flightId: String</text>
+  <text class="at" x="8" y="58">- flightNumber: String</text>
+  <text class="at" x="8" y="72">- departure: String</text>
+  <text class="at" x="8" y="86">- arrival: String</text>
+  <text class="at" x="8" y="100">- departureTime: DateTime</text>
+  <text class="at" x="8" y="114">- arrivalTime: DateTime</text>
+  <text class="at" x="8" y="128">- price: double</text>
+  <text class="at" x="8" y="142">- availableSeats: int</text>
+  <line class="ln" x1="0" y1="150" x2="270" y2="150"/>
+  <text class="mt" x="8" y="166">+ getFlightInfo(): String</text>
+  <text class="mt" x="8" y="180">+ checkAvailability(): boolean</text>
+  <text class="mt" x="8" y="194">+ bookSeat(): boolean</text>
+  <text class="mt" x="8" y="208">+ releaseSeat(): boolean</text>
+</g>
+
+<!-- Ticket -->
+<g transform="translate(450,570)">
+  <rect class="box" width="260" height="190" rx="4"/>
+  <rect class="hdr" width="260" height="28" rx="4"/>
+  <text class="nm" x="130" y="20" text-anchor="middle">机票 (Ticket)</text>
+  <line class="ln" x1="0" y1="28" x2="260" y2="28"/>
+  <text class="at" x="8" y="44">- ticketId: String</text>
+  <text class="at" x="8" y="58">- purchaseDate: DateTime</text>
+  <text class="at" x="8" y="72">- price: double</text>
+  <text class="at" x="8" y="86">- status: TicketStatus</text>
+  <text class="at" x="8" y="100">- seatNumber: String</text>
+  <line class="ln" x1="0" y1="108" x2="260" y2="108"/>
+  <text class="mt" x="8" y="124">+ cancel(): boolean</text>
+  <text class="mt" x="8" y="138">+ getDetails(): String</text>
+  <text class="mt" x="8" y="152">+ isCancelled(): boolean</text>
+  <text class="mt" x="8" y="166">+ getPurchaseDate(): DateTime</text>
+  <text class="mt" x="8" y="180">+ getStatus(): TicketStatus</text>
+</g>
+
+<!-- TicketStatus enum -->
+<g transform="translate(450,790)">
+  <rect class="box" width="260" height="70" rx="4"/>
+  <rect class="hdrS" width="260" height="38" rx="4"/>
+  <text class="st" x="130" y="15" text-anchor="middle">&lt;&lt;enumeration&gt;&gt;</text>
+  <text class="nm" x="130" y="32" text-anchor="middle">机票状态 (TicketStatus)</text>
+  <line class="ln" x1="0" y1="38" x2="260" y2="38"/>
+  <text class="at" x="12" y="54">VALID</text>
+  <text class="at" x="80" y="54">CANCELLED</text>
+  <text class="at" x="178" y="54">USED</text>
+</g>
+
+<!-- CreditSystem (boundary) -->
+<g transform="translate(860,570)">
+  <rect class="box" width="280" height="218" rx="4"/>
+  <rect class="hdrS" width="280" height="42" rx="4"/>
+  <text class="st" x="140" y="16" text-anchor="middle">&lt;&lt;boundary&gt;&gt;</text>
+  <text class="nm" x="140" y="34" text-anchor="middle">信用评价系统 (CreditSystem)</text>
+  <line class="ln" x1="0" y1="42" x2="280" y2="42"/>
+  <text class="at" x="8" y="58">- creditThreshold: int = 30</text>
+  <text class="at" x="8" y="72">- penaltyPerCancel: int = 10</text>
+  <text class="at" x="8" y="86">- userCreditMap: Map&lt;String, int&gt;</text>
+  <line class="ln" x1="0" y1="94" x2="280" y2="94"/>
+  <text class="mt" x="8" y="110">+ getCreditLevel(userId: String): int</text>
+  <text class="mt" x="8" y="124">+ lowerCreditLevel(userId: String): void</text>
+  <text class="mt" x="8" y="138">+ isEligibleToPurchase(userId: String): boolean</text>
+  <text class="mt" x="8" y="152">+ recordCancellation(userId: String): void</text>
+  <text class="mt" x="8" y="166">+ getMonthlyCancelCount(userId: String): int</text>
+  <text class="mt" x="8" y="180">+ resetMonthlyCount(userId: String): void</text>
+</g>
+
+<!-- BookingSystem -->
+<g transform="translate(860,820)">
+  <rect class="box" width="280" height="110" rx="4"/>
+  <rect class="hdrS" width="280" height="42" rx="4"/>
+  <text class="st" x="140" y="16" text-anchor="middle">&lt;&lt;facade&gt;&gt;</text>
+  <text class="nm" x="140" y="34" text-anchor="middle">机票预订系统 (BookingSystem)</text>
+  <line class="ln" x1="0" y1="42" x2="280" y2="42"/>
+  <text class="at" x="8" y="58">- flights: List&lt;Flight&gt;</text>
+  <text class="at" x="8" y="72">- tickets: List&lt;Ticket&gt;</text>
+  <line class="ln" x1="0" y1="80" x2="280" y2="80"/>
+  <text class="mt" x="8" y="96">+ processCancellation(ticket: Ticket): void</text>
+</g>
+
+<!-- Relationship lines -->
+
+<!-- RegisteredUser -> Ticket (aggregation) -->
+<line class="agg" x1="570" y1="478" x2="570" y2="570"/>
+<text class="mul" x="548" y="530">1</text>
+<text class="mul" x="548" y="560">0..*</text>
+
+<!-- Ticket -> Flight (association) -->
+<line class="asc" x1="450" y1="665" x2="330" y2="665"/>
+<text class="mul" x="340" y="656">1</text>
+<text class="mul" x="432" y="656">1</text>
+<text class="rl"  x="370" y="656">belongs to</text>
+
+<!-- Ticket -> TicketStatus -->
+<line class="asc" x1="580" y1="760" x2="580" y2="790"/>
+
+<!-- Guest -> Flight (query) -->
+<path class="asc" d="M 200,392 Q 180,480 180,570"/>
+<text class="mul" x="168" y="560">0..*</text>
+<text class="rl"  x="112" y="480">queries</text>
+
+<!-- RegisteredUser -> Flight (purchase) -->
+<path class="asc" d="M 440,406 Q 370,490 310,570"/>
+<text class="rl"  x="340" y="488">purchases</text>
+
+<!-- Administrator -> Flight (manages) -->
+<path class="asc" d="M 920,436 Q 700,530 330,600"/>
+<text class="mul" x="340" y="592">0..*</text>
+<text class="mul" x="898" y="446">1</text>
+<text class="rl"  x="580" y="498">manages</text>
+
+<!-- RegisteredUser -> CreditSystem (dependency) -->
+<path class="dep" d="M 700,430 Q 800,500 890,570"/>
+<text class="rl" x="770" y="480">&lt;&lt;use&gt;&gt;</text>
+<text class="rl" x="748" y="496">check credit / lower level</text>
+
+<!-- BookingSystem -> CreditSystem (dependency) -->
+<line class="dep" x1="1000" y1="820" x2="1000" y2="788"/>
+<text class="rl" x="1008" y="810">&lt;&lt;use&gt;&gt;</text>
+
+<!-- BookingSystem -> Flight (aggregation) -->
+<path class="agg" d="M 860,870 Q 500,860 330,788"/>
+<text class="mul" x="345" y="800">0..*</text>
+<text class="mul" x="838" y="868">1</text>
+
+<!-- Legend -->
+<g transform="translate(1060,76)">
+  <rect width="210" height="195" rx="6" fill="#fafafa" stroke="#ccc"/>
+  <text class="nm" x="105" y="20" text-anchor="middle" font-size="12">Legend</text>
+  <line stroke="#ddd" x1="8" y1="28" x2="202" y2="28"/>
+  <line x1="15" y1="48" x2="70" y2="48" stroke="#333" stroke-width="1.5" marker-end="url(#gH)"/>
+  <text class="nt" x="82" y="52">Generalization</text>
+  <line x1="15" y1="73" x2="70" y2="73" stroke="#555" stroke-width="1.3"/>
+  <text class="nt" x="82" y="77">Association</text>
+  <line x1="25" y1="98" x2="70" y2="98" stroke="#555" stroke-width="1.3" marker-start="url(#aD)"/>
+  <text class="nt" x="82" y="102">Aggregation</text>
+  <line x1="15" y1="123" x2="70" y2="123" stroke="#b07d2e" stroke-width="1.3" stroke-dasharray="7,4" marker-end="url(#dep)"/>
+  <text class="nt" x="82" y="127">Dependency</text>
+  <text class="nt" x="15" y="152"><tspan fill="#556b2f" font-style="italic">&lt;&lt;boundary&gt;&gt;</tspan> External</text>
+  <text class="nt" x="15" y="170"><tspan fill="#556b2f" font-style="italic">&lt;&lt;abstract&gt;&gt;</tspan> Abstract</text>
+  <text class="nt" x="15" y="188"><tspan fill="#556b2f" font-style="italic">&lt;&lt;enumeration&gt;&gt;</tspan> Enum</text>
+</g>
+
+<!-- Business Rules Note -->
+<g transform="translate(60,820)">
+  <rect width="370" height="110" rx="6" fill="#fffbe6" stroke="#e6d48e" stroke-width="1"/>
+  <text class="ntT" x="14" y="20">Business Rules</text>
+  <line stroke="#e6d48e" x1="0" y1="28" x2="370" y2="28"/>
+  <text class="nt" x="14" y="46">1. Cancel &gt;= 2 times/month -&gt; lower credit level</text>
+  <text class="nt" x="14" y="64">2. Credit below threshold -&gt; cannot purchase</text>
+  <text class="nt" x="14" y="82">3. Guest can only query flights</text>
+  <text class="nt" x="14" y="100">4. Admin can manage flight info</text>
+</g>
+
+</svg>

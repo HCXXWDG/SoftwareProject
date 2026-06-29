@@ -11,11 +11,13 @@ import type {
   MapFeedbackDraft,
   ScoredRoute,
 } from "../../types";
+import { CampusMarkers } from "./CampusMarkers";
 import { EmojiFountain } from "./EmojiFountain";
 import { FeedbackPanel } from "./FeedbackPanel";
 import { HeatmapOverlay } from "./HeatmapOverlay";
 import { RouteLegend } from "./RouteLegend";
 import { RouteOverlay } from "./RouteOverlay";
+import { isInsideBounds } from "./boundsClamp";
 import { loadAMap } from "./amapLoader";
 import { createAMapAdapter, type MapAdapter } from "./mapAdapter";
 import { OfflineMap } from "./OfflineMap";
@@ -148,6 +150,7 @@ export function MapSurface({
   );
 
   // Long-press handler: screen position -> GeoPoint -> show feedback panel
+  // 校园外长按不弹出反馈面板
   const handleLongPress = useCallback(
     (position: LongPressPosition) => {
       const container = mapHostRef.current;
@@ -161,6 +164,12 @@ export function MapSurface({
         y: position.y - rect.top,
       };
       const geoPoint = unprojector(relativePoint);
+
+      // 边界校验：校园外长按不弹出反馈面板
+      if (!isInsideBounds(geoPoint)) {
+        return;
+      }
+
       setFeedbackGeoPoint(geoPoint);
       setFeedbackPosition(relativePoint);
     },
@@ -221,7 +230,7 @@ export function MapSurface({
 
   return (
     <section
-      aria-label="城市通勤情绪地图"
+      aria-label="校园通勤情绪地图"
       className="map-surface"
       data-map-mode={mode}
       onPointerCancel={handlePointerUp}
@@ -239,6 +248,13 @@ export function MapSurface({
         <OfflineMap
           containerRef={mapHostRef}
           onProjectorChange={handleOfflineProjectorChange}
+        />
+      )}
+
+      {mode !== "loading" && (
+        <CampusMarkers
+          project={(point) => projector(point)}
+          viewportRevision={viewportRevision}
         />
       )}
 

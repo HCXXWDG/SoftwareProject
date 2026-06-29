@@ -217,6 +217,45 @@
   font-size: 11px;
 }
 
+/* 校园起终点标记 */
+.map-surface__campus-marker {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transform: translate(-50%, -100%);
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+.map-surface__campus-marker-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.map-surface__campus-marker-dot--origin {
+  background: #22c55e;
+}
+
+.map-surface__campus-marker-dot--destination {
+  background: #ef4444;
+}
+
+.map-surface__campus-marker-label {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  font-weight: 600;
+  color: #17324d;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .map-surface__heat-point {
     transition: none;
