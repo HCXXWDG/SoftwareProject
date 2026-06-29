@@ -6,9 +6,11 @@ import type {
   AMapPointLike,
 } from "./amapLoader";
 import {
+  clampZoom,
   DEFAULT_MAP_CENTER,
   DEFAULT_MAP_ZOOM,
   type MapViewport,
+  type MapViewportConstraint,
   type ProjectedPoint,
 } from "./viewport";
 
@@ -18,6 +20,10 @@ export interface MapAdapter {
   project: (point: GeoPoint) => ProjectedPoint;
   unproject: (point: ProjectedPoint) => GeoPoint;
   subscribe: (listener: () => void) => () => void;
+}
+
+export interface CreateAMapAdapterOptions {
+  viewportConstraint?: MapViewportConstraint;
 }
 
 function readCoordinate(
@@ -51,12 +57,34 @@ function readPixel(point: AMapPointLike, axis: "x" | "y"): number {
 export function createAMapAdapter(
   container: HTMLElement,
   namespace: AMapNamespaceLike,
+  options: CreateAMapAdapterOptions = {},
 ): MapAdapter {
+  const { viewportConstraint } = options;
+  const initialCenter = viewportConstraint?.center ?? DEFAULT_MAP_CENTER;
+  const initialZoom = viewportConstraint
+    ? clampZoom(
+        viewportConstraint.defaultZoom ?? DEFAULT_MAP_ZOOM,
+        viewportConstraint.minZoom,
+        viewportConstraint.maxZoom,
+      )
+    : DEFAULT_MAP_ZOOM;
   const map: AMapInstanceLike = new namespace.Map(container, {
-    center: [DEFAULT_MAP_CENTER.longitude, DEFAULT_MAP_CENTER.latitude],
+    center: [initialCenter.longitude, initialCenter.latitude],
     resizeEnable: true,
     viewMode: "2D",
-    zoom: DEFAULT_MAP_ZOOM,
+    zoom: initialZoom,
+    ...(viewportConstraint
+      ? {
+          zooms: [viewportConstraint.minZoom, viewportConstraint.maxZoom],
+          // limitBounds: [sw.lng, sw.lat, ne.lng, ne.lat]
+          limitBounds: [
+            viewportConstraint.bounds.west,
+            viewportConstraint.bounds.south,
+            viewportConstraint.bounds.east,
+            viewportConstraint.bounds.north,
+          ],
+        }
+      : {}),
   });
   const listeners = new Set<() => void>();
   let destroyed = false;

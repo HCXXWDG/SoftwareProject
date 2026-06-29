@@ -11,6 +11,8 @@ import {
 import type { GeoPoint } from "../../types";
 import {
   calculateViewport,
+  clampCenterToBounds,
+  clampZoom,
   DEFAULT_MAP_CENTER,
   DEFAULT_MAP_ZOOM,
   getMapSize,
@@ -18,6 +20,7 @@ import {
   projectGeoPoint,
   unprojectGeoPoint,
   type MapViewport,
+  type MapViewportConstraint,
   type ProjectedPoint,
 } from "./viewport";
 
@@ -33,6 +36,7 @@ interface OfflineMapProps {
     viewport: MapViewport,
     commitViewport: boolean,
   ) => void;
+  viewportConstraint?: MapViewportConstraint;
 }
 
 interface DragState {
@@ -45,9 +49,20 @@ interface DragState {
 export function OfflineMap({
   containerRef,
   onProjectorChange,
+  viewportConstraint,
 }: OfflineMapProps) {
-  const [center, setCenter] = useState(DEFAULT_MAP_CENTER);
-  const [zoom, setZoom] = useState(DEFAULT_MAP_ZOOM);
+  const [center, setCenter] = useState(
+    viewportConstraint?.center ?? DEFAULT_MAP_CENTER,
+  );
+  const [zoom, setZoom] = useState(
+    viewportConstraint
+      ? clampZoom(
+          viewportConstraint.defaultZoom ?? DEFAULT_MAP_ZOOM,
+          viewportConstraint.minZoom,
+          viewportConstraint.maxZoom,
+        )
+      : DEFAULT_MAP_ZOOM,
+  );
   const dragRef = useRef<DragState | null>(null);
   const centerRef = useRef(center);
   const zoomRef = useRef(zoom);
@@ -85,9 +100,22 @@ export function OfflineMap({
     return () => observer.disconnect();
   }, [containerRef, publishViewport]);
 
+  const effectiveMinZoom = viewportConstraint?.minZoom ?? MIN_ZOOM;
+  const effectiveMaxZoom = viewportConstraint?.maxZoom ?? MAX_ZOOM;
+
+  const clampPanCenter = useCallback(
+    (next: GeoPoint): GeoPoint =>
+      viewportConstraint
+        ? clampCenterToBounds(next, viewportConstraint.bounds)
+        : next,
+    [viewportConstraint],
+  );
+
   const changeZoom = (delta: number) => {
     commitViewportRef.current = true;
-    setZoom((current) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, current + delta)));
+    setZoom((current) =>
+      clampZoom(current + delta, effectiveMinZoom, effectiveMaxZoom),
+    );
   };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -106,12 +134,15 @@ export function OfflineMap({
       return;
     }
     commitViewportRef.current = false;
+    commitViewportRef.current = false;
     setCenter(
-      panCenter(
-        drag.center,
-        zoom,
-        event.clientX - drag.startX,
-        event.clientY - drag.startY,
+      clampPanCenter(
+        panCenter(
+          drag.center,
+          zoom,
+          event.clientX - drag.startX,
+          event.clientY - drag.startY,
+        ),
       ),
     );
   };
@@ -153,7 +184,9 @@ export function OfflineMap({
     if (delta) {
       event.preventDefault();
       commitViewportRef.current = true;
-      setCenter((current) => panCenter(current, zoom, delta[0], delta[1]));
+      setCenter((current) =>
+      clampPanCenter(panCenter(current, zoom, delta[0], delta[1])),
+    );
     }
   };
 
