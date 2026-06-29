@@ -1,6 +1,7 @@
 package com.example.commutemood.api;
 
 import com.example.commutemood.CommuteMoodApplication;
+import com.example.commutemood.config.DemoGeography;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -10,7 +11,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -25,7 +28,7 @@ class ApiSmokeTest {
         mockMvc.perform(get("/actuator/info"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.app.name").value("commute-mood-api"))
-                .andExpect(jsonPath("$.app.version").value("0.1.0"))
+                .andExpect(jsonPath("$.app.version").value("1.0.0"))
                 .andExpect(jsonPath("$.app.mode").value("demo"));
     }
 
@@ -36,12 +39,15 @@ class ApiSmokeTest {
                         .contentType("application/json")
                         .content("""
                                 {
-                                  "location":{"longitude":116.398,"latitude":39.908},
+                                  "location":{"longitude":%.4f,"latitude":%.4f},
                                   "stressLevel":75,
                                   "tag":"CROWD",
                                   "reportedAt":"%s"
                                 }
-                                """.formatted(Instant.now())))
+                                """.formatted(
+                                DemoGeography.REPORT_LONGITUDE,
+                                DemoGeography.REPORT_LATITUDE,
+                                Instant.now())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("created"));
     }
@@ -49,7 +55,7 @@ class ApiSmokeTest {
     @Test
     void servesHeatmapFromDemoSeed() throws Exception {
         mockMvc.perform(get("/api/v1/heatmap")
-                        .param("bbox", "116.39,39.90,116.41,39.92")
+                        .param("bbox", DemoGeography.HEATMAP_BBOX)
                         .param("zoom", "16")
                         .param("hours", "168"))
                 .andExpect(status().isOk())
@@ -59,7 +65,7 @@ class ApiSmokeTest {
     @Test
     void refreshesHeatmapCacheFromDemoSeed() throws Exception {
         mockMvc.perform(post("/api/v1/heatmap/refresh")
-                        .param("bbox", "116.39,39.90,116.41,39.92")
+                        .param("bbox", DemoGeography.HEATMAP_BBOX)
                         .param("zoom", "16")
                         .param("hours", "168"))
                 .andExpect(status().isOk())
@@ -84,7 +90,7 @@ class ApiSmokeTest {
     @Test
     void rejectsInvalidHeatmapZoomType() throws Exception {
         mockMvc.perform(get("/api/v1/heatmap")
-                        .param("bbox", "116.39,39.90,116.41,39.92")
+                        .param("bbox", DemoGeography.HEATMAP_BBOX)
                         .param("zoom", "bad"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("invalid_request"));
@@ -96,15 +102,62 @@ class ApiSmokeTest {
                         .contentType("application/json")
                         .content("""
                                 {
-                                  "origin":{"longitude":116.392,"latitude":39.905},
-                                  "destination":{"longitude":116.405,"latitude":39.912}
+                                  "origin":{"longitude":%.3f,"latitude":%.3f},
+                                  "destination":{"longitude":%.3f,"latitude":%.3f}
                                 }
-                                """))
+                                """.formatted(
+                                DemoGeography.ORIGIN_LONGITUDE,
+                                DemoGeography.ORIGIN_LATITUDE,
+                                DemoGeography.DESTINATION_LONGITUDE,
+                                DemoGeography.DESTINATION_LATITUDE)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.routes.length()").value(3))
                 .andExpect(jsonPath("$.fastestRouteId").value("route-fast"))
                 .andExpect(jsonPath("$.leastStressfulRouteId").value("route-calm"))
                 .andExpect(jsonPath("$.recommendation").exists());
+    }
+
+    @Test
+    void allowsConfiguredCorsOrigins() throws Exception {
+        mockMvc.perform(options("/api/v1/heatmap")
+                        .param("bbox", DemoGeography.HEATMAP_BBOX)
+                        .param("zoom", "16")
+                        .header("Origin", "http://127.0.0.1:5173")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://127.0.0.1:5173"));
+    }
+
+    @Test
+    void allowsCapacitorHttpLocalhostOrigin() throws Exception {
+        mockMvc.perform(options("/api/v1/heatmap")
+                        .param("bbox", DemoGeography.HEATMAP_BBOX)
+                        .param("zoom", "16")
+                        .header("Origin", "http://localhost")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost"));
+    }
+
+    @Test
+    void allowsCapacitorHttpsLocalhostOrigin() throws Exception {
+        mockMvc.perform(options("/api/v1/heatmap")
+                        .param("bbox", DemoGeography.HEATMAP_BBOX)
+                        .param("zoom", "16")
+                        .header("Origin", "https://localhost")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://localhost"));
+    }
+
+    @Test
+    void rejectsUnknownCorsOrigin() throws Exception {
+        mockMvc.perform(options("/api/v1/heatmap")
+                        .param("bbox", DemoGeography.HEATMAP_BBOX)
+                        .param("zoom", "16")
+                        .header("Origin", "http://evil.example.com")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -177,4 +230,3 @@ class ApiSmokeTest {
                 .andExpect(jsonPath("$.code").value("invalid_request"));
     }
 }
-

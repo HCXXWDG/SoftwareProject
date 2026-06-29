@@ -16,15 +16,17 @@ public class MockRouteProvider implements RouteProvider {
 
         List<GeoPoint> fastest = List.of(
                 origin,
-                new GeoPoint(116.3993, 39.9086),
-                new GeoPoint(116.4025, 39.9100),
-                new GeoPoint(116.4045, 39.9114),
+                new GeoPoint(origin.longitude() + dx * 0.35 + dy * 0.08,
+                        origin.latitude() + dy * 0.35 - dx * 0.06),
+                new GeoPoint(origin.longitude() + dx * 0.70 + dy * 0.05,
+                        origin.latitude() + dy * 0.70 - dx * 0.04),
                 destination);
         List<GeoPoint> calmer = List.of(
                 origin,
-                new GeoPoint(116.3938, 39.9062),
-                new GeoPoint(116.3915, 39.9095),
-                new GeoPoint(116.3998, 39.9121),
+                new GeoPoint(origin.longitude() + dx * 0.30 - dy * 0.12,
+                        origin.latitude() + dy * 0.30 + dx * 0.10),
+                new GeoPoint(origin.longitude() + dx * 0.65 - dy * 0.08,
+                        origin.latitude() + dy * 0.65 + dx * 0.06),
                 destination);
         List<GeoPoint> scenic = List.of(
                 origin,
@@ -54,4 +56,3 @@ public class MockRouteProvider implements RouteProvider {
         return result;
     }
 }
-
