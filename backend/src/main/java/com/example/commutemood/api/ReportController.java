@@ -3,6 +3,8 @@ package com.example.commutemood.api;
 import com.example.commutemood.api.dto.ReportRequest;
 import com.example.commutemood.application.ReportService;
 import com.example.commutemood.repository.SaveOutcome;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +18,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/reports")
+@Tag(name = "Reports", description = "Submit commute mood reports for heatmap aggregation.")
 public class ReportController {
     private final ReportService reportService;
 
@@ -24,6 +27,7 @@ public class ReportController {
     }
 
     @PostMapping
+    @Operation(summary = "Submit a mood report")
     public ResponseEntity<Map<String, Object>> submit(
             @RequestHeader("X-Device-Id") String deviceId,
             @Valid @RequestBody ReportRequest request

@@ -25,6 +25,7 @@ export interface AMapInstanceLike {
   getBounds: () => AMapBoundsLike;
   getZoom: () => number;
   lngLatToContainer: (point: [number, number]) => AMapPointLike;
+  containerToLngLat: (point: [number, number]) => AMapLngLatLike;
   off: (eventName: string, listener: () => void) => void;
   on: (eventName: string, listener: () => void) => void;
   resize?: () => void;

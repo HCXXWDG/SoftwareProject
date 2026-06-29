@@ -100,6 +100,13 @@ export interface RouteCompareRequest {
   destination: GeoPoint;
 }
 
+/** 地图反馈草稿（由 C 的地图组件生成，通过回调传给 A） */
+export interface MapFeedbackDraft {
+  location: GeoPoint;
+  stressLevel: 0 | 25 | 50 | 75 | 100;
+  tag: EmotionTag;
+}
+
 /** 地图页面状态，通过 Props 传入 */
 export interface MapPageState {
   heatmapCells: HeatmapCell[];

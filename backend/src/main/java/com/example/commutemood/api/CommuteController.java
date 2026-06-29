@@ -4,6 +4,8 @@ import com.example.commutemood.api.dto.CommuteCompleteRequest;
 import com.example.commutemood.application.CommuteService;
 import com.example.commutemood.application.TrendService;
 import com.example.commutemood.domain.CommuteRecord;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,6 +19,7 @@ import java.time.ZoneId;
 
 @RestController
 @RequestMapping("/api/v1/commutes")
+@Tag(name = "Commutes", description = "Complete commutes and read commute trend summaries.")
 public class CommuteController {
     private final CommuteService commuteService;
     private final TrendService trendService;
@@ -27,6 +30,7 @@ public class CommuteController {
     }
 
     @PostMapping("/complete")
+    @Operation(summary = "Complete a commute")
     public CommuteRecord complete(
             @RequestHeader("X-Device-Id") String deviceId,
             @Valid @RequestBody CommuteCompleteRequest request
@@ -47,6 +51,7 @@ public class CommuteController {
     }
 
     @GetMapping("/trends")
+    @Operation(summary = "Get commute trends")
     public TrendService.TrendResult trends(
             @RequestHeader("X-Device-Id") String deviceId,
             @RequestParam(defaultValue = "7") int days,

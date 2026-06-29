@@ -6,6 +6,7 @@ import com.example.commutemood.domain.GeoBounds;
 import com.example.commutemood.domain.GeoPoint;
 import com.example.commutemood.domain.HeatmapCell;
 import com.example.commutemood.repository.EmotionReportRepository;
+import com.example.commutemood.repository.HeatmapCellRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -24,9 +25,11 @@ public class HeatmapService {
     private static final double PRIOR_SCORE = 50.0;
 
     private final EmotionReportRepository repository;
+    private final HeatmapCellRepository cellRepository;
 
-    public HeatmapService(EmotionReportRepository repository) {
+    public HeatmapService(EmotionReportRepository repository, HeatmapCellRepository cellRepository) {
         this.repository = repository;
+        this.cellRepository = cellRepository;
     }
 
     public List<HeatmapCell> getHeatmap(GeoBounds bounds, int zoom, int hours) {
@@ -73,6 +76,12 @@ public class HeatmapService {
         return result.stream()
                 .sorted(Comparator.comparing(HeatmapCell::cellId))
                 .toList();
+    }
+
+    public List<HeatmapCell> refreshCachedHeatmap(GeoBounds bounds, int zoom, int hours) {
+        List<HeatmapCell> cells = getHeatmap(bounds, zoom, hours);
+        cellRepository.upsertAll(zoom, cells);
+        return cells;
     }
 
     static double gridSizeForZoom(int zoom) {
