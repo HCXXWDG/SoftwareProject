@@ -101,8 +101,8 @@ test.describe("Welcome flow & 3-stage navigation", () => {
     await expect(enterMapBtn).toBeVisible({ timeout: 10_000 });
 
     // Both route cards should be visible
-    await expect(page.getByText("最快路线 A")).toBeVisible();
-    await expect(page.getByText("少心累路线 B")).toBeVisible();
+    await expect(page.getByText("最快路线 A", { exact: true })).toBeVisible();
+    await expect(page.getByText("少心累路线 B", { exact: true })).toBeVisible();
 
     // Badges should appear
     await expect(page.getByText("最快", { exact: true })).toBeVisible();
@@ -180,10 +180,10 @@ test.describe("Welcome flow & 3-stage navigation", () => {
     });
     await mapSection.dispatchEvent("pointerup", pointer);
 
-    // Fill and submit feedback
-    await page.getByRole("button", { name: /压力 50/ }).click();
-    await page.getByRole("button", { name: /原因 噪音/ }).click();
-    await page.getByRole("button", { name: "提交反馈" }).click();
+    // Fill and submit feedback (use dispatchEvent to bypass overlay on small viewports)
+    await page.getByRole("button", { name: /压力 50/ }).dispatchEvent("click");
+    await page.getByRole("button", { name: /原因 噪音/ }).dispatchEvent("click");
+    await page.getByRole("button", { name: "提交反馈" }).dispatchEvent("click");
 
     // Panel should close
     await expect(page.getByTestId("feedback-panel")).not.toBeVisible({

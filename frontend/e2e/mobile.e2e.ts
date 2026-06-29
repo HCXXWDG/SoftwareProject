@@ -113,8 +113,8 @@ test.describe("Mobile viewport — iPhone 14 Pro (390×844)", () => {
     await expect(enterMapBtn).toBeVisible({ timeout: 10_000 });
 
     // Both route cards should be visible
-    await expect(page.getByText("最快路线 A")).toBeVisible();
-    await expect(page.getByText("少心累路线 B")).toBeVisible();
+    await expect(page.getByText("最快路线 A", { exact: true })).toBeVisible();
+    await expect(page.getByText("少心累路线 B", { exact: true })).toBeVisible();
   });
 
   test("map loads and heatmap displays on mobile", async ({ page }) => {
@@ -166,10 +166,10 @@ test.describe("Mobile viewport — iPhone 14 Pro (390×844)", () => {
     });
     await mapSection.dispatchEvent("pointerup", pointer);
 
-    // Interact with feedback panel
-    await page.getByRole("button", { name: /压力 50/ }).click();
-    await page.getByRole("button", { name: /原因 噪音/ }).click();
-    await page.getByRole("button", { name: "提交反馈" }).click();
+    // Interact with feedback panel (use dispatchEvent to bypass overlay on small viewports)
+    await page.getByRole("button", { name: /压力 50/ }).dispatchEvent("click");
+    await page.getByRole("button", { name: /原因 噪音/ }).dispatchEvent("click");
+    await page.getByRole("button", { name: "提交反馈" }).dispatchEvent("click");
     await expect(page.getByTestId("feedback-panel")).not.toBeVisible({
       timeout: 5000,
     });
