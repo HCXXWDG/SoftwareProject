@@ -7,6 +7,7 @@
 .env
 .env.local
 !.env.example
+!.env.android.example
 
 # Frontend
 frontend/node_modules/
@@ -27,3 +28,5 @@ Thumbs.db
 # Generated course artifacts
 outputs/
 
+# Temporary files
+.tmp/
