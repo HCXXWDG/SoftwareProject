@@ -135,13 +135,12 @@ export function MapSurface({
   const handleOfflineProjectorChange = useCallback(
     (
       nextProjector: (point: GeoPoint) => ProjectedPoint,
-      _nextUnprojector: (point: ProjectedPoint) => GeoPoint,
+      nextUnprojector: (point: ProjectedPoint) => GeoPoint,
       viewport: MapViewport,
       commitViewport: boolean,
     ) => {
       setProjector(() => nextProjector);
-      // 离线模式不提供 unproject，使用 unavailable 占位
-      setUnprojector(() => unavailableUnprojector);
+      setUnprojector(() => nextUnprojector);
       setViewportRevision((current) => current + 1);
       if (commitViewport) {
         viewportCallbackRef.current(viewport.bbox, viewport.zoom);
