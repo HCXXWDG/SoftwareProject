@@ -29,8 +29,8 @@ android {
         applicationId "com.jiangnan.course.commutemoodmap"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode Integer.parseInt(System.getenv("ANDROID_VERSION_CODE") ?: project.findProperty("versionCode") ?: "1")
-        versionName System.getenv("ANDROID_VERSION_NAME") ?: project.findProperty("versionName") ?: "1.0"
+        versionCode 1
+        versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
