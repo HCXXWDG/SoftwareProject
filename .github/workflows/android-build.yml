@@ -50,6 +50,18 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
 
+      - name: Verify versionCode and versionName
+        working-directory: frontend/android
+        run: |
+          VERSION_CODE=$(grep -oP 'versionCode\s+\K\d+' app/build.gradle)
+          VERSION_NAME=$(grep -oP 'versionName\s+"\K[^"]+' app/build.gradle)
+          if [ -z "$VERSION_CODE" ] || [ -z "$VERSION_NAME" ]; then
+            echo "::error::versionCode or versionName is missing in app/build.gradle"
+            exit 1
+          fi
+          echo "versionCode=$VERSION_CODE versionName=$VERSION_NAME"
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
+
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
@@ -119,3 +131,92 @@ jobs:
           path: frontend/android/app/build/reports/lint-results-*.html
           if-no-files-found: ignore
           retention-days: 14
+
+  android-emulator-e2e:
+    name: Android Emulator E2E Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install required SDK platform
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" --channel=3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend for production
+        working-directory: frontend
+        run: npm run build
+
+      - name: Sync Capacitor Android project
+        working-directory: frontend
+        run: npx cap sync android
+
+      - name: Configure local.properties
+        working-directory: frontend/android
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - name: Grant execute permission for gradlew
+        working-directory: frontend/android
+        run: chmod +x gradlew
+
+      - name: Build Android debug APK
+        working-directory: frontend/android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Run emulator smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          profile: pixel_5
+          script: |
+            echo "Installing debug APK..."
+            adb install -r frontend/android/app/build/outputs/apk/debug/app-debug.apk
+            sleep 5
+            echo "Launching MainActivity..."
+            adb shell am start -n com.jiangnan.course.commutemoodmap/.MainActivity
+            sleep 15
+            ACTIVITY=$(adb shell dumpsys activity activities)
+            if echo "$ACTIVITY" | grep -q "com.jiangnan.course.commutemoodmap"; then
+              echo "App launched successfully on emulator"
+              adb shell screencap -p /sdcard/smoke.png
+              adb pull /sdcard/smoke.png frontend/smoke.png
+            else
+              echo "::error::App failed to launch on emulator"
+              echo "$ACTIVITY" | grep -E "mResumedActivity|topResumedActivity" || true
+              exit 1
+            fi
+
+      - name: Upload emulator screenshot
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-emulator-smoke-${{ github.run_id }}
+          path: frontend/smoke.png
+          if-no-files-found: ignore
+          retention-days: 7
