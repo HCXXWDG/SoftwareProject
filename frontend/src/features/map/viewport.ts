@@ -1,10 +1,10 @@
 import type { GeoPoint } from "../../types";
 
 export const DEFAULT_MAP_CENTER: GeoPoint = {
-  longitude: 116.4,
-  latitude: 39.91,
+  longitude: 120.273915,
+  latitude: 31.479302,
 };
-export const DEFAULT_MAP_ZOOM = 14;
+export const DEFAULT_MAP_ZOOM = 16;
 
 const TILE_SIZE = 256;
 const MAX_LATITUDE = 85.05112878;
@@ -26,8 +26,52 @@ export interface ProjectedPoint {
   y: number;
 }
 
+export interface GeoBounds {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+}
+
+export interface MapViewportConstraint {
+  center: GeoPoint;
+  bounds: GeoBounds;
+  minZoom: number;
+  maxZoom: number;
+  defaultZoom?: number;
+}
+
 function clampLatitude(latitude: number): number {
   return Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, latitude));
+}
+
+export function clampZoom(zoom: number, minZoom: number, maxZoom: number): number {
+  return Math.max(minZoom, Math.min(maxZoom, Math.round(zoom)));
+}
+
+export function clampCenterToBounds(
+  center: GeoPoint,
+  bounds: GeoBounds,
+): GeoPoint {
+  return {
+    longitude: Math.max(
+      bounds.west,
+      Math.min(bounds.east, center.longitude),
+    ),
+    latitude: Math.max(
+      bounds.south,
+      Math.min(bounds.north, center.latitude),
+    ),
+  };
+}
+
+export function isPointInBounds(point: GeoPoint, bounds: GeoBounds): boolean {
+  return (
+    point.longitude >= bounds.west &&
+    point.longitude <= bounds.east &&
+    point.latitude >= bounds.south &&
+    point.latitude <= bounds.north
+  );
 }
 
 function worldSize(zoom: number): number {
