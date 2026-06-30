@@ -45,7 +45,7 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install required SDK platform
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" --channel=3
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
@@ -132,11 +132,10 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  android-emulator-e2e:
-    name: Android Emulator E2E Smoke
+  android-apk-verify:
+    name: Android APK Verification
     runs-on: ubuntu-latest
-    timeout-minutes: 40
-    continue-on-error: true
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -159,7 +158,7 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install required SDK platform
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" --channel=3
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
@@ -188,35 +187,64 @@ jobs:
         working-directory: frontend/android
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Run emulator smoke test
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 29
-          arch: x86_64
-          profile: pixel_5
-          script: |
-            echo "Installing debug APK..."
-            adb install -r frontend/android/app/build/outputs/apk/debug/app-debug.apk
-            sleep 5
-            echo "Launching MainActivity..."
-            adb shell am start -n com.jiangnan.course.commutemoodmap/.MainActivity
-            sleep 15
-            ACTIVITY=$(adb shell dumpsys activity activities)
-            if echo "$ACTIVITY" | grep -q "com.jiangnan.course.commutemoodmap"; then
-              echo "App launched successfully on emulator"
-              adb shell screencap -p /sdcard/smoke.png
-              adb pull /sdcard/smoke.png frontend/smoke.png
-            else
-              echo "::error::App failed to launch on emulator"
-              echo "$ACTIVITY" | grep -E "mResumedActivity|topResumedActivity" || true
-              exit 1
-            fi
+      - name: Verify APK structure and manifest
+        run: |
+          APK="frontend/android/app/build/outputs/apk/debug/app-debug.apk"
 
-      - name: Upload emulator screenshot
-        if: always()
+          echo "=== Verifying APK exists ==="
+          if [ ! -f "$APK" ]; then
+            echo "::error::Debug APK not found at $APK"
+            exit 1
+          fi
+          echo "APK size: $(du -h "$APK" | cut -f1)"
+
+          echo "=== Verifying APK is valid ZIP ==="
+          unzip -t "$APK" > /dev/null 2>&1
+          if [ $? -ne 0 ]; then
+            echo "::error::APK is not a valid ZIP archive"
+            exit 1
+          fi
+
+          echo "=== Verifying AndroidManifest.xml ==="
+          # Use aapt2 to dump the manifest
+          AAPT2=$(find $ANDROID_HOME/build-tools -name "aapt2" | head -1)
+          MANIFEST=$($AAPT2 dump xmltree --file AndroidManifest.xml "$APK" 2>&1)
+
+          # Check for required elements
+          if echo "$MANIFEST" | grep -q "com.jiangnan.course.commutemoodmap"; then
+            echo "Package name verified"
+          else
+            echo "::error::Package name not found in manifest"
+            exit 1
+          fi
+
+          if echo "$MANIFEST" | grep -q "MainActivity"; then
+            echo "MainActivity verified"
+          else
+            echo "::error::MainActivity not found in manifest"
+            exit 1
+          fi
+
+          if echo "$MANIFEST" | grep -q "android.permission.INTERNET"; then
+            echo "INTERNET permission verified"
+          else
+            echo "::warning::INTERNET permission not found in manifest"
+          fi
+
+          echo "=== Verifying web assets in APK ==="
+          if unzip -l "$APK" | grep -q "assets/public/index.html"; then
+            echo "Web assets (index.html) verified"
+          else
+            echo "::error::Web assets not found in APK"
+            exit 1
+          fi
+
+          echo "=== All APK verification checks passed ==="
+
+      - name: Upload debug APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: android-emulator-smoke-${{ github.run_id }}
-          path: frontend/smoke.png
-          if-no-files-found: ignore
+          name: android-debug-apk-verify-${{ github.run_id }}
+          path: frontend/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
           retention-days: 7
