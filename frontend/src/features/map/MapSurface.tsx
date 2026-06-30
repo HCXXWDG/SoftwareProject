@@ -11,7 +11,6 @@ import type {
   MapFeedbackDraft,
   ScoredRoute,
 } from "../../types";
-import { CampusMarkers } from "./CampusMarkers";
 import { EmojiFountain } from "./EmojiFountain";
 import { EndpointMarkers } from "./EndpointMarkers";
 import { FeedbackPanel } from "./FeedbackPanel";
@@ -269,13 +268,6 @@ export function MapSurface({
           origin={origin}
           destination={destination}
           project={projector}
-          viewportRevision={viewportRevision}
-        />
-      )}
-
-      {mode !== "loading" && (
-        <CampusMarkers
-          project={(point) => projector(point)}
           viewportRevision={viewportRevision}
         />
       )}
