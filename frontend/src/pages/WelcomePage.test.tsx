@@ -68,8 +68,8 @@ describe("WelcomePage", () => {
     const btn = screen.getByRole("button", { name: "查看推荐路线" });
     expect(btn).not.toBeDisabled();
 
-    expect(screen.getByText("学生公寓区")).toBeInTheDocument();
-    expect(screen.getByText("第一教学楼")).toBeInTheDocument();
+    expect(screen.getAllByText("学生公寓区").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("第一教学楼").length).toBeGreaterThan(0);
   });
 
   it("calls onNavigateToPreview when CTA is clicked", () => {

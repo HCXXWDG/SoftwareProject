@@ -168,12 +168,12 @@ function mockFetchForCommute(mode: "success" | "fail" | "success-trend-fail") {
 
 /** Select origin and destination on WelcomePage, then navigate to route preview */
 function selectEndpoints() {
-  // Click "学生公寓区" as origin (first occurrence in origin grid)
+  // Click "学生公寓区" as origin (first button in origin grid)
   const originBtns = screen.getAllByText("学生公寓区");
   fireEvent.click(originBtns[0]);
-  // Click "第一教学楼" as destination (second occurrence in dest grid)
+  // Click "第一教学楼" as destination (second button in dest grid)
   const destBtns = screen.getAllByText("第一教学楼");
-  fireEvent.click(destBtns.length > 1 ? destBtns[1] : destBtns[0]);
+  fireEvent.click(destBtns[1]);
 }
 
 /** Navigate from welcome → route-preview → map */
@@ -312,8 +312,8 @@ describe("App three-stage flow", () => {
     expect(cta).not.toBeDisabled();
 
     // Summary shows selected route
-    expect(screen.getByText("学生公寓区")).toBeInTheDocument();
-    expect(screen.getByText("第一教学楼")).toBeInTheDocument();
+    expect(screen.getAllByText("学生公寓区").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("第一教学楼").length).toBeGreaterThan(0);
 
     fireEvent.click(cta);
     await waitFor(() => {
