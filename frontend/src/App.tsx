@@ -1,13 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { WelcomePage } from "./pages/WelcomePage";
+import { RoutePreviewPage } from "./pages/RoutePreviewPage";
 import { MapPage } from "./pages/MapPage";
 import { MapSurface } from "./features/map";
 import { RoutePanel } from "./features/routes";
 import { TrendPanel } from "./features/trends";
 import { fetchHeatmap } from "./services/heatmap";
-import { compareRoutes } from "./services/route";
 import { fetchTrends, completeCommute } from "./services/commute";
 import { submitReport } from "./services/report";
-import type { MapPageState, HeatmapCell, GeoPoint, MapFeedbackDraft } from "./types";
+import { CAMPUS_DEFAULT_BBOX } from "./config/campus";
+import type {
+  AppStage,
+  MapPageState,
+  HeatmapCell,
+  RouteComparison,
+  MapFeedbackDraft,
+} from "./types";
 
 const initialMapState: MapPageState = {
   heatmapCells: [],
@@ -15,18 +23,14 @@ const initialMapState: MapPageState = {
   error: null,
   routeComparison: null,
   trend: null,
-  selectedOrigin: null,
-  selectedDestination: null,
 };
 
-/** 默认地图视口 bbox（北京西直门附近，匹配后端 Demo 数据区域） */
-const DEFAULT_BBOX = "116.39,39.90,116.41,39.92";
-/** 预设 Demo 起终点（与后端 ApiSmokeTest 一致） */
-const DEMO_ORIGIN: GeoPoint = { longitude: 116.395, latitude: 39.905 };
-const DEMO_DESTINATION: GeoPoint = { longitude: 116.405, latitude: 39.910 };
+
 const DEBOUNCE_MS = 300;
 
 function App() {
+  const [stage, setStage] = useState<AppStage>("welcome");
+  const [isOfflineFallback, setIsOfflineFallback] = useState(false);
   const [mapState, setMapState] = useState<MapPageState>(initialMapState);
   const [selectedRouteId, setSelectedRouteId] = useState<string | undefined>();
   const [userStressLevel, setUserStressLevel] = useState<number | null>(null);
@@ -38,7 +42,6 @@ function App() {
 
   /** 获取热力图（自动取消旧请求，避免竞态） */
   const loadHeatmap = useCallback(async (bbox: string, zoom?: number) => {
-    // 取消进行中的旧请求
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -141,25 +144,28 @@ function App() {
     }
   }, [mapState.routeComparison, selectedRouteId, userStressLevel]);
 
-  /** 首次加载：热力图 + 路线对比 + 通勤趋势 */
+  /** 路线预览 → 地图阶段：设置路线对比数据并加载热力图+趋势 */
+  const handleEnterMap = useCallback(
+    (comparison: RouteComparison, offline: boolean) => {
+      setIsOfflineFallback(offline);
+      setMapState((prev) => ({ ...prev, routeComparison: comparison }));
+      setStage("map");
+    },
+    [],
+  );
+
+  /** 进入地图阶段时加载热力图和趋势 */
   useEffect(() => {
-    loadHeatmap(DEFAULT_BBOX);
+    if (stage !== "map") return;
+
+    loadHeatmap(CAMPUS_DEFAULT_BBOX);
 
     (async () => {
       try {
-        const [comparison, trend] = await Promise.all([
-          compareRoutes({ origin: DEMO_ORIGIN, destination: DEMO_DESTINATION }),
-          fetchTrends(),
-        ]);
-        setMapState((prev) => ({
-          ...prev,
-          routeComparison: comparison,
-          trend,
-          selectedOrigin: DEMO_ORIGIN,
-          selectedDestination: DEMO_DESTINATION,
-        }));
+        const trend = await fetchTrends();
+        setMapState((prev) => ({ ...prev, trend }));
       } catch {
-        // 后端不可用时静默降级，页面仍可显示热力图
+        // 后端不可用时静默降级
       }
     })();
 
@@ -167,10 +173,26 @@ function App() {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       abortRef.current?.abort();
     };
-  }, [loadHeatmap]);
+  }, [stage, loadHeatmap]);
 
+  // ── Stage: welcome ──
+  if (stage === "welcome") {
+    return <WelcomePage onNavigateToPreview={() => setStage("route-preview")} />;
+  }
+
+  // ── Stage: route-preview ──
+  if (stage === "route-preview") {
+    return <RoutePreviewPage onEnterMap={handleEnterMap} />;
+  }
+
+  // ── Stage: map ──
   return (
     <>
+      {isOfflineFallback && (
+        <div className="map-offline-banner" role="status">
+          离线模式 — 评分数据暂不可用
+        </div>
+      )}
       <MapPage
         state={mapState}
         mapSlot={

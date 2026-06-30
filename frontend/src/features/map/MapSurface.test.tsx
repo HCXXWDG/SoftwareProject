@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HeatmapCell, MapFeedbackDraft, ScoredRoute } from "../../types";
+import { CAMPUS } from "../../config/campus";
 import {
   resetAMapLoaderForTests,
   type AMapNamespaceLike,
@@ -10,14 +11,30 @@ import { MapSurface, type MapSurfaceProps } from "./MapSurface";
 const heatmapCell: HeatmapCell = {
   cellId: "cell-1",
   center: {
-    longitude: 116.4,
-    latitude: 39.91,
+    longitude: CAMPUS.center.longitude,
+    latitude: CAMPUS.center.latitude,
   },
   score: 100,
   confidence: 0.05,
   count: 18,
   dominantTag: "NOISE",
 };
+
+const campusViewportConstraint = {
+  center: { longitude: 120.273915, latitude: 31.479302 },
+  bounds: {
+    west: 120.26067,
+    south: 31.47278,
+    east: 120.27946,
+    north: 31.49417,
+  },
+  minZoom: 15,
+  maxZoom: 18,
+  defaultZoom: 16,
+};
+
+const campusOrigin = { longitude: 120.2735103, latitude: 31.4753281 };
+const campusDestination = { longitude: 120.2743195, latitude: 31.4832753 };
 
 const defaultProps: Omit<MapSurfaceProps, "heatmapCells" | "loading"> = {
   routes: [],
@@ -56,7 +73,7 @@ describe("MapSurface", () => {
     const [west, south, east, north] = String(bbox).split(",").map(Number);
     expect(west).toBeLessThan(east);
     expect(south).toBeLessThan(north);
-    expect(zoom).toBe(14);
+    expect(zoom).toBe(16);
   });
 
   it("renders heatmap visuals and opens cell details", async () => {
@@ -107,7 +124,7 @@ describe("MapSurface", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "放大地图" }));
     await waitFor(() =>
-      expect(lastCall(onViewportChange)[1]).toBe(15),
+      expect(lastCall(onViewportChange)[1]).toBe(17),
     );
 
     fireEvent.keyDown(offlineMap, { key: "ArrowRight" });
@@ -148,24 +165,41 @@ describe("MapSurface", () => {
         destroy = destroySpy;
         getBounds() {
           return {
-            getNorthEast: () => ({ lng: 116.41, lat: 39.92 }),
-            getSouthWest: () => ({ lng: 116.39, lat: 39.9 }),
+            getNorthEast: () => ({ lng: CAMPUS.bounds.east, lat: CAMPUS.bounds.north }),
+            getSouthWest: () => ({ lng: CAMPUS.bounds.west, lat: CAMPUS.bounds.south }),
           };
         }
         getZoom() {
-          return 14;
+          return 16;
         }
+        getCenter() {
+          return { lng: CAMPUS.center.longitude, lat: CAMPUS.center.latitude };
+        }
+        setCenter() {}
+        setZoom() {}
         lngLatToContainer() {
           return { x: 480, y: 300 };
         }
         containerToLngLat() {
-          return { getLng: () => 116.4, getLat: () => 39.91 };
+          return { getLng: () => CAMPUS.center.longitude, getLat: () => CAMPUS.center.latitude };
         }
         off(eventName: string) {
           listeners.delete(eventName);
         }
         on(eventName: string, listener: () => void) {
           listeners.set(eventName, listener);
+        }
+      },
+      Bounds: class {
+        constructor(
+          public sw: [number, number],
+          public ne: [number, number],
+        ) {}
+        getSouthWest() {
+          return { lng: this.sw[0], lat: this.sw[1] };
+        }
+        getNorthEast() {
+          return { lng: this.ne[0], lat: this.ne[1] };
         }
       },
     };
@@ -212,12 +246,41 @@ describe("MapSurface", () => {
     expect(screen.getByTestId("offline-map")).toBeInTheDocument();
   });
 
-  it("shows feedback panel on long press and submits feedback", async () => {
-    vi.stubEnv("VITE_AMAP_JS_KEY", "");
-    vi.useFakeTimers();
+  it("shows feedback panel on long press via AMap and submits feedback", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "browser-key");
     const onFeedbackSubmit = vi
       .fn<(draft: MapFeedbackDraft) => Promise<void>>()
       .mockResolvedValue(undefined);
+
+    const listeners = new Map<string, () => void>();
+    const namespace: AMapNamespaceLike = {
+      Map: class {
+        destroy() {}
+        getBounds() {
+          return {
+            getNorthEast: () => ({ lng: CAMPUS.bounds.east, lat: CAMPUS.bounds.north }),
+            getSouthWest: () => ({ lng: CAMPUS.bounds.west, lat: CAMPUS.bounds.south }),
+          };
+        }
+        getZoom() { return 16; }
+        getCenter() { return { lng: CAMPUS.center.longitude, lat: CAMPUS.center.latitude }; }
+        setCenter() {}
+        setZoom() {}
+        lngLatToContainer() { return { x: 380, y: 250 }; }
+        containerToLngLat() {
+          // Return a point inside campus bounds
+          return { getLng: () => CAMPUS.center.longitude, getLat: () => CAMPUS.center.latitude };
+        }
+        off(eventName: string) { listeners.delete(eventName); }
+        on(eventName: string, listener: () => void) { listeners.set(eventName, listener); }
+      },
+      Bounds: class {
+        constructor(public sw: [number, number], public ne: [number, number]) {}
+        getSouthWest() { return { lng: this.sw[0], lat: this.sw[1] }; }
+        getNorthEast() { return { lng: this.ne[0], lat: this.ne[1] }; }
+      },
+    };
+    window.AMap = namespace;
 
     render(
       <MapSurface
@@ -228,7 +291,13 @@ describe("MapSurface", () => {
       />,
     );
 
-    const section = screen.getByLabelText("城市通勤情绪地图");
+    // Wait for AMap adapter to initialize with real timers
+    expect(await screen.findByText("高德地图")).toBeInTheDocument();
+
+    // Now switch to fake timers for long press simulation
+    vi.useFakeTimers();
+
+    const section = screen.getByLabelText("校园通勤情绪地图");
     const mapCanvas = screen.getByTestId("map-canvas");
     vi.spyOn(mapCanvas, "getBoundingClientRect").mockReturnValue({
       bottom: 650,
@@ -243,7 +312,7 @@ describe("MapSurface", () => {
     });
 
     // Simulate long press: pointer down then wait 650ms
-    act(() => {
+    await act(async () => {
       const pointerDown = new MouseEvent("pointerdown", {
         bubbles: true,
         clientX: 480,
@@ -292,16 +361,16 @@ describe("MapSurface", () => {
       {
         id: "route-fast",
         label: "最快路线",
-        distanceMeters: 2100,
-        durationSeconds: 720,
-        stressExposure: 67.2,
-        stressScore: 50.4,
-        confidence: 0.68,
+        distanceMeters: 850,
+        durationSeconds: 600,
+        stressExposure: 45.2,
+        stressScore: 38.4,
+        confidence: 0.72,
         fastest: true,
         leastStressful: false,
         polyline: [
-          { longitude: 116.392, latitude: 39.905 },
-          { longitude: 116.405, latitude: 39.912 },
+          { longitude: CAMPUS.origin.longitude, latitude: CAMPUS.origin.latitude },
+          { longitude: CAMPUS.destination.longitude, latitude: CAMPUS.destination.latitude },
         ],
       },
     ];
@@ -319,5 +388,109 @@ describe("MapSurface", () => {
     expect(await screen.findByTestId("route-overlay")).toBeInTheDocument();
     expect(screen.getByTestId("route-legend")).toBeInTheDocument();
     expect(screen.getByText("最快路线")).toBeInTheDocument();
+  }, 15_000);
+});
+
+describe("MapSurface campus bounds", () => {
+  it("uses the campus default zoom and renders fixed endpoint markers", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+    const onViewportChange = vi.fn();
+
+    render(
+      <MapSurface
+        {...defaultProps}
+        heatmapCells={[]}
+        loading={false}
+        origin={campusOrigin}
+        destination={campusDestination}
+        viewportConstraint={campusViewportConstraint}
+        onViewportChange={onViewportChange}
+      />,
+    );
+
+    await screen.findByTestId("offline-map");
+    await waitFor(() => expect(onViewportChange).toHaveBeenCalled());
+    expect(lastCall(onViewportChange)[1]).toBe(16);
+
+    expect(screen.getByTestId("endpoint-markers")).toBeInTheDocument();
+    expect(screen.getByTestId("endpoint-origin")).toBeInTheDocument();
+    expect(screen.getByTestId("endpoint-destination")).toBeInTheDocument();
+  });
+
+  it("clamps offline zoom to the campus range and rejects long-press outside bounds", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+    const onViewportChange = vi.fn();
+
+    render(
+      <MapSurface
+        {...defaultProps}
+        heatmapCells={[]}
+        loading={false}
+        viewportConstraint={campusViewportConstraint}
+        onViewportChange={onViewportChange}
+      />,
+    );
+
+    const offlineMap = await screen.findByTestId("offline-map");
+    await waitFor(() => expect(onViewportChange).toHaveBeenCalled());
+
+    // Zoom out repeatedly — should never fall below minZoom 15
+    for (let i = 0; i < 6; i += 1) {
+      fireEvent.click(screen.getByRole("button", { name: "缩小地图" }));
+    }
+    await waitFor(() =>
+      expect(lastCall(onViewportChange)[1]).toBeGreaterThanOrEqual(15),
+    );
+
+    // Long-press near the top-left corner (outside the campus bounds) should
+    // not open the feedback panel because the projected GeoPoint is far away.
+    const section = screen.getByLabelText("校园通勤情绪地图");
+    const mapCanvas = screen.getByTestId("map-canvas");
+    vi.spyOn(mapCanvas, "getBoundingClientRect").mockReturnValue({
+      bottom: 650,
+      height: 600,
+      left: 100,
+      right: 1060,
+      top: 50,
+      width: 960,
+      x: 100,
+      y: 50,
+      toJSON: () => ({}),
+    });
+
+    fireEvent(
+      section,
+      new MouseEvent("pointerdown", {
+        bubbles: true,
+        clientX: 110,
+        clientY: 60,
+      }),
+    );
+
+    await waitFor(() => {
+      const panel = screen.queryByTestId("feedback-panel");
+      expect(panel).not.toBeInTheDocument();
+    });
+
+    // A press near the map center (within bounds) should open the panel.
+    vi.useFakeTimers();
+    act(() => {
+      fireEvent(
+        section,
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          clientX: 480,
+          clientY: 300,
+        }),
+      );
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(700);
+    });
+    expect(screen.getByTestId("feedback-panel")).toBeInTheDocument();
+    vi.useRealTimers();
+
+    // silence unused var lint in some toolchains
+    expect(offlineMap).toBeInTheDocument();
   });
 });

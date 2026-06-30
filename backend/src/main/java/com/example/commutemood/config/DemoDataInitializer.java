@@ -92,11 +92,11 @@ public class DemoDataInitializer implements ApplicationRunner {
     }
 
     private enum Cluster {
-        BUSY_CENTER(116.3993, 39.9086, 78, 0.0012),
-        CALM_NORTH(116.3998, 39.9121, 24, 0.0014),
-        BUSY_GATE(116.4045, 39.9114, 72, 0.0008),
-        CALM_WEST(116.3938, 39.9062, 32, 0.0010),
-        MIXED_SOUTH(116.3990, 39.9049, 55, 0.0013);
+        BUSY_CENTER(120.2739, 31.4793, 78, 0.0012),
+        CALM_NORTH(120.2750, 31.4833, 24, 0.0014),
+        BUSY_GATE(120.2760, 31.4810, 72, 0.0008),
+        CALM_WEST(120.2680, 31.4770, 32, 0.0010),
+        MIXED_SOUTH(120.2730, 31.4750, 55, 0.0013);
 
         private final double longitude;
         private final double latitude;

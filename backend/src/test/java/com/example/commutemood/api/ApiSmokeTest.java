@@ -36,7 +36,7 @@ class ApiSmokeTest {
                         .contentType("application/json")
                         .content("""
                                 {
-                                  "location":{"longitude":116.398,"latitude":39.908},
+                                  "location":{"longitude":120.274,"latitude":31.479},
                                   "stressLevel":75,
                                   "tag":"CROWD",
                                   "reportedAt":"%s"
@@ -49,7 +49,7 @@ class ApiSmokeTest {
     @Test
     void servesHeatmapFromDemoSeed() throws Exception {
         mockMvc.perform(get("/api/v1/heatmap")
-                        .param("bbox", "116.39,39.90,116.41,39.92")
+                        .param("bbox", "120.260,31.472,120.280,31.495")
                         .param("zoom", "16")
                         .param("hours", "168"))
                 .andExpect(status().isOk())
@@ -59,7 +59,7 @@ class ApiSmokeTest {
     @Test
     void refreshesHeatmapCacheFromDemoSeed() throws Exception {
         mockMvc.perform(post("/api/v1/heatmap/refresh")
-                        .param("bbox", "116.39,39.90,116.41,39.92")
+                        .param("bbox", "120.260,31.472,120.280,31.495")
                         .param("zoom", "16")
                         .param("hours", "168"))
                 .andExpect(status().isOk())
@@ -84,7 +84,7 @@ class ApiSmokeTest {
     @Test
     void rejectsInvalidHeatmapZoomType() throws Exception {
         mockMvc.perform(get("/api/v1/heatmap")
-                        .param("bbox", "116.39,39.90,116.41,39.92")
+                        .param("bbox", "120.260,31.472,120.280,31.495")
                         .param("zoom", "bad"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("invalid_request"));
@@ -96,8 +96,8 @@ class ApiSmokeTest {
                         .contentType("application/json")
                         .content("""
                                 {
-                                  "origin":{"longitude":116.392,"latitude":39.905},
-                                  "destination":{"longitude":116.405,"latitude":39.912}
+                                  "origin":{"longitude":120.2735,"latitude":31.4753},
+                                  "destination":{"longitude":120.2743,"latitude":31.4833}
                                 }
                                 """))
                 .andExpect(status().isOk())

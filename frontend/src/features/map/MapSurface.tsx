@@ -12,6 +12,7 @@ import type {
   ScoredRoute,
 } from "../../types";
 import { EmojiFountain } from "./EmojiFountain";
+import { EndpointMarkers } from "./EndpointMarkers";
 import { FeedbackPanel } from "./FeedbackPanel";
 import { HeatmapOverlay } from "./HeatmapOverlay";
 import { RouteLegend } from "./RouteLegend";
@@ -20,7 +21,12 @@ import { loadAMap } from "./amapLoader";
 import { createAMapAdapter, type MapAdapter } from "./mapAdapter";
 import { OfflineMap } from "./OfflineMap";
 import { useLongPress, type LongPressPosition } from "./useLongPress";
-import type { MapViewport, ProjectedPoint } from "./viewport";
+import {
+  isPointInBounds,
+  type MapViewport,
+  type MapViewportConstraint,
+  type ProjectedPoint,
+} from "./viewport";
 import "./MapSurface.css";
 
 export interface MapSurfaceProps {
@@ -31,6 +37,9 @@ export interface MapSurfaceProps {
   onFeedbackSubmit: (draft: MapFeedbackDraft) => Promise<void>;
   onRouteSelect: (routeId: string) => void;
   onViewportChange: (bbox: string, zoom: number) => void;
+  origin?: GeoPoint;
+  destination?: GeoPoint;
+  viewportConstraint?: MapViewportConstraint;
 }
 
 type MapMode = "loading" | "amap" | "offline";
@@ -46,6 +55,9 @@ export function MapSurface({
   onFeedbackSubmit,
   onRouteSelect,
   onViewportChange,
+  origin,
+  destination,
+  viewportConstraint,
 }: MapSurfaceProps) {
   const mapHostRef = useRef<HTMLDivElement>(null);
   const adapterRef = useRef<MapAdapter | null>(null);
@@ -110,7 +122,9 @@ export function MapSurface({
         if (cancelled) {
           return;
         }
-        const adapter = createAMapAdapter(container, namespace);
+        const adapter = createAMapAdapter(container, namespace, {
+          viewportConstraint,
+        });
         adapterRef.current = adapter;
         setProjector(() => (point: GeoPoint) => adapter.project(point));
         setUnprojector(
@@ -128,7 +142,7 @@ export function MapSurface({
       adapterRef.current?.destroy();
       adapterRef.current = null;
     };
-  }, [publishAdapterViewport]);
+  }, [publishAdapterViewport, viewportConstraint]);
 
   const handleOfflineProjectorChange = useCallback(
     (
@@ -148,6 +162,7 @@ export function MapSurface({
   );
 
   // Long-press handler: screen position -> GeoPoint -> show feedback panel
+  // 校园外长按不弹出反馈面板
   const handleLongPress = useCallback(
     (position: LongPressPosition) => {
       const container = mapHostRef.current;
@@ -161,10 +176,15 @@ export function MapSurface({
         y: position.y - rect.top,
       };
       const geoPoint = unprojector(relativePoint);
+      // Reject long-press feedback coordinates outside the campus bounds
+      if (viewportConstraint && !isPointInBounds(geoPoint, viewportConstraint.bounds)) {
+        return;
+      }
+
       setFeedbackGeoPoint(geoPoint);
       setFeedbackPosition(relativePoint);
     },
-    [unprojector],
+    [unprojector, viewportConstraint],
   );
 
   const {
@@ -221,7 +241,7 @@ export function MapSurface({
 
   return (
     <section
-      aria-label="城市通勤情绪地图"
+      aria-label="校园通勤情绪地图"
       className="map-surface"
       data-map-mode={mode}
       onPointerCancel={handlePointerUp}
@@ -239,6 +259,16 @@ export function MapSurface({
         <OfflineMap
           containerRef={mapHostRef}
           onProjectorChange={handleOfflineProjectorChange}
+          viewportConstraint={viewportConstraint}
+        />
+      )}
+
+      {mode !== "loading" && (origin || destination) && (
+        <EndpointMarkers
+          origin={origin}
+          destination={destination}
+          project={projector}
+          viewportRevision={viewportRevision}
         />
       )}
 

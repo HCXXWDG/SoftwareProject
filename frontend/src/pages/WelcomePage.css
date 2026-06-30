@@ -1,0 +1,109 @@
+.welcome-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  background: linear-gradient(135deg, #e8f0fe 0%, #f0f4f8 50%, #e6f0e8 100%);
+}
+
+.welcome-page__content {
+  max-width: 480px;
+  text-align: center;
+}
+
+.welcome-page__title {
+  margin: 0 0 8px;
+  color: #1a365d;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.welcome-page__subtitle {
+  margin: 0 0 32px;
+  color: #4a6fa5;
+  font-size: 15px;
+}
+
+.welcome-page__info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 28px;
+  text-align: left;
+}
+
+.welcome-page__endpoint {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.welcome-page__endpoint-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.welcome-page__endpoint-icon--origin {
+  background: #22c55e;
+}
+
+.welcome-page__endpoint-icon--destination {
+  background: #ef4444;
+}
+
+.welcome-page__endpoint strong {
+  display: block;
+  color: #1a365d;
+  font-size: 14px;
+}
+
+.welcome-page__endpoint p {
+  margin: 4px 0 0;
+  color: #4a6fa5;
+  font-size: 13px;
+}
+
+.welcome-page__description {
+  margin: 0 0 32px;
+  color: #374151;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.welcome-page__cta {
+  display: inline-block;
+  padding: 14px 32px;
+  border: none;
+  border-radius: 12px;
+  background: #2368ff;
+  box-shadow: 0 4px 14px rgba(35, 104, 255, 0.35);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.welcome-page__cta:hover {
+  background: #1a56db;
+  box-shadow: 0 6px 20px rgba(35, 104, 255, 0.45);
+  transform: translateY(-1px);
+}
+
+.welcome-page__cta:active {
+  transform: translateY(0);
+}
