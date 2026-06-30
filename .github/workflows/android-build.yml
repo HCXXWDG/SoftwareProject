@@ -66,6 +66,19 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Create .env.production for Android build
+        working-directory: frontend
+        run: |
+          echo "VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL || 'https://10.0.2.2:8080' }}" > .env.production
+          if [ -n "${{ secrets.VITE_AMAP_JS_KEY }}" ]; then
+            echo "VITE_AMAP_JS_KEY=${{ secrets.VITE_AMAP_JS_KEY }}" >> .env.production
+          fi
+          if [ -n "${{ secrets.VITE_AMAP_SECURITY_CODE }}" ]; then
+            echo "VITE_AMAP_SECURITY_CODE=${{ secrets.VITE_AMAP_SECURITY_CODE }}" >> .env.production
+          fi
+          echo "=== .env.production (secrets masked) ==="
+          cat .env.production | sed 's/\(VITE_AMAP_JS_KEY=\).*/\1***masked***/; s/\(VITE_AMAP_SECURITY_CODE=\).*/\1***masked***/'
+
       - name: Build frontend for production
         working-directory: frontend
         run: npm run build
@@ -166,6 +179,11 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: Create .env.production for Android build
+        working-directory: frontend
+        run: |
+          echo "VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL || 'https://10.0.2.2:8080' }}" > .env.production
 
       - name: Build frontend for production
         working-directory: frontend
