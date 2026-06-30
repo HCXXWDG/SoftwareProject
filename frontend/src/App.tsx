@@ -154,9 +154,10 @@ function App() {
     [],
   );
 
-  /** 进入地图阶段时加载热力图和趋势 */
+  /** 进入地图阶段时加载热力图和趋势（离线降级时跳过） */
   useEffect(() => {
     if (stage !== "map") return;
+    if (isOfflineFallback) return; // 离线模式下不请求后端数据，避免重复报错
 
     loadHeatmap(CAMPUS_DEFAULT_BBOX);
 
@@ -173,7 +174,7 @@ function App() {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       abortRef.current?.abort();
     };
-  }, [stage, loadHeatmap]);
+  }, [stage, isOfflineFallback, loadHeatmap]);
 
   // ── Stage: welcome ──
   if (stage === "welcome") {
