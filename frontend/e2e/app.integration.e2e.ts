@@ -43,8 +43,13 @@ async function waitForInitialApiResponses(page: Page) {
 
   await page.goto("/");
 
-  // Stage 1: Welcome page — click "查看预设路线" (triggers routes/compare on preview page)
-  await page.getByRole("button", { name: "查看预设路线" }).click();
+  // Stage 1: Welcome page — select origin and destination
+  const originGrid = page.locator(".welcome-page__selector").first();
+  await originGrid.getByRole("button", { name: "学生公寓区" }).click();
+  const destGrid = page.locator(".welcome-page__selector").nth(1);
+  await destGrid.getByRole("button", { name: "第一教学楼" }).click();
+  // Click CTA "查看推荐路线" (triggers navigation to route preview)
+  await page.getByRole("button", { name: "查看推荐路线" }).click();
 
   // Stage 2: Route preview — wait for routes, then click "进入地图"
   await expect(page.getByRole("button", { name: "进入地图" })).toBeVisible({
