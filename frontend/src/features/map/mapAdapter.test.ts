@@ -22,6 +22,16 @@ function buildNamespace(optionsSpy: {
 }): AMapNamespaceLike {
   const listeners = new Map<string, () => void>();
   const namespace: AMapNamespaceLike = {
+    Bounds: class {
+      private sw: [number, number];
+      private ne: [number, number];
+      constructor(sw: [number, number], ne: [number, number]) {
+        this.sw = sw;
+        this.ne = ne;
+      }
+      getSouthWest() { return { lng: this.sw[0], lat: this.sw[1] }; }
+      getNorthEast() { return { lng: this.ne[0], lat: this.ne[1] }; }
+    },
     Map: class {
       constructor(_container: HTMLElement, options: Record<string, unknown>) {
         optionsSpy.value = options;
@@ -33,9 +43,14 @@ function buildNamespace(optionsSpy: {
           getSouthWest: () => ({ lng: 120.2607, lat: 31.4728 }),
         };
       }
+      getCenter() {
+        return { lng: 120.273915, lat: 31.479302 };
+      }
       getZoom() {
         return 16;
       }
+      setCenter = vi.fn();
+      setZoom = vi.fn();
       lngLatToContainer() {
         return { x: 480, y: 300 };
       }
