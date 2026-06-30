@@ -216,17 +216,23 @@ jobs:
           api-level: 29
           arch: x86_64
           profile: pixel_5
-          app: frontend/android/app/build/outputs/apk/debug/app-debug.apk
           script: |
+            echo "Installing debug APK..."
+            adb install -r frontend/android/app/build/outputs/apk/debug/app-debug.apk
+            echo "Waiting for package to be available..."
+            sleep 5
+            echo "Launching MainActivity..."
             adb shell am start -n com.jiangnan.course.commutemoodmap/.MainActivity
-            sleep 10
-            ACTIVITY=$(adb shell dumpsys activity activities | grep -oP 'mResumedActivity.*?com.jiangnan.course.commutemoodmap/\S+')
+            sleep 15
+            ACTIVITY=$(adb shell dumpsys activity activities | grep -oP 'mResumedActivity.*?com.jiangnan.course.commutemoodmap/\S+' || true)
             if echo "$ACTIVITY" | grep -q "com.jiangnan.course.commutemoodmap"; then
               echo "App launched successfully on emulator"
               adb shell screencap -p /sdcard/smoke.png
               adb pull /sdcard/smoke.png frontend/smoke.png
             else
               echo "::error::App failed to launch on emulator"
+              echo "Current activity: $ACTIVITY"
+              adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" || true
               exit 1
             fi
 
