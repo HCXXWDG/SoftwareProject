@@ -8,7 +8,7 @@ import { TrendPanel } from "./features/trends";
 import { fetchHeatmap } from "./services/heatmap";
 import { fetchTrends, completeCommute } from "./services/commute";
 import { submitReport } from "./services/report";
-import { CAMPUS_DEFAULT_BBOX } from "./config/campus";
+import { CAMPUS_DEFAULT_BBOX, CAMPUS, CAMPUS_VIEWPORT_CONSTRAINT } from "./config/campus";
 import type {
   AppStage,
   MapPageState,
@@ -204,6 +204,9 @@ function App() {
             onFeedbackSubmit={handleFeedbackSubmit}
             onRouteSelect={handleRouteSelect}
             onViewportChange={handleViewportChange}
+            origin={CAMPUS.origin}
+            destination={CAMPUS.destination}
+            viewportConstraint={CAMPUS_VIEWPORT_CONSTRAINT}
           />
         }
       />
