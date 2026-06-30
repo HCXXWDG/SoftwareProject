@@ -30,7 +30,14 @@ async function request<T>(
     throw new Error(`API ${res.status}: ${body}`);
   }
 
-  return res.json() as Promise<T>;
+  try {
+    return (await res.json()) as T;
+  } catch {
+    // Capacitor/localhost may return index.html when VITE_API_BASE_URL is unset.
+    throw new Error(
+      "无法连接后端服务。请检查 VITE_API_BASE_URL 配置，或点击“进入离线地图”。"
+    );
+  }
 }
 
 export const api = {
