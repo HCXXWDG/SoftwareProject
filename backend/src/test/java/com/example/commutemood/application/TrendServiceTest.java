@@ -20,7 +20,7 @@ import static org.mockito.Mockito.when;
 class TrendServiceTest {
     private final CommuteRecordRepository repository = mock(CommuteRecordRepository.class);
     private final DeviceIdentityService identityService = new DeviceIdentityService(
-            new AppProperties("test-salt", new AppProperties.Amap(""), List.of("http://localhost:5173")));
+            new AppProperties("test-salt", new AppProperties.Amap(""), "http://localhost:5173"));
     private final TrendService service = new TrendService(repository, identityService);
 
     @Test

@@ -1,5 +1,6 @@
 package com.example.commutemood.application;
 
+import com.example.commutemood.config.DemoGeography;
 import com.example.commutemood.config.AppProperties;
 import com.example.commutemood.domain.GeoPoint;
 import com.example.commutemood.domain.RouteComparison;
@@ -28,7 +29,7 @@ class RouteComparisonServiceTest {
     private final EmotionReportRepository emotionReportRepository = mock(EmotionReportRepository.class);
     private final RouteQueryRepository routeQueryRepository = mock(RouteQueryRepository.class);
     private final DeviceIdentityService identityService = new DeviceIdentityService(
-            new AppProperties("test-salt", new AppProperties.Amap(""), List.of("http://localhost:5173")));
+            new AppProperties("test-salt", new AppProperties.Amap(""), "http://localhost:5173"));
     private final RouteComparisonService service = new RouteComparisonService(
             amapRouteProvider,
             new MockRouteProvider(),
@@ -41,8 +42,8 @@ class RouteComparisonServiceTest {
     void storesRouteQueryWhenDeviceIdIsProvided() {
         when(amapRouteProvider.isConfigured()).thenReturn(false);
         when(emotionReportRepository.findWithin(any(), any())).thenReturn(List.of());
-        GeoPoint origin = new GeoPoint(120.2735, 31.4753);
-        GeoPoint destination = new GeoPoint(120.2743, 31.4833);
+        GeoPoint origin = new GeoPoint(DemoGeography.ORIGIN_LONGITUDE, DemoGeography.ORIGIN_LATITUDE);
+        GeoPoint destination = new GeoPoint(DemoGeography.DESTINATION_LONGITUDE, DemoGeography.DESTINATION_LATITUDE);
 
         RouteComparison comparison = service.compare("demo-browser", origin, destination);
 
@@ -62,7 +63,9 @@ class RouteComparisonServiceTest {
         when(amapRouteProvider.isConfigured()).thenReturn(false);
         when(emotionReportRepository.findWithin(any(), any())).thenReturn(List.of());
 
-        service.compare(null, new GeoPoint(120.2735, 31.4753), new GeoPoint(120.2743, 31.4833));
+        service.compare(null,
+                new GeoPoint(DemoGeography.ORIGIN_LONGITUDE, DemoGeography.ORIGIN_LATITUDE),
+                new GeoPoint(DemoGeography.DESTINATION_LONGITUDE, DemoGeography.DESTINATION_LATITUDE));
 
         verify(routeQueryRepository, never()).save(any(), any(), any(), any());
     }
@@ -71,8 +74,8 @@ class RouteComparisonServiceTest {
     void readsRouteQueryHistoryForHashedDevice() {
         RouteQueryHistory history = new RouteQueryHistory(
                 UUID.randomUUID(),
-                new GeoPoint(120.2735, 31.4753),
-                new GeoPoint(120.2743, 31.4833),
+                new GeoPoint(DemoGeography.ORIGIN_LONGITUDE, DemoGeography.ORIGIN_LATITUDE),
+                new GeoPoint(DemoGeography.DESTINATION_LONGITUDE, DemoGeography.DESTINATION_LATITUDE),
                 new RouteComparison(List.of(), "route-fast", "route-calm", "ok", false),
                 Instant.now());
         when(routeQueryRepository.findRecent(identityService.hash("demo-browser"), 5))
