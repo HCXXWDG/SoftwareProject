@@ -14,7 +14,7 @@
     "cap:open": "npx cap open android",
     "test:e2e": "playwright test",
     "test:e2e:integration": "playwright test --config playwright.integration.config.ts",
-    "test:pwa": "playwright test --grep \"PWA Service Worker\""
+    "test:pwa": "playwright test --config playwright.pwa.config.ts"
   },
   "dependencies": {
     "@capacitor/core": "^8.4.0",
