@@ -166,11 +166,22 @@ function mockFetchForCommute(mode: "success" | "fail" | "success-trend-fail") {
   return calls;
 }
 
+/** Select origin and destination on WelcomePage, then navigate to route preview */
+function selectEndpoints() {
+  // Click "学生公寓区" as origin (first occurrence in origin grid)
+  const originBtns = screen.getAllByText("学生公寓区");
+  fireEvent.click(originBtns[0]);
+  // Click "第一教学楼" as destination (second occurrence in dest grid)
+  const destBtns = screen.getAllByText("第一教学楼");
+  fireEvent.click(destBtns.length > 1 ? destBtns[1] : destBtns[0]);
+}
+
 /** Navigate from welcome → route-preview → map */
 async function navigateToMap() {
-  fireEvent.click(screen.getByText("查看预设路线"));
+  selectEndpoints();
+  fireEvent.click(screen.getByRole("button", { name: "查看推荐路线" }));
   await waitFor(() => {
-    expect(screen.getByText("预设路线")).toBeInTheDocument();
+    expect(screen.getByText("推荐路线")).toBeInTheDocument();
   });
   await waitFor(() => {
     expect(screen.getByText("进入地图")).toBeInTheDocument();
@@ -197,7 +208,7 @@ describe("App three-stage flow", () => {
     render(<App />);
 
     expect(screen.getByText("校园通勤情绪地图")).toBeInTheDocument();
-    expect(screen.getByText("查看预设路线")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "查看推荐路线" })).toBeInTheDocument();
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
@@ -212,7 +223,7 @@ describe("App three-stage flow", () => {
     expect(screen.queryByTestId("route-legend")).toBeNull();
   });
 
-  it("route preview sends compareRoutes with fixed campus endpoints", async () => {
+  it("route preview sends compareRoutes with selected endpoints", async () => {
     (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockRouteComparison),
@@ -221,7 +232,8 @@ describe("App three-stage flow", () => {
     const { default: App } = await import("../App");
     render(<App />);
 
-    fireEvent.click(screen.getByText("查看预设路线"));
+    selectEndpoints();
+    fireEvent.click(screen.getByRole("button", { name: "查看推荐路线" }));
 
     await waitFor(() => {
       const compareCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
@@ -255,9 +267,10 @@ describe("App three-stage flow", () => {
     expect(calls).toHaveLength(0);
 
     // Navigate to route-preview
-    fireEvent.click(screen.getByText("查看预设路线"));
+    selectEndpoints();
+    fireEvent.click(screen.getByRole("button", { name: "查看推荐路线" }));
     await waitFor(() => {
-      expect(screen.getByText("预设路线")).toBeInTheDocument();
+      expect(screen.getByText("推荐路线")).toBeInTheDocument();
     });
 
     // Only compareRoutes should be called — no heatmap or trends yet
@@ -279,7 +292,7 @@ describe("App three-stage flow", () => {
     expect(trendsAfter.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("user can select route but cannot edit endpoints", async () => {
+  it("user selects endpoints on welcome page before navigating", async () => {
     (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockRouteComparison),
@@ -288,16 +301,24 @@ describe("App three-stage flow", () => {
     const { default: App } = await import("../App");
     render(<App />);
 
-    fireEvent.click(screen.getByText("查看预设路线"));
+    // CTA should be disabled before selecting endpoints
+    const cta = screen.getByRole("button", { name: "查看推荐路线" });
+    expect(cta).toBeDisabled();
+
+    // Select endpoints
+    selectEndpoints();
+
+    // CTA should now be enabled
+    expect(cta).not.toBeDisabled();
+
+    // Summary shows selected route
+    expect(screen.getByText("学生公寓区")).toBeInTheDocument();
+    expect(screen.getByText("第一教学楼")).toBeInTheDocument();
+
+    fireEvent.click(cta);
     await waitFor(() => {
       expect(screen.getByText("进入地图")).toBeInTheDocument();
     });
-
-    // Endpoints are displayed as text, not editable inputs
-    expect(screen.getByText(/学生公寓区/)).toBeInTheDocument();
-    expect(screen.getByText(/第一教学楼/)).toBeInTheDocument();
-    expect(screen.queryByRole("textbox")).toBeNull();
-    expect(screen.queryByPlaceholderText(/起点|终点|origin|destination/i)).toBeNull();
   });
 
   it("route preview failure shows retry and offline entry", async () => {
@@ -308,7 +329,8 @@ describe("App three-stage flow", () => {
     const { default: App } = await import("../App");
     render(<App />);
 
-    fireEvent.click(screen.getByText("查看预设路线"));
+    selectEndpoints();
+    fireEvent.click(screen.getByRole("button", { name: "查看推荐路线" }));
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toBeInTheDocument();
@@ -326,7 +348,8 @@ describe("App three-stage flow", () => {
     const { default: App } = await import("../App");
     render(<App />);
 
-    fireEvent.click(screen.getByText("查看预设路线"));
+    selectEndpoints();
+    fireEvent.click(screen.getByRole("button", { name: "查看推荐路线" }));
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "进入离线地图" })).toBeInTheDocument();
     });
