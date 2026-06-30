@@ -224,15 +224,14 @@ jobs:
             echo "Launching MainActivity..."
             adb shell am start -n com.jiangnan.course.commutemoodmap/.MainActivity
             sleep 15
-            ACTIVITY=$(adb shell dumpsys activity activities | grep -oP 'mResumedActivity.*?com.jiangnan.course.commutemoodmap/\S+' || true)
+            ACTIVITY=$(adb shell dumpsys activity activities)
             if echo "$ACTIVITY" | grep -q "com.jiangnan.course.commutemoodmap"; then
               echo "App launched successfully on emulator"
               adb shell screencap -p /sdcard/smoke.png
               adb pull /sdcard/smoke.png frontend/smoke.png
             else
               echo "::error::App failed to launch on emulator"
-              echo "Current activity: $ACTIVITY"
-              adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity" || true
+              echo "$ACTIVITY" | grep -E "mResumedActivity|topResumedActivity" || true
               exit 1
             fi
 
