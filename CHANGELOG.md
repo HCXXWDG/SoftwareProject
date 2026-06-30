@@ -4,6 +4,33 @@ All notable changes follow Semantic Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+
+## [1.1.0] - 2026-06-30
+
+### Added
+- Welcome page, fixed campus routes, and three-stage page flow for Jiangnan University Lihu campus.
+- Capacitor 8 Android and Windows PWA support with production HTTPS config.
+- Campus map boundary constraints and fixed endpoint markers.
+- Campus demo/PostGIS data migration to Jiangnan University Lihu campus.
+- Cross-platform precise CORS configuration for Capacitor and PWA.
+- Android release signing, production environment config, and version management.
+- Android minify, release CI workflow, and campus-themed launcher icons.
+- Mobile E2E tests and Android Build CI workflows.
+- Version verification, Android emulator E2E smoke test, and release checklist.
+- Android emulator E2E smoke test fix.
+- Production HTTPS deployment guide with Nginx/Caddy reverse proxy, Let's Encrypt, and AMap key rotation.
+- Production domain certificate pinning in network_security_config.xml.
+- Action version upgrades, Canary channel removal, and lint error fixes.
+
+### Changed
+- Frontend `package.json` version 1.0.0 -> 1.1.0.
+- Android `versionCode` 1 -> 2, `versionName` 1.0.0 -> 1.1.0.
+- Backend `pom.xml` version 1.0.0 -> 1.1.0.
+- Updated `infra/README.md` with production deployment checklist.
+
+### Fixed
+- Campus origin/destination/viewportConstraint passing to MapSurface.
+- 11 Member-A scope Android engineering issues.
 ## [1.0.0] - 2026-06-14
 
 ### Added
