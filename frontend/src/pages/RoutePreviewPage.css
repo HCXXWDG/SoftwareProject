@@ -195,3 +195,23 @@
   background: #1a56db;
   transform: translateY(-1px);
 }
+
+/* ── Back button (Issue A) ── */
+.route-preview-page__back-btn {
+  display: inline-block;
+  margin-bottom: 16px;
+  padding: 6px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: transparent;
+  color: #4a6fa5;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.route-preview-page__back-btn:hover {
+  background: #f3f4f6;
+  border-color: #93c5fd;
+  color: #1a365d;
+}

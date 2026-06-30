@@ -20,67 +20,102 @@
 }
 
 .welcome-page__subtitle {
-  margin: 0 0 32px;
+  margin: 0 0 28px;
   color: #4a6fa5;
   font-size: 15px;
 }
 
-.welcome-page__info {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 28px;
+/* ── Selector sections ── */
+.welcome-page__selector {
+  margin-bottom: 20px;
   text-align: left;
 }
 
-.welcome-page__endpoint {
+.welcome-page__selector-label {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  color: #1a365d;
+  font-size: 15px;
+  font-weight: 600;
 }
 
-.welcome-page__endpoint-icon {
+.welcome-page__dot {
   display: inline-block;
-  flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-  margin-top: 2px;
-  border: 3px solid #fff;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
 }
 
-.welcome-page__endpoint-icon--origin {
+.welcome-page__dot--origin {
   background: #22c55e;
 }
 
-.welcome-page__endpoint-icon--destination {
+.welcome-page__dot--dest {
   background: #ef4444;
 }
 
-.welcome-page__endpoint strong {
-  display: block;
-  color: #1a365d;
-  font-size: 14px;
+/* ── Grid buttons ── */
+.welcome-page__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
 }
 
-.welcome-page__endpoint p {
-  margin: 4px 0 0;
-  color: #4a6fa5;
-  font-size: 13px;
-}
-
-.welcome-page__description {
-  margin: 0 0 32px;
+.welcome-page__point-btn {
+  padding: 10px 6px;
+  border: 2px solid #d1d5db;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.9);
   color: #374151;
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
 }
 
+.welcome-page__point-btn:hover:not(:disabled) {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.welcome-page__point-btn--active-origin {
+  border-color: #22c55e;
+  background: #dcfce7;
+  color: #166534;
+  font-weight: 600;
+}
+
+.welcome-page__point-btn--active-dest {
+  border-color: #ef4444;
+  background: #fef2f2;
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.welcome-page__point-btn--disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── Summary ── */
+.welcome-page__summary {
+  margin: 20px 0;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  color: #1a365d;
+  font-size: 15px;
+}
+
+.welcome-page__summary-hint {
+  color: #9ca3af;
+}
+
+/* ── CTA button ── */
 .welcome-page__cta {
   display: inline-block;
   padding: 14px 32px;
@@ -92,18 +127,20 @@
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition:
-    background 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
+  transition: background 150ms ease, box-shadow 150ms ease, transform 150ms ease;
 }
 
-.welcome-page__cta:hover {
+.welcome-page__cta:hover:not(:disabled) {
   background: #1a56db;
   box-shadow: 0 6px 20px rgba(35, 104, 255, 0.45);
   transform: translateY(-1px);
 }
 
-.welcome-page__cta:active {
+.welcome-page__cta:active:not(:disabled) {
   transform: translateY(0);
+}
+
+.welcome-page__cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

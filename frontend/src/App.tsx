@@ -8,13 +8,14 @@ import { TrendPanel } from "./features/trends";
 import { fetchHeatmap } from "./services/heatmap";
 import { fetchTrends, completeCommute } from "./services/commute";
 import { submitReport } from "./services/report";
-import { CAMPUS_DEFAULT_BBOX, CAMPUS, CAMPUS_VIEWPORT_CONSTRAINT } from "./config/campus";
+import { CAMPUS_DEFAULT_BBOX, CAMPUS_VIEWPORT_CONSTRAINT } from "./config/campus";
 import type {
   AppStage,
   MapPageState,
   HeatmapCell,
   RouteComparison,
   MapFeedbackDraft,
+  GeoPoint,
 } from "./types";
 
 const initialMapState: MapPageState = {
@@ -24,7 +25,6 @@ const initialMapState: MapPageState = {
   routeComparison: null,
   trend: null,
 };
-
 
 const DEBOUNCE_MS = 300;
 
@@ -39,6 +39,12 @@ function App() {
   const [trendRefreshWarning, setTrendRefreshWarning] = useState<string | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  /* ── 起终点选择状态（Issue A 新增） ── */
+  const [originPoint, setOriginPoint] = useState<GeoPoint | null>(null);
+  const [destPoint, setDestPoint] = useState<GeoPoint | null>(null);
+  const [originName, setOriginName] = useState("");
+  const [destName, setDestName] = useState("");
 
   /** 获取热力图（自动取消旧请求，避免竞态） */
   const loadHeatmap = useCallback(async (bbox: string, zoom?: number) => {
@@ -90,14 +96,13 @@ function App() {
   const handleCompleteCommute = useCallback(async () => {
     const comparison = mapState.routeComparison;
     if (!comparison) return;
-    if (userStressLevel == null) return; // 未选择压力档位时不提交
+    if (userStressLevel == null) return;
 
     const selectedId = selectedRouteId ?? comparison.fastestRouteId;
     const selected = comparison.routes.find((r) => r.id === selectedId);
     if (!selected) return;
 
     const fastest = comparison.routes.find((r) => r.id === comparison.fastestRouteId);
-    // 替代路线：优先取 leastStressful；若与已选相同，显式回退到 fastestRouteId
     const leastStressful = comparison.routes.find((r) => r.id === comparison.leastStressfulRouteId);
     const alternative =
       leastStressful && leastStressful.id !== selectedId
@@ -128,7 +133,6 @@ function App() {
       });
       postSucceeded = true;
 
-      // 刷新趋势数据（POST 已成功，刷新失败仅提示警告，不视为通勤失败）
       try {
         const freshTrend = await fetchTrends();
         setMapState((prev) => ({ ...prev, trend: freshTrend }));
@@ -144,7 +148,7 @@ function App() {
     }
   }, [mapState.routeComparison, selectedRouteId, userStressLevel]);
 
-  /** 路线预览 → 地图阶段：设置路线对比数据并加载热力图+趋势 */
+  /** 路线预览 → 地图阶段 */
   const handleEnterMap = useCallback(
     (comparison: RouteComparison, offline: boolean) => {
       setIsOfflineFallback(offline);
@@ -177,12 +181,37 @@ function App() {
 
   // ── Stage: welcome ──
   if (stage === "welcome") {
-    return <WelcomePage onNavigateToPreview={() => setStage("route-preview")} />;
+    return (
+      <WelcomePage
+        originPoint={originPoint}
+        destPoint={destPoint}
+        originName={originName}
+        destName={destName}
+        onOriginChange={(point, name) => {
+          setOriginPoint(point);
+          setOriginName(name);
+        }}
+        onDestChange={(point, name) => {
+          setDestPoint(point);
+          setDestName(name);
+        }}
+        onNavigateToPreview={() => setStage("route-preview")}
+      />
+    );
   }
 
   // ── Stage: route-preview ──
-  if (stage === "route-preview") {
-    return <RoutePreviewPage onEnterMap={handleEnterMap} />;
+  if (stage === "route-preview" && originPoint && destPoint) {
+    return (
+      <RoutePreviewPage
+        origin={originPoint}
+        destination={destPoint}
+        originName={originName}
+        destName={destName}
+        onEnterMap={handleEnterMap}
+        onBack={() => setStage("welcome")}
+      />
+    );
   }
 
   // ── Stage: map ──
@@ -204,8 +233,8 @@ function App() {
             onFeedbackSubmit={handleFeedbackSubmit}
             onRouteSelect={handleRouteSelect}
             onViewportChange={handleViewportChange}
-            origin={CAMPUS.origin}
-            destination={CAMPUS.destination}
+            origin={originPoint ?? undefined}
+            destination={destPoint ?? undefined}
             viewportConstraint={CAMPUS_VIEWPORT_CONSTRAINT}
           />
         }

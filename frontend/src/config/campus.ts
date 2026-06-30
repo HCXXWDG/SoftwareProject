@@ -21,6 +21,15 @@ export const CAMPUS = {
   destination: { longitude: 120.2743195, latitude: 31.4832753 } as GeoPoint,
 } as const;
 
+/** 5 个校园地标点位（GCJ-02 坐标） */
+export const CAMPUS_POINTS = [
+  { id: "dorm",    name: "学生公寓区", point: { longitude: 120.2735103, latitude: 31.4753281 } as GeoPoint },
+  { id: "teach1",  name: "第一教学楼", point: { longitude: 120.2743195, latitude: 31.4832753 } as GeoPoint },
+  { id: "library", name: "图书馆",     point: { longitude: 120.2740,    latitude: 31.4795 } as GeoPoint },
+  { id: "canteen", name: "三食堂",     point: { longitude: 120.2725,    latitude: 31.4770 } as GeoPoint },
+  { id: "sports",  name: "体育中心",   point: { longitude: 120.2760,    latitude: 31.4810 } as GeoPoint },
+] as const;
+
 /** 默认 bbox 字符串（与 campus bounds 对齐） */
 export const CAMPUS_DEFAULT_BBOX = `${CAMPUS.bounds.west},${CAMPUS.bounds.south},${CAMPUS.bounds.east},${CAMPUS.bounds.north}`;
 

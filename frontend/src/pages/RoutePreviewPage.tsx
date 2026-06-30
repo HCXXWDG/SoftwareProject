@@ -1,12 +1,16 @@
 import { useEffect, useCallback, useState } from "react";
-import { CAMPUS } from "../config/campus";
-import { MOCK_ROUTE_COMPARISON } from "../config/mockRoutes";
+import { generateMockRoutes } from "../config/mockRoutes";
 import { compareRoutes } from "../services/route";
-import type { RoutePreviewState, RouteComparison } from "../types";
+import type { RoutePreviewState, RouteComparison, GeoPoint } from "../types";
 import "./RoutePreviewPage.css";
 
 interface RoutePreviewPageProps {
+  origin: GeoPoint;
+  destination: GeoPoint;
+  originName: string;
+  destName: string;
   onEnterMap: (comparison: RouteComparison, isOfflineFallback: boolean) => void;
+  onBack?: () => void;
 }
 
 const initialState: RoutePreviewState = {
@@ -18,32 +22,37 @@ const initialState: RoutePreviewState = {
 
 /**
  * 路线预览页 — 三阶段流程的第二阶段。
- * 调用 compareRoutes 展示固定端点和两条候选路线。
- * 失败时提供重试和"进入离线地图"，不伪造后端评分。
+ * 接收 props 传入的 origin/destination，调用 compareRoutes 获取路线。
+ * 失败时 fallback 到 generateMockRoutes 动态生成模拟路线。
  */
-export function RoutePreviewPage({ onEnterMap }: RoutePreviewPageProps) {
+export function RoutePreviewPage({
+  origin,
+  destination,
+  originName,
+  destName,
+  onEnterMap,
+  onBack,
+}: RoutePreviewPageProps) {
   const [state, setState] = useState<RoutePreviewState>(initialState);
 
   const loadRoutes = useCallback(async () => {
     setState({ loading: true, error: null, routeComparison: null, isOfflineFallback: false });
     try {
-      const comparison = await compareRoutes({
-        origin: CAMPUS.origin,
-        destination: CAMPUS.destination,
-      });
+      const comparison = await compareRoutes({ origin, destination });
       setState({ loading: false, error: null, routeComparison: comparison, isOfflineFallback: false });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "路线请求失败";
       setState({ loading: false, error: msg, routeComparison: null, isOfflineFallback: false });
     }
-  }, []);
+  }, [origin, destination]);
 
   useEffect(() => {
     loadRoutes();
   }, [loadRoutes]);
 
   const handleEnterOfflineMap = () => {
-    onEnterMap(MOCK_ROUTE_COMPARISON, true);
+    const mockComparison = generateMockRoutes(origin, destination);
+    onEnterMap(mockComparison, true);
   };
 
   const handleEnterMap = () => {
@@ -55,9 +64,19 @@ export function RoutePreviewPage({ onEnterMap }: RoutePreviewPageProps) {
   return (
     <div className="route-preview-page">
       <div className="route-preview-page__content">
-        <h2 className="route-preview-page__title">预设路线</h2>
+        {onBack && (
+          <button
+            className="route-preview-page__back-btn"
+            onClick={onBack}
+            type="button"
+          >
+            ← 重新选择
+          </button>
+        )}
+
+        <h2 className="route-preview-page__title">推荐路线</h2>
         <p className="route-preview-page__route-info">
-          学生公寓区 → 第一教学楼
+          {originName} → {destName}
         </p>
 
         {state.loading && (
