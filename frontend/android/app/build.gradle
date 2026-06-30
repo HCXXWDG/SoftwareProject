@@ -4,40 +4,23 @@ android {
     namespace = "com.jiangnan.course.commutemoodmap"
     compileSdk = rootProject.ext.compileSdkVersion
 
-    // ── Signing: read from keystore.properties or env vars (CI) ──
-    // Create frontend/android/keystore.properties locally:
-    //   storeFile=release.keystore
-    //   storePassword=***
-    //   keyAlias=***
-    //   keyPassword=***
+    // ── Signing: read from keystore.properties (local or CI) ──
     def keystorePropertiesFile = rootProject.file('keystore.properties')
-    def hasKeystoreProps = keystorePropertiesFile.exists()
     def keystoreProperties = new Properties()
-    if (hasKeystoreProps) {
+    def hasSigning = false
+
+    if (keystorePropertiesFile.exists()) {
         keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+        hasSigning = true
     }
 
-    // Env-var fallback (for CI: RELEASE_STORE_FILE is base64-encoded keystore)
-    def hasEnvSigning = System.getenv("RELEASE_STORE_FILE_BASE64") != null
-
-    if (hasKeystoreProps || hasEnvSigning) {
+    if (hasSigning) {
         signingConfigs {
             release {
-                if (hasKeystoreProps) {
-                    storeFile file(keystoreProperties['storeFile'])
-                    storePassword keystoreProperties['storePassword']
-                    keyAlias keystoreProperties['keyAlias']
-                    keyPassword keystoreProperties['keyPassword']
-                } else {
-                    // CI: decode base64 keystore to temp file
-                    def tmpKeystore = new File(rootProject.buildDir, "release-ci.keystore")
-                    tmpKeystore.parentFile.mkdirs()
-                    tmpKeystore.bytes = Base64.decoder.decode(System.getenv("RELEASE_STORE_FILE_BASE64"))
-                    storeFile tmpKeystore
-                    storePassword System.getenv("RELEASE_STORE_PASSWORD")
-                    keyAlias System.getenv("RELEASE_KEY_ALIAS")
-                    keyPassword System.getenv("RELEASE_KEY_PASSWORD")
-                }
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
             }
         }
     }
@@ -46,8 +29,8 @@ android {
         applicationId "com.jiangnan.course.commutemoodmap"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.1.0"
+        versionCode 1
+        versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -57,9 +40,10 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            if (hasKeystoreProps || hasEnvSigning) {
+            if (hasSigning) {
                 signingConfig signingConfigs.release
             }
         }
