@@ -394,6 +394,50 @@
   }
 }
 
+/* ── Endpoint Markers ── */
+.map-surface__endpoint-markers {
+  position: absolute;
+  inset: 0;
+  z-index: 2.6;
+  pointer-events: none;
+}
+
+.map-surface__endpoint {
+  position: absolute;
+  display: grid;
+  gap: 2px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.map-surface__endpoint-pin {
+  width: 18px;
+  height: 18px;
+  margin: 0 auto;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(25, 52, 66, 0.35);
+}
+
+.map-surface__endpoint--origin .map-surface__endpoint-pin {
+  background: #1aa260;
+}
+
+.map-surface__endpoint--destination .map-surface__endpoint-pin {
+  background: #e8453c;
+}
+
+.map-surface__endpoint-label {
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: #183848;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 8px rgba(30, 58, 73, 0.18);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* ── Route Overlay ── */
 .map-surface__route-overlay {
   position: absolute;

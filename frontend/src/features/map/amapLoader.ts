@@ -39,6 +39,9 @@ export interface AMapNamespaceLike {
       resizeEnable: boolean;
       viewMode: "2D";
       zoom: number;
+      zooms?: [number, number];
+      // AMap limitBounds order: [sw.lng, sw.lat, ne.lng, ne.lat]
+      limitBounds?: [number, number, number, number];
     },
   ) => AMapInstanceLike;
 }

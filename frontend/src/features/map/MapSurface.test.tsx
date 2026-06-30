@@ -19,6 +19,22 @@ const heatmapCell: HeatmapCell = {
   dominantTag: "NOISE",
 };
 
+const campusViewportConstraint = {
+  center: { longitude: 120.273915, latitude: 31.479302 },
+  bounds: {
+    west: 120.26067,
+    south: 31.47278,
+    east: 120.27946,
+    north: 31.49417,
+  },
+  minZoom: 15,
+  maxZoom: 18,
+  defaultZoom: 16,
+};
+
+const campusOrigin = { longitude: 120.2735103, latitude: 31.4753281 };
+const campusDestination = { longitude: 120.2743195, latitude: 31.4832753 };
+
 const defaultProps: Omit<MapSurfaceProps, "heatmapCells" | "loading"> = {
   routes: [],
   onFeedbackSubmit: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -319,5 +335,109 @@ describe("MapSurface", () => {
     expect(await screen.findByTestId("route-overlay")).toBeInTheDocument();
     expect(screen.getByTestId("route-legend")).toBeInTheDocument();
     expect(screen.getByText("最快路线")).toBeInTheDocument();
+  });
+});
+
+describe("MapSurface campus bounds", () => {
+  it("uses the campus default zoom and renders fixed endpoint markers", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+    const onViewportChange = vi.fn();
+
+    render(
+      <MapSurface
+        {...defaultProps}
+        heatmapCells={[]}
+        loading={false}
+        origin={campusOrigin}
+        destination={campusDestination}
+        viewportConstraint={campusViewportConstraint}
+        onViewportChange={onViewportChange}
+      />,
+    );
+
+    await screen.findByTestId("offline-map");
+    await waitFor(() => expect(onViewportChange).toHaveBeenCalled());
+    expect(lastCall(onViewportChange)[1]).toBe(16);
+
+    expect(screen.getByTestId("endpoint-markers")).toBeInTheDocument();
+    expect(screen.getByTestId("endpoint-origin")).toBeInTheDocument();
+    expect(screen.getByTestId("endpoint-destination")).toBeInTheDocument();
+  });
+
+  it("clamps offline zoom to the campus range and rejects long-press outside bounds", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+    const onViewportChange = vi.fn();
+
+    render(
+      <MapSurface
+        {...defaultProps}
+        heatmapCells={[]}
+        loading={false}
+        viewportConstraint={campusViewportConstraint}
+        onViewportChange={onViewportChange}
+      />,
+    );
+
+    const offlineMap = await screen.findByTestId("offline-map");
+    await waitFor(() => expect(onViewportChange).toHaveBeenCalled());
+
+    // Zoom out repeatedly — should never fall below minZoom 15
+    for (let i = 0; i < 6; i += 1) {
+      fireEvent.click(screen.getByRole("button", { name: "缩小地图" }));
+    }
+    await waitFor(() =>
+      expect(lastCall(onViewportChange)[1]).toBeGreaterThanOrEqual(15),
+    );
+
+    // Long-press near the top-left corner (outside the campus bounds) should
+    // not open the feedback panel because the projected GeoPoint is far away.
+    const section = screen.getByLabelText("城市通勤情绪地图");
+    const mapCanvas = screen.getByTestId("map-canvas");
+    vi.spyOn(mapCanvas, "getBoundingClientRect").mockReturnValue({
+      bottom: 650,
+      height: 600,
+      left: 100,
+      right: 1060,
+      top: 50,
+      width: 960,
+      x: 100,
+      y: 50,
+      toJSON: () => ({}),
+    });
+
+    fireEvent(
+      section,
+      new MouseEvent("pointerdown", {
+        bubbles: true,
+        clientX: 110,
+        clientY: 60,
+      }),
+    );
+
+    await waitFor(() => {
+      const panel = screen.queryByTestId("feedback-panel");
+      expect(panel).not.toBeInTheDocument();
+    });
+
+    // A press near the map center (within bounds) should open the panel.
+    vi.useFakeTimers();
+    act(() => {
+      fireEvent(
+        section,
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          clientX: 480,
+          clientY: 300,
+        }),
+      );
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(700);
+    });
+    expect(screen.getByTestId("feedback-panel")).toBeInTheDocument();
+    vi.useRealTimers();
+
+    // silence unused var lint in some toolchains
+    expect(offlineMap).toBeInTheDocument();
   });
 });
