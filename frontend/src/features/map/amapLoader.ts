@@ -42,9 +42,8 @@ export interface AMapNamespaceLike {
       resizeEnable: boolean;
       viewMode: "2D";
       zoom: number;
-      minZoom?: number;
-      maxZoom?: number;
-      limitBounds?: AMapBoundsLike;
+      zooms?: [number, number];
+      limitBounds?: [number, number, number, number];
     },
   ) => AMapInstanceLike;
   Bounds: new (

@@ -26,8 +26,52 @@ export interface ProjectedPoint {
   y: number;
 }
 
+export interface GeoBounds {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+}
+
+export interface MapViewportConstraint {
+  center: GeoPoint;
+  bounds: GeoBounds;
+  minZoom: number;
+  maxZoom: number;
+  defaultZoom?: number;
+}
+
 function clampLatitude(latitude: number): number {
   return Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, latitude));
+}
+
+export function clampZoom(zoom: number, minZoom: number, maxZoom: number): number {
+  return Math.max(minZoom, Math.min(maxZoom, Math.round(zoom)));
+}
+
+export function clampCenterToBounds(
+  center: GeoPoint,
+  bounds: GeoBounds,
+): GeoPoint {
+  return {
+    longitude: Math.max(
+      bounds.west,
+      Math.min(bounds.east, center.longitude),
+    ),
+    latitude: Math.max(
+      bounds.south,
+      Math.min(bounds.north, center.latitude),
+    ),
+  };
+}
+
+export function isPointInBounds(point: GeoPoint, bounds: GeoBounds): boolean {
+  return (
+    point.longitude >= bounds.west &&
+    point.longitude <= bounds.east &&
+    point.latitude >= bounds.south &&
+    point.latitude <= bounds.north
+  );
 }
 
 function worldSize(zoom: number): number {

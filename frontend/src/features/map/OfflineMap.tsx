@@ -9,18 +9,23 @@ import {
   type WheelEvent,
 } from "react";
 import type { GeoPoint } from "../../types";
-import { CAMPUS } from "../../config/campus";
-import { clampCenter, clampZoom } from "./boundsClamp";
 import {
   calculateViewport,
+  clampCenterToBounds,
+  clampZoom,
+  DEFAULT_MAP_CENTER,
+  DEFAULT_MAP_ZOOM,
   getMapSize,
   panCenter,
   projectGeoPoint,
   unprojectGeoPoint,
   type MapViewport,
+  type MapViewportConstraint,
   type ProjectedPoint,
 } from "./viewport";
 
+const MIN_ZOOM = 11;
+const MAX_ZOOM = 18;
 const KEYBOARD_PAN_PIXELS = 80;
 
 interface OfflineMapProps {
@@ -31,6 +36,7 @@ interface OfflineMapProps {
     viewport: MapViewport,
     commitViewport: boolean,
   ) => void;
+  viewportConstraint?: MapViewportConstraint;
 }
 
 interface DragState {
@@ -43,9 +49,20 @@ interface DragState {
 export function OfflineMap({
   containerRef,
   onProjectorChange,
+  viewportConstraint,
 }: OfflineMapProps) {
-  const [center, setCenter] = useState(CAMPUS.center);
-  const [zoom, setZoom] = useState(CAMPUS.minZoom + 1);
+  const [center, setCenter] = useState(
+    viewportConstraint?.center ?? DEFAULT_MAP_CENTER,
+  );
+  const [zoom, setZoom] = useState(
+    viewportConstraint
+      ? clampZoom(
+          viewportConstraint.defaultZoom ?? DEFAULT_MAP_ZOOM,
+          viewportConstraint.minZoom,
+          viewportConstraint.maxZoom,
+        )
+      : DEFAULT_MAP_ZOOM,
+  );
   const dragRef = useRef<DragState | null>(null);
   const centerRef = useRef(center);
   const zoomRef = useRef(zoom);
@@ -53,13 +70,24 @@ export function OfflineMap({
   centerRef.current = center;
   zoomRef.current = zoom;
 
+  const effectiveMinZoom = viewportConstraint?.minZoom ?? MIN_ZOOM;
+  const effectiveMaxZoom = viewportConstraint?.maxZoom ?? MAX_ZOOM;
+
+  const clampPanCenter = useCallback(
+    (next: GeoPoint): GeoPoint =>
+      viewportConstraint
+        ? clampCenterToBounds(next, viewportConstraint.bounds)
+        : next,
+    [viewportConstraint],
+  );
+
   const publishViewport = useCallback((commitViewport = commitViewportRef.current) => {
     const container = containerRef.current;
     if (!container) {
       return;
     }
-    const currentCenter = clampCenter(centerRef.current);
-    const currentZoom = clampZoom(zoomRef.current);
+    const currentCenter = clampPanCenter(centerRef.current);
+    const currentZoom = clampZoom(zoomRef.current, effectiveMinZoom, effectiveMaxZoom);
     const size = getMapSize(container);
     onProjectorChange(
       (point) => projectGeoPoint(point, currentCenter, currentZoom, size),
@@ -67,7 +95,7 @@ export function OfflineMap({
       calculateViewport(currentCenter, currentZoom, size),
       commitViewport,
     );
-  }, [containerRef, onProjectorChange]);
+  }, [containerRef, onProjectorChange, clampPanCenter, effectiveMinZoom, effectiveMaxZoom]);
 
   useEffect(() => {
     publishViewport();
@@ -85,7 +113,9 @@ export function OfflineMap({
 
   const changeZoom = (delta: number) => {
     commitViewportRef.current = true;
-    setZoom((current) => clampZoom(current + delta));
+    setZoom((current) =>
+      clampZoom(current + delta, effectiveMinZoom, effectiveMaxZoom),
+    );
   };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -104,13 +134,16 @@ export function OfflineMap({
       return;
     }
     commitViewportRef.current = false;
-    const newCenter = panCenter(
-      drag.center,
-      zoom,
-      event.clientX - drag.startX,
-      event.clientY - drag.startY,
+    setCenter(
+      clampPanCenter(
+        panCenter(
+          drag.center,
+          zoom,
+          event.clientX - drag.startX,
+          event.clientY - drag.startY,
+        ),
+      ),
     );
-    setCenter(clampCenter(newCenter));
   };
 
   const stopDragging = (event: PointerEvent<HTMLDivElement>) => {
@@ -151,7 +184,7 @@ export function OfflineMap({
       event.preventDefault();
       commitViewportRef.current = true;
       setCenter((current) =>
-        clampCenter(panCenter(current, zoom, delta[0], delta[1])),
+        clampPanCenter(panCenter(current, zoom, delta[0], delta[1])),
       );
     }
   };

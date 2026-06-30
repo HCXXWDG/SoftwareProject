@@ -1,6 +1,4 @@
 import type { GeoPoint } from "../../types";
-import { CAMPUS } from "../../config/campus";
-import { clampCenter } from "./boundsClamp";
 import type {
   AMapInstanceLike,
   AMapLngLatLike,
@@ -8,7 +6,12 @@ import type {
   AMapPointLike,
 } from "./amapLoader";
 import {
+  clampCenterToBounds,
+  clampZoom,
+  DEFAULT_MAP_CENTER,
+  DEFAULT_MAP_ZOOM,
   type MapViewport,
+  type MapViewportConstraint,
   type ProjectedPoint,
 } from "./viewport";
 
@@ -18,6 +21,10 @@ export interface MapAdapter {
   project: (point: GeoPoint) => ProjectedPoint;
   unproject: (point: ProjectedPoint) => GeoPoint;
   subscribe: (listener: () => void) => () => void;
+}
+
+export interface CreateAMapAdapterOptions {
+  viewportConstraint?: MapViewportConstraint;
 }
 
 function readCoordinate(
@@ -51,21 +58,33 @@ function readPixel(point: AMapPointLike, axis: "x" | "y"): number {
 export function createAMapAdapter(
   container: HTMLElement,
   namespace: AMapNamespaceLike,
+  options: CreateAMapAdapterOptions = {},
 ): MapAdapter {
-  /** 构建校园边界约束对象 */
-  const campusBounds = new namespace.Bounds(
-    [CAMPUS.bounds.west, CAMPUS.bounds.south],
-    [CAMPUS.bounds.east, CAMPUS.bounds.north],
-  );
-
+  const { viewportConstraint } = options;
+  const initialCenter = viewportConstraint?.center ?? DEFAULT_MAP_CENTER;
+  const initialZoom = viewportConstraint
+    ? clampZoom(
+        viewportConstraint.defaultZoom ?? DEFAULT_MAP_ZOOM,
+        viewportConstraint.minZoom,
+        viewportConstraint.maxZoom,
+      )
+    : DEFAULT_MAP_ZOOM;
   const map: AMapInstanceLike = new namespace.Map(container, {
-    center: [CAMPUS.center.longitude, CAMPUS.center.latitude],
+    center: [initialCenter.longitude, initialCenter.latitude],
     resizeEnable: true,
     viewMode: "2D",
-    zoom: CAMPUS.minZoom + 1,
-    minZoom: CAMPUS.minZoom,
-    maxZoom: CAMPUS.maxZoom,
-    limitBounds: campusBounds,
+    zoom: initialZoom,
+    ...(viewportConstraint
+      ? {
+          zooms: [viewportConstraint.minZoom, viewportConstraint.maxZoom],
+          limitBounds: [
+            viewportConstraint.bounds.west,
+            viewportConstraint.bounds.south,
+            viewportConstraint.bounds.east,
+            viewportConstraint.bounds.north,
+          ],
+        }
+      : {}),
   });
   const listeners = new Set<() => void>();
   let destroyed = false;
@@ -74,14 +93,18 @@ export function createAMapAdapter(
     listeners.forEach((listener) => listener());
   };
 
-  /** moveend 时检查中心，超出校园边界则自动回弹 */
   const handleMoveEnd = () => {
     const center = map.getCenter();
     const lng = readCoordinate(center, "getLng", "lng");
     const lat = readCoordinate(center, "getLat", "lat");
-    const clamped = clampCenter({ longitude: lng, latitude: lat });
-    if (clamped.longitude !== lng || clamped.latitude !== lat) {
-      map.setCenter([clamped.longitude, clamped.latitude]);
+    if (viewportConstraint) {
+      const clamped = clampCenterToBounds(
+        { longitude: lng, latitude: lat },
+        viewportConstraint.bounds,
+      );
+      if (clamped.longitude !== lng || clamped.latitude !== lat) {
+        map.setCenter([clamped.longitude, clamped.latitude]);
+      }
     }
     notify();
   };
