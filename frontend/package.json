@@ -13,7 +13,8 @@
     "cap:sync": "npx cap sync android",
     "cap:open": "npx cap open android",
     "test:e2e": "playwright test",
-    "test:e2e:integration": "playwright test --config playwright.integration.config.ts"
+    "test:e2e:integration": "playwright test --config playwright.integration.config.ts",
+    "test:pwa": "playwright test --grep \"PWA Service Worker\""
   },
   "dependencies": {
     "@capacitor/core": "^8.4.0",
