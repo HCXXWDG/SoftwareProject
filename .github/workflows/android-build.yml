@@ -82,6 +82,31 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # ── Release build with CI-generated keystore ──
+      - name: Generate CI keystore for release signing
+        run: |
+          keytool -genkeypair -v             -storetype PKCS12             -keystore $RUNNER_TEMP/ci-release.keystore             -alias ci-release             -keyalg RSA -keysize 2048 -validity 10000             -storepass android-ci-pass             -keypass android-ci-pass             -dname "CN=CI Build, OU=DevOps, O=CommuteMoodMap, L=WX, ST=JS, C=CN"
+
+      - name: Write keystore.properties
+        working-directory: frontend/android
+        run: |
+          echo "storeFile=$RUNNER_TEMP/ci-release.keystore" > keystore.properties
+          echo "storePassword=android-ci-pass" >> keystore.properties
+          echo "keyAlias=ci-release" >> keystore.properties
+          echo "keyPassword=android-ci-pass" >> keystore.properties
+
+      - name: Build Android release APK
+        working-directory: frontend/android
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Upload release APK artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-release-apk-${{ github.run_id }}
+          path: frontend/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Run Android lint
         working-directory: frontend/android
         run: ./gradlew lint --no-daemon || true
