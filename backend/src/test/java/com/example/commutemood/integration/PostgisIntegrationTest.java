@@ -1,6 +1,7 @@
 package com.example.commutemood.integration;
 
 import com.example.commutemood.CommuteMoodApplication;
+import com.example.commutemood.config.DemoGeography;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -50,7 +51,7 @@ class PostgisIntegrationTest {
     @Test
     void servesHeatmapFromFlywaySeed() throws Exception {
         mockMvc.perform(get("/api/v1/heatmap")
-                        .param("bbox", "116.39,39.90,116.41,39.92")
+                        .param("bbox", DemoGeography.HEATMAP_BBOX)
                         .param("zoom", "16")
                         .param("hours", "168"))
                 .andExpect(status().isOk())
@@ -64,10 +65,14 @@ class PostgisIntegrationTest {
                         .contentType("application/json")
                         .content("""
                                 {
-                                  "origin":{"longitude":116.392,"latitude":39.905},
-                                  "destination":{"longitude":116.405,"latitude":39.912}
+                                  "origin":{"longitude":%.3f,"latitude":%.3f},
+                                  "destination":{"longitude":%.3f,"latitude":%.3f}
                                 }
-                                """))
+                                """.formatted(
+                                DemoGeography.ORIGIN_LONGITUDE,
+                                DemoGeography.ORIGIN_LATITUDE,
+                                DemoGeography.DESTINATION_LONGITUDE,
+                                DemoGeography.DESTINATION_LATITUDE)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.fastestRouteId").value("route-fast"))
                 .andExpect(jsonPath("$.leastStressfulRouteId").value("route-calm"));
@@ -88,12 +93,12 @@ class PostgisIntegrationTest {
     void persistsReportAndDetectsDuplicateWithinRadius() throws Exception {
         String payload = """
                 {
-                  "location":{"longitude":116.401,"latitude":39.915},
+                  "location":{"longitude":%.4f,"latitude":%.4f},
                   "stressLevel":75,
                   "tag":"CROWD",
                   "reportedAt":"%s"
                 }
-                """.formatted(Instant.now());
+                """.formatted(DemoGeography.REPORT_LONGITUDE, DemoGeography.REPORT_LATITUDE, Instant.now());
 
         mockMvc.perform(post("/api/v1/reports")
                         .header("X-Device-Id", "postgis-report-device")
@@ -112,7 +117,7 @@ class PostgisIntegrationTest {
     @Test
     void refreshesHeatmapCacheIntoPostgis() throws Exception {
         mockMvc.perform(post("/api/v1/heatmap/refresh")
-                        .param("bbox", "116.39,39.90,116.41,39.92")
+                        .param("bbox", DemoGeography.HEATMAP_BBOX)
                         .param("zoom", "16")
                         .param("hours", "168"))
                 .andExpect(status().isOk())

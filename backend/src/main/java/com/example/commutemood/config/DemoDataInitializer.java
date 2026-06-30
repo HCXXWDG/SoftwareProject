@@ -36,13 +36,14 @@ public class DemoDataInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        Random random = new Random(20260610L);
+        Random random = new Random(DemoGeography.RANDOM_SEED);
         Instant now = Instant.now();
+        DemoGeography.Cluster[] clusters = DemoGeography.Cluster.values();
         for (int index = 0; index < 500; index++) {
-            Cluster cluster = Cluster.values()[index % Cluster.values().length];
-            double longitude = cluster.longitude + random.nextGaussian() * cluster.spread;
-            double latitude = cluster.latitude + random.nextGaussian() * cluster.spread;
-            int stress = clampToLevel((int) Math.round(cluster.meanStress + random.nextGaussian() * 15));
+            DemoGeography.Cluster cluster = clusters[index % clusters.length];
+            double longitude = cluster.longitude() + random.nextGaussian() * cluster.spread();
+            double latitude = cluster.latitude() + random.nextGaussian() * cluster.spread();
+            int stress = clampToLevel((int) Math.round(cluster.meanStress() + random.nextGaussian() * 15));
             EmotionTag tag = switch (index % 5) {
                 case 0 -> EmotionTag.NOISE;
                 case 1 -> EmotionTag.CROWD;
@@ -89,25 +90,5 @@ public class DemoDataInitializer implements ApplicationRunner {
             }
         }
         return nearest;
-    }
-
-    private enum Cluster {
-        BUSY_CENTER(120.2739, 31.4793, 78, 0.0012),
-        CALM_NORTH(120.2750, 31.4833, 24, 0.0014),
-        BUSY_GATE(120.2760, 31.4810, 72, 0.0008),
-        CALM_WEST(120.2680, 31.4770, 32, 0.0010),
-        MIXED_SOUTH(120.2730, 31.4750, 55, 0.0013);
-
-        private final double longitude;
-        private final double latitude;
-        private final double meanStress;
-        private final double spread;
-
-        Cluster(double longitude, double latitude, double meanStress, double spread) {
-            this.longitude = longitude;
-            this.latitude = latitude;
-            this.meanStress = meanStress;
-            this.spread = spread;
-        }
     }
 }
