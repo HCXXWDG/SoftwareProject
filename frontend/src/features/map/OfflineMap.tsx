@@ -70,13 +70,24 @@ export function OfflineMap({
   centerRef.current = center;
   zoomRef.current = zoom;
 
+  const effectiveMinZoom = viewportConstraint?.minZoom ?? MIN_ZOOM;
+  const effectiveMaxZoom = viewportConstraint?.maxZoom ?? MAX_ZOOM;
+
+  const clampPanCenter = useCallback(
+    (next: GeoPoint): GeoPoint =>
+      viewportConstraint
+        ? clampCenterToBounds(next, viewportConstraint.bounds)
+        : next,
+    [viewportConstraint],
+  );
+
   const publishViewport = useCallback((commitViewport = commitViewportRef.current) => {
     const container = containerRef.current;
     if (!container) {
       return;
     }
-    const currentCenter = centerRef.current;
-    const currentZoom = zoomRef.current;
+    const currentCenter = clampPanCenter(centerRef.current);
+    const currentZoom = clampZoom(zoomRef.current, effectiveMinZoom, effectiveMaxZoom);
     const size = getMapSize(container);
     onProjectorChange(
       (point) => projectGeoPoint(point, currentCenter, currentZoom, size),
@@ -84,7 +95,7 @@ export function OfflineMap({
       calculateViewport(currentCenter, currentZoom, size),
       commitViewport,
     );
-  }, [containerRef, onProjectorChange]);
+  }, [containerRef, onProjectorChange, clampPanCenter, effectiveMinZoom, effectiveMaxZoom]);
 
   useEffect(() => {
     publishViewport();
@@ -99,17 +110,6 @@ export function OfflineMap({
     observer.observe(container);
     return () => observer.disconnect();
   }, [containerRef, publishViewport]);
-
-  const effectiveMinZoom = viewportConstraint?.minZoom ?? MIN_ZOOM;
-  const effectiveMaxZoom = viewportConstraint?.maxZoom ?? MAX_ZOOM;
-
-  const clampPanCenter = useCallback(
-    (next: GeoPoint): GeoPoint =>
-      viewportConstraint
-        ? clampCenterToBounds(next, viewportConstraint.bounds)
-        : next,
-    [viewportConstraint],
-  );
 
   const changeZoom = (delta: number) => {
     commitViewportRef.current = true;
@@ -133,7 +133,6 @@ export function OfflineMap({
     if (!drag || drag.pointerId !== event.pointerId) {
       return;
     }
-    commitViewportRef.current = false;
     commitViewportRef.current = false;
     setCenter(
       clampPanCenter(
@@ -185,8 +184,8 @@ export function OfflineMap({
       event.preventDefault();
       commitViewportRef.current = true;
       setCenter((current) =>
-      clampPanCenter(panCenter(current, zoom, delta[0], delta[1])),
-    );
+        clampPanCenter(panCenter(current, zoom, delta[0], delta[1])),
+      );
     }
   };
 
@@ -209,10 +208,10 @@ export function OfflineMap({
       <div className="map-surface__offline-road map-surface__offline-road--two" />
       <div className="map-surface__offline-road map-surface__offline-road--three" />
       <span className="map-surface__offline-place map-surface__offline-place--one">
-        通勤站
+        学生公寓区
       </span>
       <span className="map-surface__offline-place map-surface__offline-place--two">
-        城市公园
+        第一教学楼
       </span>
 
       <div aria-label="地图缩放" className="map-surface__zoom-controls">

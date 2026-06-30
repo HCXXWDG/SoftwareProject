@@ -162,6 +162,7 @@ export function MapSurface({
   );
 
   // Long-press handler: screen position -> GeoPoint -> show feedback panel
+  // 校园外长按不弹出反馈面板
   const handleLongPress = useCallback(
     (position: LongPressPosition) => {
       const container = mapHostRef.current;
@@ -179,6 +180,7 @@ export function MapSurface({
       if (viewportConstraint && !isPointInBounds(geoPoint, viewportConstraint.bounds)) {
         return;
       }
+
       setFeedbackGeoPoint(geoPoint);
       setFeedbackPosition(relativePoint);
     },
@@ -239,7 +241,7 @@ export function MapSurface({
 
   return (
     <section
-      aria-label="城市通勤情绪地图"
+      aria-label="校园通勤情绪地图"
       className="map-surface"
       data-map-mode={mode}
       onPointerCancel={handlePointerUp}

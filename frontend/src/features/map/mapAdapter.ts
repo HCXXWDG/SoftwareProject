@@ -6,6 +6,7 @@ import type {
   AMapPointLike,
 } from "./amapLoader";
 import {
+  clampCenterToBounds,
   clampZoom,
   DEFAULT_MAP_CENTER,
   DEFAULT_MAP_ZOOM,
@@ -76,7 +77,6 @@ export function createAMapAdapter(
     ...(viewportConstraint
       ? {
           zooms: [viewportConstraint.minZoom, viewportConstraint.maxZoom],
-          // limitBounds: [sw.lng, sw.lat, ne.lng, ne.lat]
           limitBounds: [
             viewportConstraint.bounds.west,
             viewportConstraint.bounds.south,
@@ -92,7 +92,24 @@ export function createAMapAdapter(
   const notify = () => {
     listeners.forEach((listener) => listener());
   };
-  map.on("moveend", notify);
+
+  const handleMoveEnd = () => {
+    const center = map.getCenter();
+    const lng = readCoordinate(center, "getLng", "lng");
+    const lat = readCoordinate(center, "getLat", "lat");
+    if (viewportConstraint) {
+      const clamped = clampCenterToBounds(
+        { longitude: lng, latitude: lat },
+        viewportConstraint.bounds,
+      );
+      if (clamped.longitude !== lng || clamped.latitude !== lat) {
+        map.setCenter([clamped.longitude, clamped.latitude]);
+      }
+    }
+    notify();
+  };
+
+  map.on("moveend", handleMoveEnd);
   map.on("zoomend", notify);
 
   const resizeObserver = typeof ResizeObserver === "undefined"
@@ -110,7 +127,7 @@ export function createAMapAdapter(
       }
       destroyed = true;
       resizeObserver?.disconnect();
-      map.off("moveend", notify);
+      map.off("moveend", handleMoveEnd);
       map.off("zoomend", notify);
       listeners.clear();
       map.destroy();
