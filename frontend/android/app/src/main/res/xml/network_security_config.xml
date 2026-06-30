@@ -11,4 +11,11 @@
             <certificates src="system" />
         </trust-anchors>
     </base-config>
+    <!-- Production domain: enforce system certificates only (prevents MITM via user-installed CA) -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">your-production-domain.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
 </network-security-config>
