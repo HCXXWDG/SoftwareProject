@@ -69,8 +69,6 @@ export function generateMockRoutes(
   origin: GeoPoint,
   destination: GeoPoint,
 ): RouteComparison {
-  const baseDist = haversine(origin, destination);
-
   // 路线变体定义
   const variants = [
     {
