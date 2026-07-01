@@ -69,7 +69,11 @@ jobs:
       - name: Create .env.production for Android build
         working-directory: frontend
         run: |
-          echo "VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL || 'https://10.0.2.2:8080' }}" > .env.production
+          if [ -n "${{ vars.VITE_API_BASE_URL }}" ]; then
+            echo "VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}" > .env.production
+          else
+            echo "VITE_API_BASE_URL=" > .env.production
+          fi
           if [ -n "${{ secrets.VITE_AMAP_JS_KEY }}" ]; then
             echo "VITE_AMAP_JS_KEY=${{ secrets.VITE_AMAP_JS_KEY }}" >> .env.production
           fi
@@ -183,7 +187,11 @@ jobs:
       - name: Create .env.production for Android build
         working-directory: frontend
         run: |
-          echo "VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL || 'https://10.0.2.2:8080' }}" > .env.production
+          if [ -n "${{ vars.VITE_API_BASE_URL }}" ]; then
+            echo "VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}" > .env.production
+          else
+            echo "VITE_API_BASE_URL=" > .env.production
+          fi
 
       - name: Build frontend for production
         working-directory: frontend
