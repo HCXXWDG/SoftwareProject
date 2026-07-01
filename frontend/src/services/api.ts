@@ -1,4 +1,5 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
+const FETCH_TIMEOUT_MS = 8_000;
 
 function deviceId(): string {
   const key = "commute-device-id";
@@ -20,13 +21,23 @@ async function request<T>(
     ...((options.headers as Record<string, string>) ?? {}),
   };
 
+  const signal = (options as { signal?: AbortSignal }).signal;
+  const timeoutController = signal ? null : new AbortController();
+  if (timeoutController) {
+    setTimeout(() => timeoutController.abort(), FETCH_TIMEOUT_MS);
+  }
+
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}`, {
       ...options,
       headers,
+      signal: signal ?? timeoutController?.signal,
     });
   } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("请求超时：服务器无响应，请检查网络或使用离线模式");
+    }
     if (err instanceof Error && err.message) {
       throw err;
     }
