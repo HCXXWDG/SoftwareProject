@@ -1,5 +1,24 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
+const API_BASE_KEY = "commute-api-base";
+
+function getApiBase(): string {
+  const userUrl = localStorage.getItem(API_BASE_KEY);
+  if (userUrl !== null) return userUrl;
+  return import.meta.env.VITE_API_BASE_URL ?? "";
+}
+
+export function setApiBase(url: string): void {
+  localStorage.setItem(API_BASE_KEY, url);
+}
+
+export function clearApiBase(): void {
+  localStorage.removeItem(API_BASE_KEY);
+}
+
+export function getApiBaseDisplay(): string {
+  return localStorage.getItem(API_BASE_KEY) ?? import.meta.env.VITE_API_BASE_URL ?? "";
+}
 const FETCH_TIMEOUT_MS = 8_000;
+const NO_BACKEND = "__OFFLINE__";
 
 function deviceId(): string {
   const key = "commute-device-id";
@@ -27,9 +46,14 @@ async function request<T>(
     setTimeout(() => timeoutController.abort(), FETCH_TIMEOUT_MS);
   }
 
+  const base = getApiBase();
+  if (base === NO_BACKEND) {
+    throw new Error("后端地址未配置，请在欢迎页设置服务器地址或使用离线模式");
+  }
+
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, {
+    res = await fetch(`${base}${path}`, {
       ...options,
       headers,
       signal: signal ?? timeoutController?.signal,
