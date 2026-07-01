@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { MapPage } from "../pages/MapPage";
 import type { MapPageState, HeatmapCell } from "../types";
-import { CAMPUS } from "../config/campus";
+import { CAMPUS, DEFAULT_ORIGIN, DEFAULT_DESTINATION } from "../config/campus";
 
 const baseState: MapPageState = {
   heatmapCells: [],
@@ -81,8 +81,8 @@ const mockRouteComparison = {
       fastest: true,
       leastStressful: false,
       polyline: [
-        { longitude: CAMPUS.origin.longitude, latitude: CAMPUS.origin.latitude },
-        { longitude: CAMPUS.destination.longitude, latitude: CAMPUS.destination.latitude },
+        { longitude: DEFAULT_ORIGIN.point.longitude, latitude: DEFAULT_ORIGIN.point.latitude },
+        { longitude: DEFAULT_DESTINATION.point.longitude, latitude: DEFAULT_DESTINATION.point.latitude },
       ],
     },
     {
@@ -96,8 +96,8 @@ const mockRouteComparison = {
       fastest: false,
       leastStressful: true,
       polyline: [
-        { longitude: CAMPUS.origin.longitude, latitude: CAMPUS.origin.latitude },
-        { longitude: CAMPUS.destination.longitude, latitude: CAMPUS.destination.latitude },
+        { longitude: DEFAULT_ORIGIN.point.longitude, latitude: DEFAULT_ORIGIN.point.latitude },
+        { longitude: DEFAULT_DESTINATION.point.longitude, latitude: DEFAULT_DESTINATION.point.latitude },
       ],
     },
   ],
@@ -229,10 +229,10 @@ describe("App three-stage flow", () => {
       );
       expect(compareCall).toBeDefined();
       const body = JSON.parse((compareCall![1] as RequestInit).body as string);
-      expect(body.origin.longitude).toBe(CAMPUS.origin.longitude);
-      expect(body.origin.latitude).toBe(CAMPUS.origin.latitude);
-      expect(body.destination.longitude).toBe(CAMPUS.destination.longitude);
-      expect(body.destination.latitude).toBe(CAMPUS.destination.latitude);
+      expect(body.origin.longitude).toBe(DEFAULT_ORIGIN.point.longitude);
+      expect(body.origin.latitude).toBe(DEFAULT_ORIGIN.point.latitude);
+      expect(body.destination.longitude).toBe(DEFAULT_DESTINATION.point.longitude);
+      expect(body.destination.latitude).toBe(DEFAULT_DESTINATION.point.latitude);
     });
   });
 
