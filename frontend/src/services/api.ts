@@ -1,4 +1,5 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
+const NO_BACKEND = "__OFFLINE__";
 const FETCH_TIMEOUT_MS = 8_000;
 
 function deviceId(): string {
@@ -15,6 +16,10 @@ async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
+  if (API_BASE === NO_BACKEND) {
+    throw new Error("后端地址未配置，请使用离线模式");
+  }
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "X-Device-Id": deviceId(),

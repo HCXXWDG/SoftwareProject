@@ -72,7 +72,7 @@ jobs:
           if [ -n "${{ vars.VITE_API_BASE_URL }}" ]; then
             echo "VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}" > .env.production
           else
-            echo "VITE_API_BASE_URL=" > .env.production
+            echo "VITE_API_BASE_URL=__OFFLINE__" > .env.production
           fi
           if [ -n "${{ secrets.VITE_AMAP_JS_KEY }}" ]; then
             echo "VITE_AMAP_JS_KEY=${{ secrets.VITE_AMAP_JS_KEY }}" >> .env.production
@@ -190,7 +190,7 @@ jobs:
           if [ -n "${{ vars.VITE_API_BASE_URL }}" ]; then
             echo "VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}" > .env.production
           else
-            echo "VITE_API_BASE_URL=" > .env.production
+            echo "VITE_API_BASE_URL=__OFFLINE__" > .env.production
           fi
 
       - name: Build frontend for production
