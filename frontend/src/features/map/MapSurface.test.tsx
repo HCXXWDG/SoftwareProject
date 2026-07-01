@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HeatmapCell, MapFeedbackDraft, ScoredRoute } from "../../types";
-import { CAMPUS } from "../../config/campus";
+import { CAMPUS, DEFAULT_ORIGIN, DEFAULT_DESTINATION } from "../../config/campus";
 import {
   resetAMapLoaderForTests,
   type AMapNamespaceLike,
@@ -33,8 +33,8 @@ const campusViewportConstraint = {
   defaultZoom: 16,
 };
 
-const campusOrigin = { longitude: 120.2735103, latitude: 31.4753281 };
-const campusDestination = { longitude: 120.2743195, latitude: 31.4832753 };
+const campusOrigin = DEFAULT_ORIGIN.point;
+const campusDestination = DEFAULT_DESTINATION.point;
 
 const defaultProps: Omit<MapSurfaceProps, "heatmapCells" | "loading"> = {
   routes: [],
