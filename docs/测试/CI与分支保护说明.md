@@ -1,61 +1,26 @@
-# CI 与分支保护
+# CI 与分支保护说明
 
-## 必需检查
+仓库：https://github.com/xlm-xlm/xintu-campus-commute
 
-所有合并到 `develop` 的 Pull Request 必须通过：
+## 核心检查
 
-- `Frontend CI`：安装锁定依赖、运行 Vitest、构建生产包。
-- `Backend CI`：使用 Java 17 执行 Maven `verify`，并上传 JaCoCo 报告。
-- `E2E CI`：使用稳定 API Mock 验证地图、路线和反馈浏览器链路。
-- `Full-stack E2E`：启动 Spring Boot demo Profile 和 Vite，验证浏览器
-  实际访问 `/api/v1`，不拦截或伪造接口响应。
+- Frontend CI：Vitest 和前端生产构建。
+- Backend CI：Java 17 下 Maven verify 和 JaCoCo 报告。
+- E2E CI：API Mock 的浏览器回归。
+- Full-stack E2E：启动 demo 后端并运行实际 API 联调。
 
-工作流不读取高德 Key、数据库密码或其他 Secret。前端地图测试使用无 Key
-离线回退，Full-stack E2E 使用默认 demo 配置。
+Android 构建与模拟器检查暂不列为必需检查。数据库集成是否实际执行以日志为准，环境导致的跳过不能作为通过证据。
 
-## develop 与 main 保护规则
+## 协作约定
 
-截至 2026-06-14，`develop` 与 `main` 已启用同等规则：
+develop 为默认集成分支，main 为稳定分支。功能经 PR 合入 develop，发布经 PR 进入 main。至少一名其他成员复核，解决评审对话，核心检查通过后合并。禁止强制覆盖和删除共享分支。
 
-- 必须通过 Pull Request 合并。
-- 至少需要 1 名批准者。
-- 新提交到来时撤销过期批准。
-- 最后一次推送必须由其他成员批准。
-- 必须通过 `Frontend CI`、`Backend CI`、`E2E CI` 和
-  `Full-stack E2E`。
-- 合并前分支必须与 `develop` 保持最新。
-- 必须解决全部评审对话。
-- 管理员也遵守上述规则。
-- 禁止强制推送和删除分支。
+拟设置 main/develop 强制要求 PR、一名批准者、过期批准失效、四项核心检查与对话解决，并禁止强制推送和删除。私有仓库的强制保护取决于 GitHub 账户权限，不能以文档约定替代实际规则。
 
-四个工作流同时监听 `develop` 和 `main`，发布 PR 必须经过同等质量门禁。
+## 本次配置状态
 
-## 本地验证
+2026 年 10 月 18 日：新仓库已创建，分支推送后将调用 GitHub API 配置并核实；本节将在核实后更新。旧 HCXXWDG/SoftwareProject 仓库的保护状态不代表新仓库状态。
 
-前端：
+## 本地检查
 
-```powershell
-cd frontend
-npm ci
-npm test
-npm run build
-npm run test:e2e
-```
-
-后端：
-
-```powershell
-cd backend
-.\mvnw.cmd --batch-mode --no-transfer-progress verify
-```
-
-Full-stack E2E 需要先启动后端：
-
-```powershell
-cd backend
-.\mvnw.cmd --batch-mode --no-transfer-progress spring-boot:run
-
-# 另一个终端
-cd frontend
-npm run test:e2e:integration
-```
+前端在 frontend 执行 npm test、npm run build、npm run test:e2e。后端在 backend 执行 mvnw.cmd verify。启动 demo 后端后，在 frontend 执行 npm run test:e2e:integration。

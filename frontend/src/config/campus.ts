@@ -1,8 +1,28 @@
 import type { GeoPoint } from "../types";
 
-/** 江南大学蠡湖校区 — GCJ-02 坐标（高德坐标拾取工具核对） */
+export interface Waypoint {
+  id: string;
+  name: string;
+  point: GeoPoint;
+}
+
+/** 五个校内导航点位（GCJ-02） */
+export const WAYPOINTS: Waypoint[] = [
+  { id: "dorm",     name: "学生公寓区", point: { longitude: 120.273510, latitude: 31.475328 } },
+  { id: "teaching", name: "第一教学楼", point: { longitude: 120.274319, latitude: 31.483275 } },
+  { id: "library",  name: "图书馆",     point: { longitude: 120.273019, latitude: 31.482245 } },
+  { id: "canteen",  name: "三食堂",     point: { longitude: 120.272137, latitude: 31.477660 } },
+  { id: "sports",   name: "体育中心",   point: { longitude: 120.275344, latitude: 31.487085 } },
+];
+
+/** 默认起点（学生公寓区） */
+export const DEFAULT_ORIGIN = WAYPOINTS[0];
+/** 默认终点（第一教学楼） */
+export const DEFAULT_DESTINATION = WAYPOINTS[1];
+
+/** 校区中心（用于默认地图视口） */
 export const CAMPUS = {
-  /** 校区中心（用于默认地图视口） */
+  /** 校区中心 */
   center: { longitude: 120.273915, latitude: 31.479302 } as GeoPoint,
   /** 可视域边界（蠡湖校区边界外扩约 200 米） */
   bounds: {
@@ -15,10 +35,6 @@ export const CAMPUS = {
   minZoom: 15,
   /** 最大缩放级别 */
   maxZoom: 18,
-  /** 学生公寓区（起点，以留学生公寓为定位锚点） */
-  origin: { longitude: 120.2735103, latitude: 31.4753281 } as GeoPoint,
-  /** 第一教学楼（终点） */
-  destination: { longitude: 120.2743195, latitude: 31.4832753 } as GeoPoint,
 } as const;
 
 /** 默认 bbox 字符串（与 campus bounds 对齐） */

@@ -1,4 +1,12 @@
-# 城市通勤情绪地图
+# 心途校园通勤情绪地图
+团队协作仓库：[xlm-xlm/xintu-campus-commute](https://github.com/xlm-xlm/xintu-campus-commute)。默认分支为 `develop`，稳定版本保存在 `main`。
+
+- [贡献与协作指南](CONTRIBUTING.md)
+- [代码与功能优化启动书](docs/project/project-charter.md)
+- [三至四人任务分工](docs/project/task-assignment.md)
+- [成员工作量量化](docs/project/workload.md)
+- [初始检查结果与已知问题](docs/project/initial-baseline.md)
+- [开发任务 Issues](https://github.com/xlm-xlm/xintu-campus-commute/issues)
 
 一个把“通勤是否心累”加入路线决策的课程软件工程项目。系统聚合用户对噪音、拥挤、暴晒和异味的反馈，生成情绪热力图，并对高德候选路线重新计算“心累指数”。
 
@@ -119,8 +127,8 @@ docker compose -f infra/compose.yml --env-file .env up --build
 ### 第一次获取项目
 
 ```powershell
-git clone git@github.com:HCXXWDG/SoftwareProject.git
-cd SoftwareProject
+git clone git@github.com:xlm-xlm/xintu-campus-commute.git
+cd xintu-campus-commute
 git switch develop
 git pull --ff-only origin develop
 ```
@@ -128,7 +136,7 @@ git pull --ff-only origin develop
 如果本机尚未配置 GitHub SSH，可临时使用 HTTPS：
 
 ```powershell
-git clone https://github.com/HCXXWDG/SoftwareProject.git
+git clone https://github.com/xlm-xlm/xintu-campus-commute.git
 ```
 
 ### 每次开始开发

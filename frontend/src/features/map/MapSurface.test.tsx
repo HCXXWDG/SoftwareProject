@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HeatmapCell, MapFeedbackDraft, ScoredRoute } from "../../types";
-import { CAMPUS } from "../../config/campus";
+import { CAMPUS, DEFAULT_ORIGIN, DEFAULT_DESTINATION } from "../../config/campus";
 import {
   resetAMapLoaderForTests,
   type AMapNamespaceLike,
@@ -369,8 +369,8 @@ describe("MapSurface", () => {
         fastest: true,
         leastStressful: false,
         polyline: [
-          { longitude: CAMPUS.origin.longitude, latitude: CAMPUS.origin.latitude },
-          { longitude: CAMPUS.destination.longitude, latitude: CAMPUS.destination.latitude },
+          { longitude: DEFAULT_ORIGIN.point.longitude, latitude: DEFAULT_ORIGIN.point.latitude },
+          { longitude: DEFAULT_DESTINATION.point.longitude, latitude: DEFAULT_DESTINATION.point.latitude },
         ],
       },
     ];

@@ -153,10 +153,40 @@ export function calculateViewport(
 
 export function scoreToColor(score: number): string {
   const ratio = Math.max(0, Math.min(100, score)) / 100;
-  const start = { red: 35, green: 104, blue: 255 };
-  const end = { red: 239, green: 68, blue: 68 };
-  const mix = (from: number, to: number) => Math.round(from + (to - from) * ratio);
-  return `rgb(${mix(start.red, end.red)}, ${mix(start.green, end.green)}, ${mix(start.blue, end.blue)})`;
+  if (ratio < 0.25) {
+    const t = ratio / 0.25;
+    const r = Math.round(52 + (255 - 52) * t);
+    const g = Math.round(199 + (193 - 199) * t);
+    const b = Math.round(89 + (7 - 89) * t);
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+  if (ratio < 0.5) {
+    const t = (ratio - 0.25) / 0.25;
+    const r = Math.round(255 + (245 - 255) * t);
+    const g = Math.round(193 + (158 - 193) * t);
+    const b = Math.round(7 + (11 - 7) * t);
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+  if (ratio < 0.75) {
+    const t = (ratio - 0.5) / 0.25;
+    const r = Math.round(245 + (239 - 245) * t);
+    const g = Math.round(158 + (68 - 158) * t);
+    const b = Math.round(11 + (68 - 11) * t);
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+  const t = (ratio - 0.75) / 0.25;
+  const r = Math.round(239 + (220 - 239) * t);
+  const g = Math.round(68 + (38 - 68) * t);
+  const b = Math.round(68 + (38 - 68) * t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+export function scoreToGradient(score: number): { inner: string; outer: string } {
+  const color = scoreToColor(score);
+  return {
+    inner: color,
+    outer: color.replace("rgb(", "rgba(").replace(")", ", 0)"),
+  };
 }
 
 export function unprojectGeoPoint(

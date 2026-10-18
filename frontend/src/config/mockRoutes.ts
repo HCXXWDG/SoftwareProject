@@ -1,4 +1,4 @@
-import { CAMPUS } from "./campus";
+import { DEFAULT_ORIGIN, DEFAULT_DESTINATION } from "./campus";
 import type { RouteComparison } from "../types";
 
 /**
@@ -21,10 +21,10 @@ export const MOCK_ROUTE_COMPARISON: RouteComparison = {
       fastest: true,
       leastStressful: false,
       polyline: [
-        CAMPUS.origin,
+        DEFAULT_ORIGIN.point,
         { longitude: 120.2738, latitude: 31.478 },
         { longitude: 120.2741, latitude: 31.481 },
-        CAMPUS.destination,
+        DEFAULT_DESTINATION.point,
       ],
     },
     {
@@ -38,10 +38,10 @@ export const MOCK_ROUTE_COMPARISON: RouteComparison = {
       fastest: false,
       leastStressful: true,
       polyline: [
-        CAMPUS.origin,
+        DEFAULT_ORIGIN.point,
         { longitude: 120.2732, latitude: 31.477 },
         { longitude: 120.2745, latitude: 31.481 },
-        CAMPUS.destination,
+        DEFAULT_DESTINATION.point,
       ],
     },
   ],
