@@ -1,0 +1,32 @@
+.recent-queries {
+  margin: 8px 12px;
+  padding: 12px 16px;
+  border: 1px solid #dce4eb;
+  border-radius: 12px;
+  background: #fff;
+  color: #1a3a4d;
+  font-size: 0.85rem;
+}
+.recent-queries__header, .recent-queries li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.recent-queries h2 { margin: 0; font-size: 0.95rem; }
+.recent-queries p { color: #526b7c; }
+.recent-queries button {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border: 1px solid #a6bed3;
+  border-radius: 6px;
+  background: #f6f9fc;
+  color: #174d89;
+  cursor: pointer;
+}
+.recent-queries button:disabled { cursor: wait; opacity: 0.6; }
+.recent-queries ul { list-style: none; margin: 0; padding: 0; }
+.recent-queries li { padding: 10px 0; border-top: 1px solid #e4ebf0; }
+.recent-queries li div { min-width: 0; overflow-wrap: anywhere; }
+.recent-queries time { display: block; margin-top: 4px; color: #607888; font-size: 0.78rem; }
+.recent-queries__warning { padding: 8px; border-radius: 6px; background: #fffbeb; }

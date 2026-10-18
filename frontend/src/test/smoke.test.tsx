@@ -1,469 +1,162 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
+import { useEffect } from "react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import App from "../App";
 import { MapPage } from "../pages/MapPage";
-import type { MapPageState, HeatmapCell } from "../types";
-import { CAMPUS, DEFAULT_ORIGIN, DEFAULT_DESTINATION } from "../config/campus";
+import { DEFAULT_ORIGIN, DEFAULT_DESTINATION, WAYPOINTS } from "../config/campus";
+import type { MapSurfaceProps } from "../features/map/MapSurface";
+import { deferred, emptyTrend, jsonResponse, routeComparison } from "./fixtures";
+import type { MapPageState } from "../types";
 
-const baseState: MapPageState = {
-  heatmapCells: [],
-  loading: false,
-  error: null,
-  routeComparison: null,
-  trend: null,
-};
+// A 的编排以 C 的公开 Props 为边界；C 内部手势与布局由其组件/E2E测试覆盖。
+vi.mock("../features/map", () => ({ MapSurface: (props: MapSurfaceProps) => {
+  useEffect(() => { props.onModeChange?.("offline"); }, [props.onModeChange]);
+  return <div data-testid="map-contract">
+    <span>{props.selectedRouteId}</span>
+    <button type="button" onClick={() => props.onViewportChange("120.26,31.47,120.28,31.49", 17)}>移动视口</button>
+    <button type="button" disabled={!props.feedbackEnabled}
+      onClick={() => { void props.onFeedbackSubmit({ location: DEFAULT_ORIGIN.point, stressLevel: 50, tag: "NOISE" }).catch(() => {}); }}>提交反馈</button>
+  </div>;
+} }));
 
-const mockCell: HeatmapCell = {
-  cellId: "16:129323:44339",
-  center: { longitude: CAMPUS.center.longitude, latitude: CAMPUS.center.latitude },
-  score: 62.5,
-  confidence: 0.18,
-  count: 1,
-  dominantTag: "NOISE",
-};
-
-describe("MapPage component", () => {
-  it("shows loading spinner when loading is true", () => {
-    render(<MapPage state={{ ...baseState, loading: true }} />);
-    expect(screen.getByRole("status")).toHaveTextContent("正在加载热力图数据");
+const baseState: MapPageState = { heatmapCells: [], loading: false, error: null, routeComparison: null, trend: null };
+describe("MapPage", () => {
+  it("shows loading", () => { render(<MapPage state={{ ...baseState, loading: true }} />); expect(screen.getByRole("status")).toHaveTextContent("正在加载热力图数据"); });
+  it("shows an explicit query error", () => { render(<MapPage state={{ ...baseState, error: "加载失败" }} />); expect(screen.getByRole("alert")).toHaveTextContent("加载失败"); });
+  it("shows the number of returned cells", () => {
+    render(<MapPage state={{ ...baseState, heatmapCells: [{ cellId: "c", center: DEFAULT_ORIGIN.point, score: 0, confidence: 1, count: 1, dominantTag: "OTHER" }] }} />);
+    expect(screen.getByRole("status", { name: "数据摘要" })).toHaveTextContent("1");
   });
-
-  it("shows error message with alert role", () => {
-    render(<MapPage state={{ ...baseState, error: "API 500: 服务异常" }} />);
-    const alert = screen.getByRole("alert");
-    expect(alert).toHaveTextContent("API 500: 服务异常");
-  });
-
-  it("shows data summary when heatmap cells are loaded", () => {
-    const cells: HeatmapCell[] = Array.from({ length: 42 }, (_, i) => ({
-      ...mockCell,
-      cellId: `cell-${i}`,
-    }));
-    render(<MapPage state={{ ...baseState, heatmapCells: cells }} />);
-    const summary = screen.getByRole("status", { name: "数据摘要" });
-    expect(summary).toHaveTextContent("42");
-    expect(summary).toHaveTextContent("个热力图单元格已加载");
-  });
-
-  it("does not show summary when cells are empty and not loading", () => {
-    render(<MapPage state={baseState} />);
-    expect(screen.queryByText(/个热力图单元格已加载/)).toBeNull();
-  });
-
-  it("shows placeholder when mapSlot is not provided", () => {
-    render(<MapPage state={baseState} />);
-    expect(screen.getByText(/地图区域/)).toBeInTheDocument();
-  });
-
-  it("renders custom mapSlot when provided", () => {
-    render(
-      <MapPage
-        state={baseState}
-        mapSlot={<div data-testid="custom-map">Custom Map</div>}
-      />
-    );
-    expect(screen.getByTestId("custom-map")).toBeInTheDocument();
-    expect(screen.queryByText(/地图区域/)).toBeNull();
-  });
+  it("does not invent a summary for no cells", () => { render(<MapPage state={baseState} />); expect(screen.queryByRole("status", { name: "数据摘要" })).not.toBeInTheDocument(); });
+  it("offers the map placeholder", () => { render(<MapPage state={baseState} />); expect(screen.getByText(/地图区域/)).toBeInTheDocument(); });
+  it("renders the supplied map", () => { render(<MapPage state={baseState} mapSlot={<p>地图插槽</p>} />); expect(screen.getByText("地图插槽")).toBeInTheDocument(); });
 });
 
-// ─── Helpers ──────────────────────────────────────────────
-
-const mockRouteComparison = {
-  routes: [
-    {
-      id: "r1",
-      label: "路线 A（东侧步道）",
-      distanceMeters: 850,
-      durationSeconds: 600,
-      stressExposure: 0.4,
-      stressScore: 38,
-      confidence: 0.85,
-      fastest: true,
-      leastStressful: false,
-      polyline: [
-        { longitude: DEFAULT_ORIGIN.point.longitude, latitude: DEFAULT_ORIGIN.point.latitude },
-        { longitude: DEFAULT_DESTINATION.point.longitude, latitude: DEFAULT_DESTINATION.point.latitude },
-      ],
-    },
-    {
-      id: "r2",
-      label: "路线 B（蠡湖环路）",
-      distanceMeters: 1100,
-      durationSeconds: 780,
-      stressExposure: 0.2,
-      stressScore: 22,
-      confidence: 0.78,
-      fastest: false,
-      leastStressful: true,
-      polyline: [
-        { longitude: DEFAULT_ORIGIN.point.longitude, latitude: DEFAULT_ORIGIN.point.latitude },
-        { longitude: DEFAULT_DESTINATION.point.longitude, latitude: DEFAULT_DESTINATION.point.latitude },
-      ],
-    },
-  ],
-  fastestRouteId: "r1",
-  leastStressfulRouteId: "r2",
-  recommendation: "推荐路线 B",
-  recommendAlternative: true,
-};
-
-const mockTrend = {
-  points: [{ date: "2025-06-10", averageStress: 40, commuteCount: 2 }],
-  recommendation: "保持好心情",
-  totalCommutes: 2,
-};
-
-function mockFetchForCommute(mode: "success" | "fail" | "success-trend-fail") {
-  const calls: { url: string; init?: RequestInit }[] = [];
-  let trendCallCount = 0;
-  (globalThis.fetch as ReturnType<typeof vi.fn>).mockImplementation(
-    async (url: string, init?: RequestInit) => {
-      calls.push({ url, init });
-      if (url.includes("/heatmap")) {
-        return { ok: true, json: () => Promise.resolve([]) };
-      }
-      if (url.includes("/routes/compare")) {
-        return { ok: true, json: () => Promise.resolve(mockRouteComparison) };
-      }
-      if (url.includes("/commutes/trends")) {
-        trendCallCount++;
-        if (mode === "success-trend-fail" && trendCallCount > 1) {
-          return { ok: false, status: 500, text: () => Promise.resolve("Internal Server Error") };
-        }
-        return { ok: true, json: () => Promise.resolve(mockTrend) };
-      }
-      if (url.includes("/commutes/complete")) {
-        if (mode === "success" || mode === "success-trend-fail") {
-          return {
-            ok: true,
-            json: () =>
-              Promise.resolve({
-                id: "c1",
-                deviceHash: "h",
-                routeId: "r1",
-                routeLabel: "路线 A",
-                endStressLevel: 50,
-                durationMinutes: 10,
-                selectedScore: 38,
-                fastestScore: 38,
-                alternativeLabel: "路线 B",
-                alternativeScore: 22,
-                alternativeDurationRatio: 1.25,
-                confidence: 0.85,
-                completedAt: "2025-06-10T09:00:00Z",
-              }),
-          };
-        }
-        return {
-          ok: false,
-          status: 400,
-          text: () => Promise.resolve("endStressLevel 必须为 0/25/50/75/100"),
-        };
-      }
-      return { ok: true, json: () => Promise.resolve([]) };
-    },
-  );
-  return calls;
+let fetchMock: ReturnType<typeof vi.fn>;
+function installBackend(overrides: (url: string, init?: RequestInit) => Response | Promise<Response> | undefined = () => undefined) {
+  fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+    const override = overrides(String(input), init); if (override !== undefined) return override;
+    if (input.includes("/routes/compare")) return jsonResponse(routeComparison);
+    if (input.includes("/commutes/trends")) return jsonResponse(emptyTrend);
+    if (input.includes("/reports")) return jsonResponse({ status: "created", message: "已提交" }, 201);
+    return jsonResponse([]);
+  });
+  vi.stubGlobal("fetch", fetchMock);
 }
-
-/** Navigate from welcome → route-preview → map */
-async function navigateToMap() {
-  fireEvent.click(screen.getByText("查看预设路线"));
-  await waitFor(() => {
-    expect(screen.getByText("预设路线")).toBeInTheDocument();
-  });
-  await waitFor(() => {
-    expect(screen.getByText("进入地图")).toBeInTheDocument();
-  });
-  fireEvent.click(screen.getByText("进入地图"));
-  await waitFor(() => {
-    expect(screen.getByText("完成本次通勤")).toBeInTheDocument();
-  });
+async function map() {
+  fireEvent.click(screen.getByRole("button", { name: "查看路线" }));
+  fireEvent.click(await screen.findByRole("button", { name: "进入地图" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "提交反馈" })).toBeEnabled());
 }
+const calls = (part: string) => fetchMock.mock.calls.filter(([url]) => String(url).includes(part));
+beforeEach(() => { localStorage.clear(); window.history.replaceState(null, "", "/"); installBackend(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-// ─── App three-stage flow ────────────────────────────────
-
-describe("App three-stage flow", () => {
-  beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn());
+describe("成员 A 页面编排", () => {
+  it("starts at selection without requesting routes, heatmap or trends", () => {
+    render(<App />); expect(screen.getByRole("button", { name: "查看路线" })).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled(); expect(screen.queryByTestId("map-contract")).not.toBeInTheDocument();
   });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+  it("submits selected non-default endpoints", async () => {
+    render(<App />); fireEvent.click(within(screen.getByRole("group", { name: "选择终点" })).getByRole("button", { name: "图书馆" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看路线" }));
+    await screen.findByRole("button", { name: "进入地图" });
+    expect(JSON.parse(calls("/routes/compare")[0][1].body)).toEqual({ origin: DEFAULT_ORIGIN.point, destination: WAYPOINTS[2].point });
   });
-
-  it("shows welcome page on initial load without API calls", async () => {
-    const { default: App } = await import("../App");
-    render(<App />);
-
-    expect(screen.getByText("校园通勤情绪地图")).toBeInTheDocument();
-    expect(screen.getByText("查看预设路线")).toBeInTheDocument();
-    expect(globalThis.fetch).not.toHaveBeenCalled();
+  it("requests independent heatmap, trend and history queries only after entering map", async () => {
+    render(<App />); fireEvent.click(screen.getByRole("button", { name: "查看路线" }));
+    await screen.findByRole("button", { name: "进入地图" });
+    expect(calls("/heatmap")).toHaveLength(0); expect(calls("/commutes/trends")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "进入地图" }));
+    await waitFor(() => expect(calls("/routes/history")).toHaveLength(1));
+    expect(calls("/heatmap").length).toBeGreaterThan(0); expect(calls("/commutes/trends")).toHaveLength(1);
   });
-
-  it("welcome page does NOT show map, routes, trends or commute button", async () => {
-    const { default: App } = await import("../App");
-    render(<App />);
-
-    expect(screen.queryByText("完成本次通勤")).toBeNull();
-    expect(screen.queryByText("高德地图")).toBeNull();
-    expect(screen.queryByText("离线演示地图")).toBeNull();
-    expect(screen.queryByTestId("route-overlay")).toBeNull();
-    expect(screen.queryByTestId("route-legend")).toBeNull();
+  it("keeps an unknown-provenance comparison scoreless and blocks legacy commute writes", async () => {
+    render(<App />); await map();
+    expect(screen.getByText("当前无有效评分，不展示舒适标签。")).toBeInTheDocument();
+    expect(screen.queryByText("少心累")).not.toBeInTheDocument();
+    const complete = screen.getByRole("button", { name: "完成本次通勤" });
+    expect(complete).toBeDisabled(); fireEvent.click(complete); expect(calls("/commutes/complete")).toHaveLength(0);
   });
-
-  it("route preview sends compareRoutes with fixed campus endpoints", async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockRouteComparison),
-    });
-
-    const { default: App } = await import("../App");
-    render(<App />);
-
-    fireEvent.click(screen.getByText("查看预设路线"));
-
-    await waitFor(() => {
-      const compareCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
-        (c: unknown[]) => typeof c[0] === "string" && (c[0] as string).includes("/routes/compare"),
-      );
-      expect(compareCall).toBeDefined();
-      const body = JSON.parse((compareCall![1] as RequestInit).body as string);
-      expect(body.origin.longitude).toBe(DEFAULT_ORIGIN.point.longitude);
-      expect(body.origin.latitude).toBe(DEFAULT_ORIGIN.point.latitude);
-      expect(body.destination.longitude).toBe(DEFAULT_DESTINATION.point.longitude);
-      expect(body.destination.latitude).toBe(DEFAULT_DESTINATION.point.latitude);
-    });
+  it("selects the same route across choices and map then clears it on replanning", async () => {
+    render(<App />); await map(); fireEvent.click(screen.getByRole("button", { name: /选择 路线 B/ }));
+    expect(screen.getByTestId("map-contract")).toHaveTextContent("r2");
+    fireEvent.click(screen.getByRole("button", { name: "重新规划" }));
+    fireEvent.click(await screen.findByRole("button", { name: "进入地图" }));
+    expect(screen.getByTestId("map-contract")).toHaveTextContent("r1");
   });
-
-  it("heatmap and trends are NOT requested until user enters map", async () => {
-    const calls: { url: string }[] = [];
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockImplementation(
-      async (url: string) => {
-        calls.push({ url });
-        if (url.includes("/routes/compare")) {
-          return { ok: true, json: () => Promise.resolve(mockRouteComparison) };
-        }
-        return { ok: true, json: () => Promise.resolve([]) };
-      },
-    );
-
-    const { default: App } = await import("../App");
-    render(<App />);
-
-    // Welcome stage — no API at all
-    expect(calls).toHaveLength(0);
-
-    // Navigate to route-preview
-    fireEvent.click(screen.getByText("查看预设路线"));
-    await waitFor(() => {
-      expect(screen.getByText("预设路线")).toBeInTheDocument();
-    });
-
-    // Only compareRoutes should be called — no heatmap or trends yet
-    const heatmapBefore = calls.filter((c) => c.url.includes("/heatmap"));
-    const trendsBefore = calls.filter((c) => c.url.includes("/commutes/trends"));
-    expect(heatmapBefore).toHaveLength(0);
-    expect(trendsBefore).toHaveLength(0);
-
-    // Click "进入地图"
-    fireEvent.click(screen.getByText("进入地图"));
-    await waitFor(() => {
-      expect(screen.getByText("完成本次通勤")).toBeInTheDocument();
-    });
-
-    // Now heatmap and trends should be requested
-    const heatmapAfter = calls.filter((c) => c.url.includes("/heatmap"));
-    const trendsAfter = calls.filter((c) => c.url.includes("/commutes/trends"));
-    expect(heatmapAfter.length).toBeGreaterThanOrEqual(1);
-    expect(trendsAfter.length).toBeGreaterThanOrEqual(1);
+  it("returns with selected endpoints and can plan a new trip", async () => {
+    render(<App />); await map(); fireEvent.click(screen.getByRole("button", { name: "修改起终点" }));
+    expect(within(screen.getByRole("group", { name: "选择终点" })).getByRole("button", { name: DEFAULT_DESTINATION.name })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(within(screen.getByRole("group", { name: "选择终点" })).getByRole("button", { name: "图书馆" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看路线" }));
+    await screen.findByRole("button", { name: "进入地图" });
+    expect(JSON.parse(calls("/routes/compare").at(-1)![1].body).destination).toEqual(WAYPOINTS[2].point);
   });
-
-  it("user can select route but cannot edit endpoints", async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockRouteComparison),
-    });
-
-    const { default: App } = await import("../App");
-    render(<App />);
-
-    fireEvent.click(screen.getByText("查看预设路线"));
-    await waitFor(() => {
-      expect(screen.getByText("进入地图")).toBeInTheDocument();
-    });
-
-    // Endpoints are displayed as text, not editable inputs
-    expect(screen.getByText(/学生公寓区/)).toBeInTheDocument();
-    expect(screen.getByText(/第一教学楼/)).toBeInTheDocument();
-    expect(screen.queryByRole("textbox")).toBeNull();
-    expect(screen.queryByPlaceholderText(/起点|终点|origin|destination/i)).toBeNull();
+  it("requires explicit demo selection and treats offline base map independently from a recovered backend", async () => {
+    installBackend((url) => url.includes("/routes/compare") ? Promise.reject(new TypeError("offline")) : undefined);
+    render(<App />); fireEvent.click(screen.getByRole("button", { name: "查看路线" }));
+    await screen.findByRole("alert"); expect(screen.queryByTestId("map-contract")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "查看匹配的演示路线" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "提交反馈" })).toBeEnabled());
+    expect(screen.getByText(/底图：离线底图/)).toHaveTextContent("数据服务：可连接");
+    expect(screen.getByRole("button", { name: "完成本次通勤" })).toBeDisabled();
+    expect(screen.queryByText("少心累")).not.toBeInTheDocument();
   });
-
-  it("route preview failure shows retry and offline entry", async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("Network error"),
-    );
-
-    const { default: App } = await import("../App");
-    render(<App />);
-
-    fireEvent.click(screen.getByText("查看预设路线"));
-
-    await waitFor(() => {
-      expect(screen.getByRole("alert")).toBeInTheDocument();
-    });
-
-    expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "进入离线地图" })).toBeInTheDocument();
+  it("retries only the heatmap after a saved report and failed refresh", async () => {
+    let heatmapCount = 0;
+    installBackend((url) => url.includes("/heatmap") && ++heatmapCount === 2 ? jsonResponse({ code: "internal_error" }, 500) : undefined);
+    render(<App />); await map();
+    fireEvent.click(screen.getByRole("button", { name: "移动视口" }));
+    fireEvent.click(screen.getByRole("button", { name: "提交反馈" }));
+    expect(await screen.findByText(/反馈已提交，但地图刷新失败/)).toBeInTheDocument();
+    expect(calls("/reports")).toHaveLength(1);
+    expect(String(calls("/heatmap").at(-1)![0])).toContain("zoom=17");
+    fireEvent.click(screen.getByRole("button", { name: "刷新地图" }));
+    await waitFor(() => expect(calls("/heatmap")).toHaveLength(3));
+    expect(calls("/reports")).toHaveLength(1);
   });
-
-  it("offline entry enters map without fake scores", async () => {
-    (globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("offline"),
-    );
-
-    const { default: App } = await import("../App");
-    render(<App />);
-
-    fireEvent.click(screen.getByText("查看预设路线"));
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "进入离线地图" })).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "进入离线地图" }));
-
-    // Map stage should appear, with offline banner
-    await waitFor(() => {
-      expect(screen.getByText("完成本次通勤")).toBeInTheDocument();
-    });
-    expect(screen.getByText(/离线模式/)).toBeInTheDocument();
+  it("recognizes duplicate reports without inventing a new write or heatmap update", async () => {
+    installBackend((url) => url.includes("/reports") ? jsonResponse({ status: "duplicate", message: "已提交过" }, 409) : undefined);
+    render(<App />); await map(); const before = calls("/heatmap").length;
+    fireEvent.click(screen.getByRole("button", { name: "提交反馈" }));
+    expect(await screen.findByText(/这条反馈已提交过/)).toBeInTheDocument();
+    expect(calls("/reports")).toHaveLength(1); expect(calls("/heatmap")).toHaveLength(before);
   });
-});
-
-// ─── Commute submission flow ─────────────────────────────
-
-describe("Commute submission flow", () => {
-  beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn());
+  it("prevents simultaneous report writes", async () => {
+    const pending = deferred<Response>(); installBackend((url) => url.includes("/reports") ? pending.promise : undefined);
+    render(<App />); await map(); const button = screen.getByRole("button", { name: "提交反馈" });
+    fireEvent.click(button); fireEvent.click(button); expect(calls("/reports")).toHaveLength(1);
+    await act(async () => pending.resolve(jsonResponse({ status: "created", message: "已保存" }, 201)));
   });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+  it("retains old trend data when refreshing it fails", async () => {
+    let count = 0; installBackend((url) => url.includes("/commutes/trends")
+      ? ++count === 1 ? jsonResponse({ ...emptyTrend, totalCommutes: 2, recommendation: "已有趋势" }) : jsonResponse({}, 500) : undefined);
+    render(<App />); await map(); await screen.findByText(/已有趋势/);
+    fireEvent.click(screen.getByRole("button", { name: "重试或刷新趋势" }));
+    expect(await screen.findByText(/显示上次趋势，刷新失败/)).toBeInTheDocument(); expect(screen.getByText(/已有趋势/)).toBeInTheDocument();
   });
-
-  it("sends valid endStressLevel when completing commute", async () => {
-    const calls = mockFetchForCommute("success");
-    const { default: App } = await import("../App");
-    render(<App />);
-
-    await navigateToMap();
-
-    fireEvent.click(screen.getByRole("button", { name: "50" }));
-    fireEvent.click(screen.getByText("完成本次通勤"));
-
-    await waitFor(() => {
-      const completeCall = calls.find((c) =>
-        c.url.includes("/commutes/complete"),
-      );
-      expect(completeCall).toBeDefined();
-      const body = JSON.parse(completeCall!.init!.body as string);
-      expect([0, 25, 50, 75, 100]).toContain(body.endStressLevel);
-      expect(body.endStressLevel).toBe(50);
-    });
+  it("does not present a failed initial trend query as a successful empty result", async () => {
+    installBackend((url) => url.includes("/commutes/trends") ? jsonResponse({}, 500) : undefined);
+    render(<App />); await map();
+    expect(await screen.findByText(/趋势加载失败/)).toBeInTheDocument();
+    expect(screen.queryByText("暂无通勤记录。")).not.toBeInTheDocument();
+    expect(screen.queryByText("暂无通勤趋势数据")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("trend-panel")).not.toBeInTheDocument();
   });
-
-  it("refreshes trends after successful commute", async () => {
-    const calls = mockFetchForCommute("success");
-    const { default: App } = await import("../App");
-    render(<App />);
-
-    await navigateToMap();
-
-    fireEvent.click(screen.getByRole("button", { name: "50" }));
-    fireEvent.click(screen.getByText("完成本次通勤"));
-
-    await waitFor(() => {
-      const trendsCalls = calls.filter((c) =>
-        c.url.includes("/commutes/trends"),
-      );
-      expect(trendsCalls.length).toBeGreaterThanOrEqual(2);
-    });
+  it("restores only endpoints on refresh and queries routes again", async () => {
+    localStorage.setItem("commute-trip-v1", JSON.stringify({ version: 1, stage: "map", selection: {
+      origin: DEFAULT_ORIGIN.point, destination: WAYPOINTS[2].point, originName: "学生公寓区", destName: "图书馆" }, result: { selectedScore: 100 } }));
+    render(<App />); await screen.findByRole("button", { name: "进入地图" });
+    expect(calls("/routes/compare")).toHaveLength(1); expect(calls("/heatmap")).toHaveLength(0);
   });
-
-  it("shows error message when commute submission fails", async () => {
-    mockFetchForCommute("fail");
-    const { default: App } = await import("../App");
-    render(<App />);
-
-    await navigateToMap();
-
-    fireEvent.click(screen.getByRole("button", { name: "50" }));
-    fireEvent.click(screen.getByText("完成本次通勤"));
-
-    await waitFor(() => {
-      const alert = screen.queryByRole("alert");
-      expect(alert).not.toBeNull();
-      expect(alert!.textContent).toMatch(/endStressLevel|通勤失败/);
-    });
-  });
-
-  it("selecting least-stressful route sends correct routeId and alternative fallback", async () => {
-    const calls = mockFetchForCommute("success");
-    const { default: App } = await import("../App");
-    render(<App />);
-
-    await navigateToMap();
-
-    fireEvent.click(screen.getByRole("button", { name: "75" }));
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /选择 路线 B/ }));
-    });
-
-    await waitFor(() => {
-      const btn = screen.getByRole("button", { name: "完成本次通勤" });
-      expect(btn).not.toBeDisabled();
-    });
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "完成本次通勤" }));
-    });
-
-    await waitFor(() => {
-      const completeCall = calls.find((c) =>
-        c.url.includes("/commutes/complete"),
-      );
-      expect(completeCall).toBeDefined();
-      const body = JSON.parse(completeCall!.init!.body as string);
-      expect(body.routeId).toBe("r2");
-      expect(body.alternativeLabel).toBe("路线 A（东侧步道）");
-    });
-  });
-
-  it("shows warning but not error when POST succeeds and trend refresh fails", async () => {
-    mockFetchForCommute("success-trend-fail");
-    const { default: App } = await import("../App");
-    render(<App />);
-
-    await navigateToMap();
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "50" }));
-    });
-
-    await waitFor(() => {
-      const btn = screen.getByRole("button", { name: "完成本次通勤" });
-      expect(btn).not.toBeDisabled();
-    });
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "完成本次通勤" }));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText(/趋势数据刷新失败/)).toBeInTheDocument();
-      expect(screen.queryByRole("alert")).toBeNull();
-    });
+  it("uses a history entry only to requery its endpoints", async () => {
+    installBackend((url) => url.includes("/routes/history") ? jsonResponse([{ id: "h", origin: DEFAULT_ORIGIN.point,
+      destination: WAYPOINTS[2].point, createdAt: "2026-10-18T00:00:00Z", result: { routes: [{ label: "不可复用的旧评分" }] } }]) : undefined);
+    render(<App />); await map(); const recent = screen.getByRole("region", { name: "最近查询" });
+    fireEvent.click(await within(recent).findByRole("button", { name: "重新规划" }));
+    await screen.findByRole("button", { name: "进入地图" });
+    expect(JSON.parse(calls("/routes/compare").at(-1)![1].body).destination).toEqual(WAYPOINTS[2].point);
+    expect(screen.queryByText("不可复用的旧评分")).not.toBeInTheDocument();
   });
 });

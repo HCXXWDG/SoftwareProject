@@ -4,6 +4,8 @@ import type { GeoPoint } from "../types";
 import "./WelcomePage.css";
 
 interface WelcomePageProps {
+  initialOriginId?: string;
+  initialDestinationId?: string;
   onNavigateToPreview: (
     origin: GeoPoint,
     destination: GeoPoint,
@@ -12,9 +14,9 @@ interface WelcomePageProps {
   ) => void;
 }
 
-export function WelcomePage({ onNavigateToPreview }: WelcomePageProps) {
-  const [originId, setOriginId] = useState<string | null>("dorm");
-  const [destId, setDestId] = useState<string | null>("teaching");
+export function WelcomePage({ onNavigateToPreview, initialOriginId = "dorm", initialDestinationId = "teaching" }: WelcomePageProps) {
+  const [originId, setOriginId] = useState(initialOriginId);
+  const [destId, setDestId] = useState(initialDestinationId);
 
   const origin = WAYPOINTS.find((w) => w.id === originId);
   const destination = WAYPOINTS.find((w) => w.id === destId);
@@ -29,6 +31,7 @@ export function WelcomePage({ onNavigateToPreview }: WelcomePageProps) {
     <button
       key={w.id}
       className={`welcome-page__point ${selected ? "welcome-page__point--selected" : ""}`}
+      aria-pressed={selected}
       onClick={() => onSelect(w.id)}
       type="button"
     >
@@ -46,14 +49,14 @@ export function WelcomePage({ onNavigateToPreview }: WelcomePageProps) {
 
         <div className="welcome-page__section">
           <p className="welcome-page__label">选择起点</p>
-          <div className="welcome-page__grid">
+          <div className="welcome-page__grid" role="group" aria-label="选择起点">
             {WAYPOINTS.map((w) => renderPoint(w, w.id === originId, (id) => setOriginId(id)))}
           </div>
         </div>
 
         <div className="welcome-page__section">
           <p className="welcome-page__label">选择终点</p>
-          <div className="welcome-page__grid">
+          <div className="welcome-page__grid" role="group" aria-label="选择终点">
             {WAYPOINTS.map((w) => renderPoint(w, w.id === destId, (id) => setDestId(id)))}
           </div>
         </div>

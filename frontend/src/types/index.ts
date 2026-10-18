@@ -38,7 +38,17 @@ export interface RouteComparison {
   leastStressfulRouteId: string;
   recommendation: string;
   recommendAlternative: boolean;
+  /** 待 B/D 契约确认；旧接口缺少时保持未知。 */
+  routeSource?: "REAL" | "DEMO" | "UNAVAILABLE";
+  feedbackSource?: "REAL" | "DEMO" | "NONE";
+  scoringStatus?: "VALID" | "INSUFFICIENT_DATA" | "UNAVAILABLE";
+  comparisonId?: string;
+  recommendationReason?: string;
 }
+
+export type BackendStatus = "unknown" | "available" | "unavailable";
+export type BaseMapMode = "loading" | "amap" | "offline";
+export interface TripEndpoints { originId: string; destinationId: string; }
 
 /** 通勤记录 */
 export interface CommuteRecord {

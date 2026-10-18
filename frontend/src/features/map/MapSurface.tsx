@@ -34,12 +34,15 @@ export interface MapSurfaceProps {
   routes: ScoredRoute[];
   selectedRouteId?: string;
   loading: boolean;
-  onFeedbackSubmit: (draft: MapFeedbackDraft) => Promise<void>;
+  onFeedbackSubmit: (draft: MapFeedbackDraft) => Promise<void | { status: "created" | "duplicate" }>;
   onRouteSelect: (routeId: string) => void;
   onViewportChange: (bbox: string, zoom: number) => void;
   origin?: GeoPoint;
   destination?: GeoPoint;
   viewportConstraint?: MapViewportConstraint;
+  /** A 统一派生操作能力；不以底图模式推断后端状态。 */
+  feedbackEnabled?: boolean;
+  onModeChange?: (mode: MapMode) => void;
 }
 
 type MapMode = "loading" | "amap" | "offline";
@@ -58,6 +61,8 @@ export function MapSurface({
   origin,
   destination,
   viewportConstraint,
+  feedbackEnabled = true,
+  onModeChange,
 }: MapSurfaceProps) {
   const mapHostRef = useRef<HTMLDivElement>(null);
   const adapterRef = useRef<MapAdapter | null>(null);
@@ -66,6 +71,7 @@ export function MapSurface({
   feedbackSubmitRef.current = onFeedbackSubmit;
 
   const [mode, setMode] = useState<MapMode>("loading");
+  useEffect(() => { onModeChange?.(mode); }, [mode, onModeChange]);
   const [projector, setProjector] = useState<
     (point: GeoPoint) => ProjectedPoint
   >(() => unavailableProjector);
@@ -79,6 +85,7 @@ export function MapSurface({
     useState<LongPressPosition | null>(null);
   const [feedbackGeoPoint, setFeedbackGeoPoint] = useState<GeoPoint | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
 
   // Emoji fountain state
   const [fountainPosition, setFountainPosition] =
@@ -165,6 +172,7 @@ export function MapSurface({
   // 校园外长按不弹出反馈面板
   const handleLongPress = useCallback(
     (position: LongPressPosition) => {
+      if (!feedbackEnabled) return;
       const container = mapHostRef.current;
       if (!container) {
         return;
@@ -182,9 +190,10 @@ export function MapSurface({
       }
 
       setFeedbackGeoPoint(geoPoint);
+      setFeedbackError(null);
       setFeedbackPosition(relativePoint);
     },
-    [unprojector, viewportConstraint],
+    [unprojector, viewportConstraint, feedbackEnabled],
   );
 
   const {
@@ -197,12 +206,13 @@ export function MapSurface({
 
   const handleFeedbackSubmit = useCallback(
     async (stressLevel: number, tag: EmotionTag) => {
-      if (!feedbackGeoPoint || !feedbackPosition) {
+      if (!feedbackGeoPoint || !feedbackPosition || !feedbackEnabled) {
         return;
       }
       setSubmitting(true);
+      setFeedbackError(null);
       try {
-        await feedbackSubmitRef.current({
+        const result = await feedbackSubmitRef.current({
           location: feedbackGeoPoint,
           stressLevel: stressLevel as MapFeedbackDraft["stressLevel"],
           tag,
@@ -215,22 +225,27 @@ export function MapSurface({
           75: "😟",
           100: "😫",
         };
-        setFountainPosition(feedbackPosition);
-        setFountainEmoji(emojiMap[stressLevel] ?? "✨");
-      } finally {
-        setSubmitting(false);
+        if (result?.status !== "duplicate") {
+          setFountainPosition(feedbackPosition);
+          setFountainEmoji(emojiMap[stressLevel] ?? "✨");
+        }
         setFeedbackPosition(null);
         setFeedbackGeoPoint(null);
         clearLongPress();
+      } catch (error) {
+        setFeedbackError(error instanceof Error ? error.message : "反馈提交失败，请稍后重试。");
+      } finally {
+        setSubmitting(false);
       }
     },
-    [feedbackGeoPoint, feedbackPosition, clearLongPress],
+    [feedbackGeoPoint, feedbackPosition, clearLongPress, feedbackEnabled],
   );
 
   const handleFeedbackCancel = useCallback(() => {
     setFeedbackPosition(null);
     setFeedbackGeoPoint(null);
     setSubmitting(false);
+    setFeedbackError(null);
     clearLongPress();
   }, [clearLongPress]);
 
@@ -294,10 +309,12 @@ export function MapSurface({
         <FeedbackPanel
           position={feedbackPosition}
           submitting={submitting}
+          submissionEnabled={feedbackEnabled}
           onCancel={handleFeedbackCancel}
           onSubmit={handleFeedbackSubmit}
         />
       )}
+      {feedbackPosition && feedbackError && <p className="map-surface__feedback-error" role="alert">{feedbackError}</p>}
 
       {fountainPosition && fountainEmoji && (
         <EmojiFountain

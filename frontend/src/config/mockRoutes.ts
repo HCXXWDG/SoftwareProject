@@ -1,5 +1,5 @@
 import { DEFAULT_ORIGIN, DEFAULT_DESTINATION } from "./campus";
-import type { RouteComparison } from "../types";
+import type { GeoPoint, RouteComparison } from "../types";
 
 /**
  * 后端不可用时的 Mock 路线对比数据。
@@ -9,6 +9,7 @@ import type { RouteComparison } from "../types";
  * 避免伪造后端评分。
  */
 export const MOCK_ROUTE_COMPARISON: RouteComparison = {
+  routeSource: "DEMO", feedbackSource: "NONE", scoringStatus: "UNAVAILABLE",
   routes: [
     {
       id: "mock-via-east",
@@ -36,7 +37,7 @@ export const MOCK_ROUTE_COMPARISON: RouteComparison = {
       stressScore: 0,
       confidence: 0,
       fastest: false,
-      leastStressful: true,
+      leastStressful: false,
       polyline: [
         DEFAULT_ORIGIN.point,
         { longitude: 120.2732, latitude: 31.477 },
@@ -50,3 +51,9 @@ export const MOCK_ROUTE_COMPARISON: RouteComparison = {
   recommendation: "后端暂不可用，仅显示路线走向",
   recommendAlternative: false,
 };
+
+/** 仅提供明确配置的端点组合，不能将默认折线套用到其他位置。 */
+export function findDemoRoutes(origin: GeoPoint, destination: GeoPoint): RouteComparison | null {
+  const same = (a: GeoPoint, b: GeoPoint) => Math.abs(a.longitude - b.longitude) < 0.000001 && Math.abs(a.latitude - b.latitude) < 0.000001;
+  return same(origin, DEFAULT_ORIGIN.point) && same(destination, DEFAULT_DESTINATION.point) ? MOCK_ROUTE_COMPARISON : null;
+}

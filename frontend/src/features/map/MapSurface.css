@@ -550,3 +550,4 @@
   font-weight: 700;
   color: #183848;
 }
+.map-surface__feedback-error { position: absolute; left: 12px; right: 12px; bottom: 42px; z-index: 40; padding: 10px; border-radius: 8px; background: #fff3f3; color: #991b1b; }

@@ -15,7 +15,7 @@ export default defineConfig({
     : "list",
   use: {
     baseURL: "http://localhost:5173",
-    channel: "chromium",
+    channel: process.env.PLAYWRIGHT_CHANNEL ?? "chromium",
     headless: true,
     screenshot: "only-on-failure",
     trace: "on-first-retry",
