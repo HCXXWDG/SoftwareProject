@@ -14,14 +14,14 @@ git switch develop
 
 ## 认领任务
 
-先查看仓库 Issues 和 [任务分工书](docs/project/task-assignment.md)，按能力确定 A、B、C、D 角色，再由负责人把账号分配到对应任务。三人合并方案和验收标准见分工书；[工作量量化表](docs/project/workload.md)给出各任务估算。
+先查看 [任务分工书](docs/project/task-assignment.md)，按能力确定 A、B、C、D 角色，再由负责人把账号分配到对应任务。三人合并方案和验收标准见分工书；[工作量量化表](docs/project/workload.md)给出各任务估算。
 
 Issue 标注负责人、前置依赖和验收结果。未解决依赖时可以依照契约样例开发，最终必须完成真实接口联调。
 
 ## 分支与提交
 
 - `main` 保存稳定版本。
-- `develop` 为默认分支，负责日常集成。
+- `develop` 负责日常集成；GitHub 默认分支目前尚未修改。
 - 任务分支使用 `codex/a-任务名`、`codex/b-任务名` 等形式，从最新 `develop` 创建。
 - 功能 PR 合并到 `develop`；稳定后通过发布 PR 从 `develop` 合并到 `main`。
 

@@ -1,12 +1,12 @@
 # 心途校园通勤情绪地图
-团队协作仓库：[xlm-xlm/xintu-campus-commute](https://github.com/xlm-xlm/xintu-campus-commute)。默认分支为 `develop`，稳定版本保存在 `main`。
+团队协作仓库：[xlm-xlm/xintu-campus-commute](https://github.com/xlm-xlm/xintu-campus-commute)。日常协作使用 `develop`，稳定版本使用 `main`；GitHub 默认分支目前尚未调整。
 
 - [贡献与协作指南](CONTRIBUTING.md)
 - [代码与功能优化启动书](docs/project/project-charter.md)
 - [三至四人任务分工](docs/project/task-assignment.md)
 - [成员工作量量化](docs/project/workload.md)
 - [初始检查结果与已知问题](docs/project/initial-baseline.md)
-- [开发任务 Issues](https://github.com/xlm-xlm/xintu-campus-commute/issues)
+- [开发任务入口](https://github.com/xlm-xlm/xintu-campus-commute/issues)（22 项任务尚未导入，先按任务分工书认领）
 
 一个把“通勤是否心累”加入路线决策的课程软件工程项目。系统聚合用户对噪音、拥挤、暴晒和异味的反馈，生成情绪热力图，并对高德候选路线重新计算“心累指数”。
 
