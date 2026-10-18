@@ -3,10 +3,15 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  base: "./",
   plugins: [
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      injectRegister: "auto",
+      devOptions: {
+        enabled: false,
+      },
       manifest: {
         name: "校园通勤情绪地图",
         short_name: "通勤地图",
@@ -41,6 +46,10 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // Capacitor WebView 下 service worker 兼容性优化
+        // 使用 skipWaiting + clientsClaim 确保新 SW 立即激活
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
           {
             urlPattern: /^https?:\/\/.*\/api\/.*/i,

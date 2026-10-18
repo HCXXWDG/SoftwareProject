@@ -1,3 +1,5 @@
-# Replace or extend with accepted collaborators after roles are assigned.
-# The repository owner is the temporary fallback for all directories.
-* @xlm-xlm
+/frontend/ @member-a @member-c
+/backend/ @member-b @member-c
+/docs/ @member-a @member-b @member-c
+/infra/ @member-b
+

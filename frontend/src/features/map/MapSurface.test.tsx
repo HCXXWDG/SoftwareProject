@@ -33,8 +33,8 @@ const campusViewportConstraint = {
   defaultZoom: 16,
 };
 
-const campusOrigin = { longitude: 120.2735103, latitude: 31.4753281 };
-const campusDestination = { longitude: 120.2743195, latitude: 31.4832753 };
+const campusOrigin = DEFAULT_ORIGIN.point;
+const campusDestination = DEFAULT_DESTINATION.point;
 
 const defaultProps: Omit<MapSurfaceProps, "heatmapCells" | "loading"> = {
   routes: [],

@@ -1,12 +1,12 @@
 # 团队协作指南
 
-项目仓库：https://github.com/xlm-xlm/xintu-campus-commute
+项目仓库：https://github.com/HCXXWDG/SoftwareProject
 
 ## 获取项目
 
 ```powershell
-git clone https://github.com/xlm-xlm/xintu-campus-commute.git
-cd xintu-campus-commute
+git clone https://github.com/HCXXWDG/SoftwareProject.git
+cd SoftwareProject
 git switch develop
 ```
 
@@ -21,7 +21,7 @@ Issue 标注负责人、前置依赖和验收结果。未解决依赖时可以�
 ## 分支与提交
 
 - `main` 保存稳定版本。
-- `develop` 负责日常集成；GitHub 默认分支目前尚未修改。
+- `develop` 负责日常集成；GitHub 默认分支为 `main`。
 - 任务分支使用 `codex/a-任务名`、`codex/b-任务名` 等形式，从最新 `develop` 创建。
 - 功能 PR 合并到 `develop`；稳定后通过发布 PR 从 `develop` 合并到 `main`。
 
@@ -47,6 +47,6 @@ Android 构建保留为补充检查，不作为网页和后端任务的默认合
 
 ## GitHub 权限和规则
 
-仓库初始为私有，协作者接受邀请后方可克隆和推送。仓库拥有者先作为 CODEOWNERS 的临时负责人，角色确定后更新真实成员账号。
+本次同步继续使用原仓库 `HCXXWDG/SoftwareProject`，保留既有 CODEOWNERS 和成员管理安排；推送和合并以账号实际权限及仓库规则为准。
 
-分支保护是否可强制执行取决于 GitHub 账户对私有仓库的支持；实际配置记录见 [CI 与分支保护说明](docs/测试/CI与分支保护说明.md)。GitHub 不支持时，团队仍按 PR、另一成员复核和四项核心 CI 通过的流程执行，不将约定写成已生效的强制保护。
+2026 年 10 月 18 日，GitHub 显示 `main` 和 `develop` 均受保护。当前账号具有 WRITE 权限，保护详情 API 不可读，未重新确认每项保护规则。既有规则与本次核实范围见 [CI 与分支保护说明](docs/测试/CI与分支保护说明.md)。继续遵守 PR、另一成员复核和四项核心 CI 检查的协作流程。

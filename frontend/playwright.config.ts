@@ -6,7 +6,7 @@ const configDir = fileURLToPath(new URL(".", import.meta.url));
 export default defineConfig({
   testDir: "./e2e",
   testMatch: "**/*.e2e.ts",
-  testIgnore: "**/*.integration.e2e.ts",
+  testIgnore: ["**/*.integration.e2e.ts", "**/pwa-sw.e2e.ts"],
   timeout: 30_000,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,

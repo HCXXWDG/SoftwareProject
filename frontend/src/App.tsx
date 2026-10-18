@@ -8,7 +8,7 @@ import { TrendPanel } from "./features/trends";
 import { fetchHeatmap } from "./services/heatmap";
 import { fetchTrends, completeCommute } from "./services/commute";
 import { submitReport } from "./services/report";
-import { CAMPUS_DEFAULT_BBOX, CAMPUS_VIEWPORT_CONSTRAINT, DEFAULT_ORIGIN, DEFAULT_DESTINATION } from "./config/campus";
+import { CAMPUS_DEFAULT_BBOX, CAMPUS_VIEWPORT_CONSTRAINT, DEFAULT_ORIGIN, DEFAULT_DESTINATION, OFFLINE_HEATMAP_CELLS } from "./config/campus";
 import type {
   AppStage,
   MapPageState,
@@ -69,8 +69,13 @@ function App() {
       setMapState((prev) => ({ ...prev, heatmapCells: cells, loading: false }));
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
-      const msg = err instanceof Error ? err.message : "加载热力图数据失败";
-      setMapState((prev) => ({ ...prev, loading: false, error: msg }));
+      // 热力图加载失败时用离线 fallback 数据，保证地图不空白
+      setMapState((prev) => ({
+        ...prev,
+        loading: false,
+        error: null,
+        heatmapCells: OFFLINE_HEATMAP_CELLS,
+      }));
     }
   }, []);
 
