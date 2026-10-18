@@ -59,8 +59,8 @@ async function readyMap(props: MapSurfaceProps) {
   return result;
 }
 
-async function longPress() {
-  const event = new MouseEvent("pointerdown", { bubbles: true, clientX: 480, clientY: 300 });
+async function longPress(clientX = 480, clientY = 300) {
+  const event = new MouseEvent("pointerdown", { bubbles: true, clientX, clientY });
   Object.defineProperty(event, "pointerId", { value: 1 });
   fireEvent(screen.getByLabelText("校园通勤情绪地图"), event);
   await act(async () => { await vi.advanceTimersByTimeAsync(650); });
@@ -91,6 +91,25 @@ afterEach(() => {
 });
 
 describe("MapSurface feedback submission boundary", () => {
+  it("keeps an open draft anchored while submitting and after a failed submission", async () => {
+    let rejectSubmission!: (error: Error) => void;
+    const onFeedbackSubmit = vi.fn<MapSurfaceProps["onFeedbackSubmit"]>()
+      .mockImplementationOnce(() => new Promise((_, reject) => { rejectSubmission = reject; }))
+      .mockResolvedValueOnce({ status: "created" });
+    await readyMap(makeProps({ onFeedbackSubmit }));
+    await longPress();
+    selectDraft();
+    await submit();
+    await longPress(680, 400);
+    expect(screen.getByTestId("feedback-panel")).toHaveStyle({ left: "380px", top: "250px" });
+
+    await act(async () => { rejectSubmission(new Error("请重试。")); });
+    await longPress(680, 400);
+    expect(screen.getByTestId("feedback-panel")).toHaveStyle({ left: "380px", top: "250px" });
+    await submit();
+    expect(onFeedbackSubmit.mock.calls[1][0]).toEqual(onFeedbackSubmit.mock.calls[0][0]);
+  });
+
   it("retains the selected draft and location on failure and allows retry", async () => {
     const onFeedbackSubmit = vi.fn<MapSurfaceProps["onFeedbackSubmit"]>()
       .mockRejectedValueOnce(new Error("反馈服务暂不可用，请重试。"))

@@ -73,6 +73,35 @@ test("A history only restores endpoints and requeries current routes", async ({ 
   await expect(page.getByText("过期评分不能使用")).toHaveCount(0);
 });
 
+test("A non-preset history endpoints survive editing and a second comparison unchanged", async ({ page }) => {
+  const origin = { longitude: 120.2735105, latitude: 31.4753285 };
+  const destination = { longitude: 120.2744, latitude: 31.4832 };
+  await backend(page);
+  await page.route("**/api/v1/routes/history*", (route) => route.fulfill({ json: [{
+    id: "history-custom-endpoints", origin, destination, createdAt: "2026-10-18T00:00:00Z",
+  }] }));
+  await page.goto("/"); await enterMap(page);
+
+  const firstRequest = page.waitForRequest("**/api/v1/routes/compare");
+  await page.getByRole("region", { name: "最近查询" }).getByRole("button", { name: "重新规划", exact: true }).click();
+  const firstEndpoints = (await firstRequest).postDataJSON();
+  expect(firstEndpoints.origin).toEqual(origin);
+  expect(firstEndpoints.destination).toEqual(destination);
+  await expect(page.getByRole("heading", { name: "路线预览" })).toBeVisible();
+  await expect(page.getByText("历史起点 → 历史终点", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "进入地图", exact: true }).click();
+  await page.getByRole("button", { name: "修改起终点" }).click();
+  await expect(page.getByRole("group", { name: "选择起点" }).getByRole("button", { name: "历史起点", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("group", { name: "选择终点" }).getByRole("button", { name: "历史终点", exact: true })).toHaveAttribute("aria-pressed", "true");
+
+  const secondRequest = page.waitForRequest("**/api/v1/routes/compare");
+  await page.getByRole("button", { name: "查看路线", exact: true }).click();
+  const secondEndpoints = (await secondRequest).postDataJSON();
+  expect(secondEndpoints.origin).toEqual(firstEndpoints.origin);
+  expect(secondEndpoints.destination).toEqual(firstEndpoints.destination);
+  await expect(page.getByRole("heading", { name: "路线预览" })).toBeVisible();
+});
+
 for (const width of [390, 320]) {
   test(`A navigation remains reachable at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 }); await backend(page); await page.goto("/");

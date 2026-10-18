@@ -17,7 +17,7 @@ import type { BackendStatus, BaseMapMode, GeoPoint, MapFeedbackDraft, RouteCompa
 import "./App.css";
 
 function findWaypoint(point: GeoPoint) {
-  return WAYPOINTS.find((w) => Math.abs(w.point.longitude - point.longitude) < 0.000001 && Math.abs(w.point.latitude - point.latitude) < 0.000001);
+  return WAYPOINTS.find((w) => w.point.longitude === point.longitude && w.point.latitude === point.latitude);
 }
 
 export default function App() {
@@ -87,9 +87,11 @@ export default function App() {
   }, [capabilities.canReport, heatmap.refresh]);
 
   if (stage === "welcome") return <>
-    <WelcomePage key={`${selection.origin.longitude}:${selection.destination.longitude}`}
+    <WelcomePage key={JSON.stringify(selection)}
       initialOriginId={findWaypoint(selection.origin)?.id ?? DEFAULT_ORIGIN.id}
       initialDestinationId={findWaypoint(selection.destination)?.id ?? DEFAULT_DESTINATION.id}
+      initialOrigin={findWaypoint(selection.origin) ?? { id: "history-origin", name: selection.originName, point: selection.origin }}
+      initialDestination={findWaypoint(selection.destination) ?? { id: "history-destination", name: selection.destName, point: selection.destination }}
       onNavigateToPreview={startPreview} />
   </>;
   if (stage === "route-preview" || !comparison) return <RoutePreviewPage

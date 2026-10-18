@@ -27,4 +27,18 @@ describe("WelcomePage", () => {
     expect(within(screen.getByRole("group", { name: "选择起点" })).getByRole("button", { name: "图书馆" })).toHaveAttribute("aria-pressed", "true");
     expect(fetch).not.toHaveBeenCalled(); fetch.mockRestore();
   });
+  it("preserves non-preset history endpoints without silently replacing them", () => {
+    const navigate = vi.fn();
+    const origin = { id: "history-origin", name: "历史起点", point: { longitude: 120.2736, latitude: 31.4754 } };
+    const destination = { id: "history-destination", name: "历史终点", point: { longitude: 120.2746, latitude: 31.4834 } };
+    render(<WelcomePage initialOrigin={origin} initialDestination={destination} onNavigateToPreview={navigate} />);
+    fireEvent.click(screen.getByRole("button", { name: "查看路线" }));
+    expect(navigate).toHaveBeenCalledWith(origin.point, destination.point, origin.name, destination.name);
+  });
+  it("rejects identical coordinates even when history endpoint identifiers differ", () => {
+    const point = { longitude: 120.2736, latitude: 31.4754 };
+    render(<WelcomePage initialOrigin={{ id: "history-origin", name: "历史起点", point }}
+      initialDestination={{ id: "history-destination", name: "历史终点", point }} onNavigateToPreview={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "查看路线" })).toBeDisabled();
+  });
 });

@@ -172,7 +172,7 @@ export function MapSurface({
   // 校园外长按不弹出反馈面板
   const handleLongPress = useCallback(
     (position: LongPressPosition) => {
-      if (!feedbackEnabled) return;
+      if (!feedbackEnabled || submitting || feedbackPosition) return;
       const container = mapHostRef.current;
       if (!container) {
         return;
@@ -193,7 +193,7 @@ export function MapSurface({
       setFeedbackError(null);
       setFeedbackPosition(relativePoint);
     },
-    [unprojector, viewportConstraint, feedbackEnabled],
+    [unprojector, viewportConstraint, feedbackEnabled, submitting, feedbackPosition],
   );
 
   const {
