@@ -5,7 +5,10 @@ import com.example.commutemood.domain.EmotionTag;
 import com.example.commutemood.domain.GeoBounds;
 import com.example.commutemood.domain.GeoPoint;
 import com.example.commutemood.repository.EmotionReportRepository;
+import com.example.commutemood.repository.ReportScope;
 import com.example.commutemood.repository.SaveOutcome;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -18,6 +21,18 @@ import java.util.List;
 @Repository
 @Profile("postgres")
 public class JdbcEmotionReportRepository implements EmotionReportRepository {
+    private static final Logger log = LoggerFactory.getLogger(JdbcEmotionReportRepository.class);
+
+    /** 范围查询主体，来源口径由 {@link #scopeClause(ReportScope)} 追加。 */
+    private static final String SELECT_WITHIN_SQL = """
+            SELECT id, device_hash, stress_level, tag,
+                   ST_X(location) AS longitude, ST_Y(location) AS latitude,
+                   reported_at, simulated
+            FROM emotion_report
+            WHERE reported_at >= ?
+              AND location && ST_MakeEnvelope(?, ?, ?, ?, 4326)
+            """;
+
     private final JdbcTemplate jdbcTemplate;
 
     public JdbcEmotionReportRepository(JdbcTemplate jdbcTemplate) {
@@ -63,24 +78,49 @@ public class JdbcEmotionReportRepository implements EmotionReportRepository {
     }
 
     @Override
-    public List<EmotionReport> findWithin(GeoBounds bounds, Instant since) {
-        return jdbcTemplate.query("""
-                        SELECT id, device_hash, stress_level, tag,
-                               ST_X(location) AS longitude, ST_Y(location) AS latitude,
-                               reported_at, simulated
-                        FROM emotion_report
-                        WHERE reported_at >= ?
-                          AND location && ST_MakeEnvelope(?, ?, ?, ?, 4326)
-                        """,
+    public List<EmotionReport> findWithin(GeoBounds bounds, Instant since, ReportScope scope) {
+        ReportScope effectiveScope = scope == null ? ReportScope.ALL : scope;
+        return jdbcTemplate.query(
+                SELECT_WITHIN_SQL + scopeClause(effectiveScope),
                 (rs, rowNum) -> new EmotionReport(
                         rs.getObject("id", java.util.UUID.class),
                         rs.getString("device_hash"),
                         new GeoPoint(rs.getDouble("longitude"), rs.getDouble("latitude")),
                         rs.getInt("stress_level"),
-                        EmotionTag.valueOf(rs.getString("tag")),
+                        parseTag(rs.getString("tag")),
                         rs.getTimestamp("reported_at").toInstant(),
                         rs.getBoolean("simulated")),
                 Timestamp.from(since), bounds.west(), bounds.south(), bounds.east(), bounds.north());
+    }
+
+    /**
+     * 把来源口径翻译成 SQL 片段。
+     *
+     * <p>用固定字面量拼接而不是绑定参数，是为了让 PostgreSQL 能命中
+     * {@code idx_emotion_report_real_*} 这类带 {@code WHERE simulated = FALSE} 的部分索引。</p>
+     */
+    private static String scopeClause(ReportScope scope) {
+        return switch (scope) {
+            case REAL_ONLY -> "  AND simulated = FALSE";
+            case SIMULATED_ONLY -> "  AND simulated = TRUE";
+            case ALL -> "";
+        };
+    }
+
+    /**
+     * 读取标签列，遇到当前枚举不认识的旧值时回退为 {@link EmotionTag#OTHER}，
+     * 保证历史数据不会让查询整体失败。
+     */
+    private static EmotionTag parseTag(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return EmotionTag.OTHER;
+        }
+        try {
+            return EmotionTag.valueOf(raw);
+        } catch (IllegalArgumentException ex) {
+            log.warn("Unknown emotion_report tag '{}' in database, falling back to OTHER", raw);
+            return EmotionTag.OTHER;
+        }
     }
 }
 

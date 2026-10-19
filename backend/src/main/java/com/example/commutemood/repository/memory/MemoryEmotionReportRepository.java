@@ -3,6 +3,7 @@ package com.example.commutemood.repository.memory;
 import com.example.commutemood.domain.EmotionReport;
 import com.example.commutemood.domain.GeoBounds;
 import com.example.commutemood.repository.EmotionReportRepository;
+import com.example.commutemood.repository.ReportScope;
 import com.example.commutemood.repository.SaveOutcome;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
@@ -32,13 +33,15 @@ public class MemoryEmotionReportRepository implements EmotionReportRepository {
     }
 
     @Override
-    public List<EmotionReport> findWithin(GeoBounds bounds, Instant since) {
+    public List<EmotionReport> findWithin(GeoBounds bounds, Instant since, ReportScope scope) {
+        ReportScope effectiveScope = scope == null ? ReportScope.ALL : scope;
         return reports.stream()
                 .filter(report -> !report.reportedAt().isBefore(since))
                 .filter(report -> report.location().longitude() >= bounds.west())
                 .filter(report -> report.location().longitude() <= bounds.east())
                 .filter(report -> report.location().latitude() >= bounds.south())
                 .filter(report -> report.location().latitude() <= bounds.north())
+                .filter(report -> effectiveScope.matches(report.simulated()))
                 .toList();
     }
 }

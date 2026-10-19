@@ -3,9 +3,14 @@ package com.example.commutemood.api;
 import com.example.commutemood.CommuteMoodApplication;
 import com.example.commutemood.application.DeviceIdentityService;
 import com.example.commutemood.config.DemoGeography;
+import com.example.commutemood.domain.EmotionReport;
+import com.example.commutemood.domain.EmotionTag;
+import com.example.commutemood.domain.GeoBounds;
 import com.example.commutemood.domain.GeoPoint;
 import com.example.commutemood.domain.RouteComparison;
 import com.example.commutemood.domain.ScoredRoute;
+import com.example.commutemood.repository.EmotionReportRepository;
+import com.example.commutemood.repository.ReportScope;
 import com.example.commutemood.repository.RouteQueryRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,10 +18,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -32,6 +39,9 @@ class ApiSmokeTest {
 
     @Autowired
     private RouteQueryRepository routeQueryRepository;
+
+    @Autowired
+    private EmotionReportRepository emotionReportRepository;
 
     @Autowired
     private DeviceIdentityService identityService;
@@ -63,6 +73,68 @@ class ApiSmokeTest {
                                 Instant.now())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("created"));
+    }
+
+    @Test
+    void acceptsNewPositiveTagAndKeepsItSeparateFromSimulatedSeed() throws Exception {
+        mockMvc.perform(post("/api/v1/reports")
+                        .header("X-Device-Id", "api-smoke-positive-tag-device")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "location":{"longitude":%.4f,"latitude":%.4f},
+                                  "stressLevel":25,
+                                  "tag":"SHADE",
+                                  "reportedAt":"%s"
+                                }
+                                """.formatted(
+                                DemoGeography.REPORT_LONGITUDE,
+                                DemoGeography.REPORT_LATITUDE,
+                                Instant.now())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("created"));
+
+        GeoBounds aroundReport = new GeoBounds(
+                DemoGeography.REPORT_LONGITUDE - 0.01,
+                DemoGeography.REPORT_LATITUDE - 0.01,
+                DemoGeography.REPORT_LONGITUDE + 0.01,
+                DemoGeography.REPORT_LATITUDE + 0.01);
+        Instant since = Instant.now().minus(Duration.ofHours(1));
+
+        // 真实口径：能读到刚提交的树荫反馈，且不含任何演示种子
+        List<EmotionReport> realOnly =
+                emotionReportRepository.findWithin(aroundReport, since, ReportScope.REAL_ONLY);
+        assertThat(realOnly)
+                .isNotEmpty()
+                .allSatisfy(report -> assertThat(report.simulated()).isFalse())
+                .anySatisfy(report -> {
+                    assertThat(report.tag()).isEqualTo(EmotionTag.SHADE);
+                    assertThat(report.deviceHash()).isEqualTo(identityService.hash("api-smoke-positive-tag-device"));
+                });
+
+        // 演示口径：只会拿到种子数据，不会把真实反馈算进演示统计
+        String realDeviceHash = identityService.hash("api-smoke-positive-tag-device");
+        assertThat(emotionReportRepository.findWithin(aroundReport, since, ReportScope.SIMULATED_ONLY))
+                .allSatisfy(report -> assertThat(report.simulated()).isTrue())
+                .noneSatisfy(report -> assertThat(report.deviceHash()).isEqualTo(realDeviceHash));
+    }
+
+    @Test
+    void rejectsUnknownEmotionTag() throws Exception {
+        mockMvc.perform(post("/api/v1/reports")
+                        .header("X-Device-Id", "api-smoke-unknown-tag-device")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "location":{"longitude":%.4f,"latitude":%.4f},
+                                  "stressLevel":50,
+                                  "tag":"NOT_A_TAG"
+                                }
+                                """.formatted(
+                                DemoGeography.REPORT_LONGITUDE,
+                                DemoGeography.REPORT_LATITUDE)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_request"));
     }
 
     @Test
