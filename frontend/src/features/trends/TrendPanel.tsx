@@ -28,6 +28,10 @@ interface TrendPanelProps {
   onStressLevelChange?: (level: number) => void;
   /** 通勤已记录但趋势刷新失败时的警告信息 */
   trendRefreshWarning?: string | null;
+  /** 刷新趋势数据回调 */
+  onRefresh?: () => void;
+  /** 是否正在加载趋势数据 */
+  loading?: boolean;
 }
 
 function stressColor(stress: number | null): string {
@@ -35,6 +39,143 @@ function stressColor(stress: number | null): string {
   if (stress <= 30) return "#22c55e";
   if (stress <= 60) return "#f59e0b";
   return "#ef4444";
+}
+
+/** Render a simple SVG line chart for trend data */
+function TrendChart({ points }: { points: TrendResult["points"] }) {
+  if (!points || points.length === 0) {
+    return null;
+  }
+
+  const width = 400;
+  const height = 120;
+  const padding = { top: 10, right: 10, bottom: 20, left: 30 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  // Filter out points with null averageStress
+  const validPoints = points.filter((p) => p.averageStress != null);
+  if (validPoints.length === 0) {
+    return null;
+  }
+
+  const maxStress = 100;
+  const xStep = validPoints.length > 1 ? chartWidth / (validPoints.length - 1) : 0;
+
+  const pathData = validPoints
+    .map((point, index) => {
+      const x = padding.left + index * xStep;
+      const y = padding.top + chartHeight - (point.averageStress! / maxStress) * chartHeight;
+      return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+    })
+    .join(" ");
+
+  return (
+    <svg
+      className="trend-panel__chart"
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label="七日通勤趋势折线图"
+    >
+      {/* Y-axis labels */}
+      <text x={5} y={padding.top + 4} fontSize="10" fill="#64748b">
+        100
+      </text>
+      <text x={5} y={padding.top + chartHeight / 2 + 4} fontSize="10" fill="#64748b">
+        50
+      </text>
+      <text x={5} y={padding.top + chartHeight + 4} fontSize="10" fill="#64748b">
+        0
+      </text>
+
+      {/* Grid lines */}
+      <line
+        x1={padding.left}
+        y1={padding.top}
+        x2={padding.left + chartWidth}
+        y2={padding.top}
+        stroke="#e2e8f0"
+        strokeWidth="1"
+      />
+      <line
+        x1={padding.left}
+        y1={padding.top + chartHeight / 2}
+        x2={padding.left + chartWidth}
+        y2={padding.top + chartHeight / 2}
+        stroke="#e2e8f0"
+        strokeWidth="1"
+      />
+      <line
+        x1={padding.left}
+        y1={padding.top + chartHeight}
+        x2={padding.left + chartWidth}
+        y2={padding.top + chartHeight}
+        stroke="#e2e8f0"
+        strokeWidth="1"
+      />
+
+      {/* Line path */}
+      <path d={pathData} fill="none" stroke="#3b82f6" strokeWidth="2" />
+
+      {/* Data points */}
+      {validPoints.map((point, index) => {
+        const x = padding.left + index * xStep;
+        const y = padding.top + chartHeight - (point.averageStress! / maxStress) * chartHeight;
+        return (
+          <circle
+            key={point.date}
+            cx={x}
+            cy={y}
+            r="4"
+            fill={stressColor(point.averageStress)}
+            stroke="#fff"
+            strokeWidth="2"
+          >
+            <title>
+              {point.date}: 平均压力 {Math.round(point.averageStress!)}, {point.commuteCount} 次通勤
+            </title>
+          </circle>
+        );
+      })}
+
+      {/* X-axis labels (show first, middle, and last dates) */}
+      {validPoints.length > 0 && (
+        <>
+          <text
+            x={padding.left}
+            y={height - 5}
+            fontSize="9"
+            fill="#64748b"
+            textAnchor="start"
+          >
+            {validPoints[0].date.slice(5)}
+          </text>
+          {validPoints.length > 2 && (
+            <text
+              x={padding.left + chartWidth / 2}
+              y={height - 5}
+              fontSize="9"
+              fill="#64748b"
+              textAnchor="middle"
+            >
+              {validPoints[Math.floor(validPoints.length / 2)].date.slice(5)}
+            </text>
+          )}
+          {validPoints.length > 1 && (
+            <text
+              x={padding.left + chartWidth}
+              y={height - 5}
+              fontSize="9"
+              fill="#64748b"
+              textAnchor="end"
+            >
+              {validPoints[validPoints.length - 1].date.slice(5)}
+            </text>
+          )}
+        </>
+      )}
+    </svg>
+  );
 }
 
 export function TrendPanel({
@@ -46,6 +187,8 @@ export function TrendPanel({
   userStressLevel = null,
   onStressLevelChange,
   trendRefreshWarning = null,
+  onRefresh,
+  loading = false,
 }: TrendPanelProps) {
   /** 压力档位选择器（用户结束通勤后填写真实感受） */
   const stressSelector = onStressLevelChange && (
@@ -116,7 +259,20 @@ export function TrendPanel({
         <span className="trend-panel__count">
           共 {trend.totalCommutes} 次通勤
         </span>
+        {onRefresh && (
+          <button
+            className="trend-panel__refresh-btn"
+            onClick={onRefresh}
+            disabled={loading}
+            type="button"
+            aria-label="刷新趋势数据"
+          >
+            {loading ? "刷新中…" : "刷新"}
+          </button>
+        )}
       </div>
+
+      {trend.points?.length > 0 && <TrendChart points={trend.points} />}
 
       {trend.points?.length > 0 && (
         <table className="trend-panel__table">

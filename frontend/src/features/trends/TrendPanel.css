@@ -168,3 +168,32 @@
   color: #94a3b8;
   margin-top: 2px;
 }
+
+.trend-panel__chart {
+  width: 100%;
+  height: auto;
+  margin: 8px 0;
+  display: block;
+}
+
+.trend-panel__refresh-btn {
+  padding: 4px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #2368ff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.trend-panel__refresh-btn:hover:not(:disabled) {
+  border-color: #2368ff;
+  background: #f0f9ff;
+}
+
+.trend-panel__refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

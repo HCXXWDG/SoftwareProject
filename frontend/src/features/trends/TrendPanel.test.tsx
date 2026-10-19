@@ -148,4 +148,69 @@ describe("TrendPanel", () => {
     const warnings = screen.getAllByRole("status");
     expect(warnings.some((el) => el.textContent?.includes("趋势数据刷新失败"))).toBe(true);
   });
+
+  it("renders line chart when trend has points", () => {
+    render(<TrendPanel trend={mockTrend} />);
+    const chart = screen.getByRole("img", { name: "七日通勤趋势折线图" });
+    expect(chart).toBeInTheDocument();
+  });
+
+  it("does not render chart when points array is empty", () => {
+    render(
+      <TrendPanel trend={{ points: [], recommendation: "", totalCommutes: 0 }} />
+    );
+    expect(
+      screen.queryByRole("img", { name: "七日通勤趋势折线图" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders refresh button when onRefresh is provided", () => {
+    const onRefresh = vi.fn();
+    render(<TrendPanel trend={mockTrend} onRefresh={onRefresh} />);
+    const btn = screen.getByRole("button", { name: "刷新趋势数据" });
+    expect(btn).toBeInTheDocument();
+    expect(btn).toHaveTextContent("刷新");
+  });
+
+  it("calls onRefresh when refresh button is clicked", () => {
+    const onRefresh = vi.fn();
+    render(<TrendPanel trend={mockTrend} onRefresh={onRefresh} />);
+    screen.getByRole("button", { name: "刷新趋势数据" }).click();
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows loading text when loading is true", () => {
+    const onRefresh = vi.fn();
+    render(<TrendPanel trend={mockTrend} onRefresh={onRefresh} loading={true} />);
+    const btn = screen.getByRole("button", { name: "刷新趋势数据" });
+    expect(btn).toHaveTextContent("刷新中…");
+    expect(btn).toBeDisabled();
+  });
+
+  it("handles single data point in chart", () => {
+    const singlePointTrend: TrendResult = {
+      points: [{ date: "2025-06-10", averageStress: 50, commuteCount: 1 }],
+      recommendation: "",
+      totalCommutes: 1,
+    };
+    render(<TrendPanel trend={singlePointTrend} />);
+    const chart = screen.getByRole("img", { name: "七日通勤趋势折线图" });
+    expect(chart).toBeInTheDocument();
+  });
+
+  it("handles null averageStress in chart data", () => {
+    const trendWithNull: TrendResult = {
+      points: [
+        { date: "2025-06-10", averageStress: null, commuteCount: 0 },
+        { date: "2025-06-11", averageStress: 50, commuteCount: 1 },
+      ],
+      recommendation: "",
+      totalCommutes: 1,
+    };
+    render(<TrendPanel trend={trendWithNull} />);
+    const chart = screen.getByRole("img", { name: "七日通勤趋势折线图" });
+    expect(chart).toBeInTheDocument();
+    // Table should show "—" for null stress
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
 });
