@@ -86,4 +86,56 @@ describe("FeedbackPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "关闭反馈面板" }));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
+
+  it("shows error message when error prop is provided", () => {
+    render(
+      <FeedbackPanel
+        position={{ x: 100, y: 200 }}
+        submitting={false}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+        error="网络错误，请稍后重试"
+      />,
+    );
+
+    expect(screen.getByText("网络错误，请稍后重试")).toBeInTheDocument();
+  });
+
+  it("shows duplicate message when isDuplicate is true", () => {
+    render(
+      <FeedbackPanel
+        position={{ x: 100, y: 200 }}
+        submitting={false}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+        isDuplicate={true}
+      />,
+    );
+
+    expect(
+      screen.getByText("五分钟内已提交过附近路段，无需重复提交。"),
+    ).toBeInTheDocument();
+  });
+
+  it("disables submit when submissionEnabled is false", () => {
+    render(
+      <FeedbackPanel
+        position={{ x: 100, y: 200 }}
+        submitting={false}
+        onCancel={vi.fn()}
+        onSubmit={vi.fn()}
+        submissionEnabled={false}
+      />,
+    );
+
+    // Select stress and tag
+    fireEvent.click(screen.getByRole("button", { name: /压力 50/ }));
+    fireEvent.click(screen.getByRole("button", { name: /原因 噪音/ }));
+
+    // Submit should still be disabled
+    expect(screen.getByRole("button", { name: "提交反馈" })).toBeDisabled();
+    expect(
+      screen.getByText("反馈服务暂不可用，草稿已保留，请恢复连接后提交。"),
+    ).toBeInTheDocument();
+  });
 });

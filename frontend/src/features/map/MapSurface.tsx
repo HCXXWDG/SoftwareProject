@@ -79,6 +79,8 @@ export function MapSurface({
     useState<LongPressPosition | null>(null);
   const [feedbackGeoPoint, setFeedbackGeoPoint] = useState<GeoPoint | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+  const [isDuplicate, setIsDuplicate] = useState(false);
 
   // Emoji fountain state
   const [fountainPosition, setFountainPosition] =
@@ -201,12 +203,20 @@ export function MapSurface({
         return;
       }
       setSubmitting(true);
+      setFeedbackError(null);
+      setIsDuplicate(false);
       try {
-        await feedbackSubmitRef.current({
+        const result = await feedbackSubmitRef.current({
           location: feedbackGeoPoint,
           stressLevel: stressLevel as MapFeedbackDraft["stressLevel"],
           tag,
         });
+        // Handle duplicate result
+        if (result?.status === "duplicate") {
+          setIsDuplicate(true);
+          // Keep panel open but show duplicate message
+          return;
+        }
         // Show emoji fountain on success
         const emojiMap: Record<number, string> = {
           0: "😊",
@@ -217,11 +227,17 @@ export function MapSurface({
         };
         setFountainPosition(feedbackPosition);
         setFountainEmoji(emojiMap[stressLevel] ?? "✨");
-      } finally {
-        setSubmitting(false);
+        // Close panel after successful submission
         setFeedbackPosition(null);
         setFeedbackGeoPoint(null);
         clearLongPress();
+      } catch (error) {
+        // Keep draft and panel open on error
+        setFeedbackError(
+          error instanceof Error ? error.message : "反馈提交失败，请稍后重试。"
+        );
+      } finally {
+        setSubmitting(false);
       }
     },
     [feedbackGeoPoint, feedbackPosition, clearLongPress],
@@ -296,6 +312,9 @@ export function MapSurface({
           submitting={submitting}
           onCancel={handleFeedbackCancel}
           onSubmit={handleFeedbackSubmit}
+          submissionEnabled={feedbackEnabled}
+          error={feedbackError}
+          isDuplicate={isDuplicate}
         />
       )}
 

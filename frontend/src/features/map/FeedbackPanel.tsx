@@ -22,6 +22,12 @@ interface FeedbackPanelProps {
   onSubmit: (stressLevel: number, tag: EmotionTag) => void;
   onCancel: () => void;
   submitting: boolean;
+  /** 后端不可用时禁用提交，但保留草稿 */
+  submissionEnabled?: boolean;
+  /** 提交失败时的错误信息 */
+  error?: string | null;
+  /** 是否为重复提交结果 */
+  isDuplicate?: boolean;
 }
 
 export function FeedbackPanel({
@@ -29,11 +35,14 @@ export function FeedbackPanel({
   onSubmit,
   onCancel,
   submitting,
+  submissionEnabled = true,
+  error,
+  isDuplicate,
 }: FeedbackPanelProps) {
   const [stressLevel, setStressLevel] = useState<number | null>(null);
   const [tag, setTag] = useState<EmotionTag | null>(null);
 
-  const canSubmit = stressLevel !== null && tag !== null && !submitting;
+  const canSubmit = stressLevel !== null && tag !== null && !submitting && submissionEnabled;
 
   const handleSubmit = () => {
     if (canSubmit) {
@@ -111,6 +120,24 @@ export function FeedbackPanel({
       >
         {submitting ? "提交中…" : "提交反馈"}
       </button>
+
+      {error && (
+        <div className="map-surface__feedback-error" role="alert">
+          {error}
+        </div>
+      )}
+
+      {isDuplicate && (
+        <div className="map-surface__feedback-duplicate" role="status">
+          五分钟内已提交过附近路段，无需重复提交。
+        </div>
+      )}
+
+      {!submissionEnabled && (
+        <div className="map-surface__feedback-disabled" role="status">
+          反馈服务暂不可用，草稿已保留，请恢复连接后提交。
+        </div>
+      )}
     </div>
   );
 }

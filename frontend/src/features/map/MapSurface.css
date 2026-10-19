@@ -532,3 +532,34 @@
   font-weight: 700;
   color: #183848;
 }
+
+/* ── Feedback Panel States ── */
+.map-surface__feedback-error {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #fff3f3;
+  color: #991b1b;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.map-surface__feedback-duplicate {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #fff8e1;
+  color: #7c5e00;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.map-surface__feedback-disabled {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 500;
+}
