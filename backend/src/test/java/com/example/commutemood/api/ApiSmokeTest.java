@@ -417,4 +417,182 @@ class ApiSmokeTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("invalid_request"));
     }
+
+    /**
+     * D05：空设备也要给出完整自然日序列，且空日期不补零。
+     * 项目 Jackson 配置为 non_null，值为 null 的字段整个键都不出现，因此用 doesNotExist 断言。
+     */
+    @Test
+    void servesFullTrendWindowWithNullInsteadOfZeroForEmptyDays() throws Exception {
+        mockMvc.perform(get("/api/v1/commutes/trends")
+                        .header("X-Device-Id", "api-smoke-empty-trend-device")
+                        .param("days", "7")
+                        .param("timezone", "Asia/Shanghai"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.days").value(7))
+                .andExpect(jsonPath("$.timezone").value("Asia/Shanghai"))
+                .andExpect(jsonPath("$.totalCommutes").value(0))
+                .andExpect(jsonPath("$.excludedDemoCommutes").value(0))
+                .andExpect(jsonPath("$.deduplicatedCommutes").value(0))
+                .andExpect(jsonPath("$.points.length()").value(7))
+                .andExpect(jsonPath("$.points[0].commuteCount").value(0))
+                .andExpect(jsonPath("$.points[0].averageStress").doesNotExist())
+                .andExpect(jsonPath("$.points[0].averageEstimatedSeconds").doesNotExist())
+                .andExpect(jsonPath("$.points[6].commuteCount").value(0))
+                .andExpect(jsonPath("$.points[6].date").exists());
+    }
+
+    /** D05：demo 种子的 7 条历史记录缺新字段，趋势要计入但显式标记来源未知。 */
+    @Test
+    void marksLegacyDemoCommutesAsUnknownSourceInTrends() throws Exception {
+        mockMvc.perform(get("/api/v1/commutes/trends")
+                        .header("X-Device-Id", "demo-browser")
+                        .param("days", "7")
+                        .param("timezone", "Asia/Shanghai"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCommutes").value(7))
+                .andExpect(jsonPath("$.unknownSourceCommutes").value(7))
+                .andExpect(jsonPath("$.excludedDemoCommutes").value(0))
+                // 历史记录没有 estimatedSeconds：样本数为 0、均值缺省，不能当成 0 秒
+                .andExpect(jsonPath("$.points[6].estimatedSampleCount").value(0))
+                .andExpect(jsonPath("$.points[6].averageEstimatedSeconds").doesNotExist());
+    }
+
+    /** D05：历史明细按时间倒序，旧记录带 legacyRecord 与 missingFields 标记。 */
+    @Test
+    void servesCommuteHistoryWithLegacyMarkers() throws Exception {
+        mockMvc.perform(get("/api/v1/commutes/history")
+                        .header("X-Device-Id", "demo-browser")
+                        .param("limit", "20")
+                        .param("days", "30")
+                        .param("timezone", "Asia/Shanghai"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(7))
+                .andExpect(jsonPath("$[0].legacyRecord").value(true))
+                .andExpect(jsonPath("$[0].routeSource").value("UNKNOWN"))
+                .andExpect(jsonPath("$[0].operationId").doesNotExist())
+                .andExpect(jsonPath("$[0].snapshotId").doesNotExist())
+                .andExpect(jsonPath("$[0].estimatedSeconds").doesNotExist())
+                .andExpect(jsonPath("$[0].missingFields.length()").value(3))
+                .andExpect(jsonPath("$[0].missingFields[0]").value("operationId"))
+                .andExpect(jsonPath("$[0].missingFields[2]").value("estimatedSeconds"))
+                // 兼容字段与按请求时区算出的自然日仍在，前端不必二次换算
+                .andExpect(jsonPath("$[0].durationMinutes").exists())
+                .andExpect(jsonPath("$[0].completedDate").exists())
+                .andExpect(jsonPath("$[0].timezone").value("Asia/Shanghai"));
+    }
+
+    /** D05：走完 D02 快照契约的通勤，在历史里不再是 legacy，且带服务端预计秒数。 */
+    @Test
+    void servesSnapshotBackedCommuteHistoryWithoutLegacyMarkers() throws Exception {
+        String deviceId = "api-smoke-history-device";
+        String deviceHash = identityService.hash(deviceId);
+        ScoredRoute fast = new ScoredRoute(
+                "route-fast", "最快路线 A", 1500, 1080, 40.0, 62.0, 0.72, true, false, List.of());
+        ScoredRoute calm = new ScoredRoute(
+                "route-calm", "少心累路线 B", 1700, 1210, 20.0, 43.0, 0.68, false, true, List.of());
+        RouteComparison comparison = new RouteComparison(
+                List.of(fast, calm), "route-fast", "route-calm", "ok", true);
+        UUID snapshotId = routeQueryRepository.save(
+                deviceHash,
+                new GeoPoint(116.392, 39.905),
+                new GeoPoint(116.405, 39.912),
+                comparison);
+        String operationId = UUID.randomUUID().toString();
+
+        mockMvc.perform(post("/api/v1/commutes/complete")
+                        .header("X-Device-Id", deviceId)
+                        .contentType("application/json")
+                        .content("""
+                                {"snapshotId":"%s","operationId":"%s","routeId":"route-fast","endStressLevel":25}
+                                """.formatted(snapshotId, operationId)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/commutes/history")
+                        .header("X-Device-Id", deviceId)
+                        .param("days", "7"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].legacyRecord").value(false))
+                .andExpect(jsonPath("$[0].missingFields.length()").value(0))
+                .andExpect(jsonPath("$[0].operationId").value(operationId))
+                .andExpect(jsonPath("$[0].snapshotId").value(snapshotId.toString()))
+                .andExpect(jsonPath("$[0].estimatedSeconds").value(1080))
+                .andExpect(jsonPath("$[0].endStressLevel").value(25))
+                .andExpect(jsonPath("$[0].selectedScore").value(62.0));
+    }
+
+    /** D05：历史与趋势同源，重复写入不会让历史多出一条。 */
+    @Test
+    void keepsHistoryConsistentWithTrendCountAfterReplay() throws Exception {
+        String deviceId = "api-smoke-history-replay-device";
+        String deviceHash = identityService.hash(deviceId);
+        ScoredRoute fast = new ScoredRoute(
+                "route-fast", "最快路线 A", 1500, 1080, 40.0, 62.0, 0.72, true, false, List.of());
+        ScoredRoute calm = new ScoredRoute(
+                "route-calm", "少心累路线 B", 1700, 1210, 20.0, 43.0, 0.68, false, true, List.of());
+        RouteComparison comparison = new RouteComparison(
+                List.of(fast, calm), "route-fast", "route-calm", "ok", true);
+        UUID snapshotId = routeQueryRepository.save(
+                deviceHash,
+                new GeoPoint(116.392, 39.905),
+                new GeoPoint(116.405, 39.912),
+                comparison);
+        String payload = """
+                {"snapshotId":"%s","operationId":"%s","routeId":"route-fast","endStressLevel":50}
+                """.formatted(snapshotId, UUID.randomUUID());
+
+        mockMvc.perform(post("/api/v1/commutes/complete")
+                        .header("X-Device-Id", deviceId)
+                        .contentType("application/json")
+                        .content(payload))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/v1/commutes/complete")
+                        .header("X-Device-Id", deviceId)
+                        .contentType("application/json")
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("duplicate"));
+
+        mockMvc.perform(get("/api/v1/commutes/history")
+                        .header("X-Device-Id", deviceId)
+                        .param("days", "7"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+
+        mockMvc.perform(get("/api/v1/commutes/trends")
+                        .header("X-Device-Id", deviceId)
+                        .param("days", "7"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCommutes").value(1))
+                .andExpect(jsonPath("$.deduplicatedCommutes").value(0));
+    }
+
+    @Test
+    void rejectsCommuteHistoryWithoutDeviceId() throws Exception {
+        mockMvc.perform(get("/api/v1/commutes/history"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_request"));
+    }
+
+    @Test
+    void rejectsCommuteHistoryWithInvalidLimitOrDays() throws Exception {
+        mockMvc.perform(get("/api/v1/commutes/history")
+                        .header("X-Device-Id", "demo-browser")
+                        .param("limit", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_request"));
+
+        mockMvc.perform(get("/api/v1/commutes/history")
+                        .header("X-Device-Id", "demo-browser")
+                        .param("days", "91"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_request"));
+
+        mockMvc.perform(get("/api/v1/commutes/history")
+                        .header("X-Device-Id", "demo-browser")
+                        .param("timezone", "Not/AZone"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_request"));
+    }
 }

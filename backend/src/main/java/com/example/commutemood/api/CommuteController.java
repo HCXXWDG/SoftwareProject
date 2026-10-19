@@ -1,7 +1,9 @@
 package com.example.commutemood.api;
 
 import com.example.commutemood.api.dto.CommuteCompleteRequest;
+import com.example.commutemood.api.dto.CommuteHistoryItem;
 import com.example.commutemood.application.CommuteCompletion;
+import com.example.commutemood.application.CommuteHistoryService;
 import com.example.commutemood.application.CommuteService;
 import com.example.commutemood.application.TrendService;
 import com.example.commutemood.domain.CommuteRecord;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.ZoneId;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -28,10 +31,16 @@ import java.util.Map;
 public class CommuteController {
     private final CommuteService commuteService;
     private final TrendService trendService;
+    private final CommuteHistoryService commuteHistoryService;
 
-    public CommuteController(CommuteService commuteService, TrendService trendService) {
+    public CommuteController(
+            CommuteService commuteService,
+            TrendService trendService,
+            CommuteHistoryService commuteHistoryService
+    ) {
         this.commuteService = commuteService;
         this.trendService = trendService;
+        this.commuteHistoryService = commuteHistoryService;
     }
 
     @PostMapping("/complete")
@@ -66,6 +75,22 @@ public class CommuteController {
             @RequestParam(defaultValue = "Asia/Shanghai") String timezone
     ) {
         return trendService.getTrends(deviceId, days, ZoneId.of(timezone));
+    }
+
+    /**
+     * 通勤历史明细（任务 D05）。与 {@code /trends} 同一时区、同一自然日窗口、同一去重口径，
+     * 因此"趋势里的次数"和"历史里的条数"不会对不上。旧记录通过 {@code legacyRecord} 与
+     * {@code missingFields} 显式标记，前端无需猜测缺失字段。
+     */
+    @GetMapping("/history")
+    @Operation(summary = "Get commute history with explicit legacy markers")
+    public List<CommuteHistoryItem> history(
+            @RequestHeader("X-Device-Id") String deviceId,
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam(defaultValue = "30") int days,
+            @RequestParam(defaultValue = "Asia/Shanghai") String timezone
+    ) {
+        return commuteHistoryService.getHistory(deviceId, limit, days, ZoneId.of(timezone));
     }
 
     private Map<String, Object> successBody(String status, CommuteRecord record, String message) {
