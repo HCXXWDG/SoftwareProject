@@ -118,6 +118,87 @@ describe("useHeatmapQuery", () => {
     expect(query).toHaveBeenLastCalledWith(latestViewport, 17, 168, expect.any(AbortSignal));
   });
 
+  it("ignores an old success during the new viewport debounce window", async () => {
+    const oldResponse = deferred<HeatmapCell[]>();
+    query.mockReturnValueOnce(oldResponse.promise).mockResolvedValueOnce(refreshedCells);
+    const onBackend = vi.fn();
+    const { result } = renderHook(() => useHeatmapQuery(true, onBackend));
+    const oldSignal = query.mock.calls[0][3]!;
+
+    act(() => result.current.updateViewport(latestViewport, 17));
+    await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+    await settle(() => oldResponse.resolve(originalCells));
+
+    expect(result.current).toMatchObject({ cells: [], loading: true, error: null });
+    expect(onBackend).not.toHaveBeenCalled();
+    expect(oldSignal.aborted).toBe(true);
+    expect(query).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+    expect(result.current).toMatchObject({ cells: refreshedCells, loading: false, error: null });
+    expect(query).toHaveBeenLastCalledWith(latestViewport, 17, 168, expect.any(AbortSignal));
+  });
+
+  it("ignores an old failure during the new viewport debounce window", async () => {
+    const oldResponse = deferred<HeatmapCell[]>();
+    query.mockReturnValueOnce(oldResponse.promise).mockResolvedValueOnce(refreshedCells);
+    const onBackend = vi.fn();
+    const { result } = renderHook(() => useHeatmapQuery(true, onBackend));
+
+    act(() => result.current.updateViewport(latestViewport, 17));
+    await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+    await settle(() => oldResponse.reject(new ApiError("network", "旧视口请求连接失败")));
+
+    expect(result.current).toMatchObject({ cells: [], loading: true, error: null });
+    expect(onBackend).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+    expect(result.current).toMatchObject({ cells: refreshedCells, loading: false, error: null });
+    expect(onBackend.mock.calls).toEqual([["available"]]);
+  });
+
+  it("returns cancelled for a report refresh superseded before the debounce fires", async () => {
+    const afterReport = deferred<HeatmapCell[]>();
+    query.mockResolvedValueOnce(originalCells).mockReturnValueOnce(afterReport.promise).mockResolvedValueOnce(refreshedCells);
+    const onBackend = vi.fn();
+    const { result } = renderHook(() => useHeatmapQuery(true, onBackend));
+    await settle();
+    onBackend.mockClear();
+    let reportRefresh!: Promise<HeatmapRefreshResult>;
+    act(() => { reportRefresh = result.current.refresh(); });
+
+    act(() => result.current.updateViewport(latestViewport, 18));
+    await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+    await settle(() => afterReport.resolve([cell("stale-report-refresh", 75)]));
+
+    expect(await reportRefresh).toBe("cancelled");
+    expect(result.current).toMatchObject({ cells: originalCells, loading: true, error: null });
+    expect(onBackend).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalledTimes(2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+    expect(result.current).toMatchObject({ cells: refreshedCells, loading: false, error: null });
+  });
+
+  it("does not cancel or postpone a request when the effective viewport is unchanged", async () => {
+    const response = deferred<HeatmapCell[]>();
+    query.mockResolvedValueOnce(originalCells).mockReturnValueOnce(response.promise);
+    const { result } = renderHook(() => useHeatmapQuery(true, vi.fn()));
+    await settle();
+
+    act(() => result.current.updateViewport(latestViewport, 17));
+    await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+    act(() => result.current.updateViewport("120.270,31.480,120.290,31.500", 17));
+    await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+    expect(query).toHaveBeenCalledTimes(2);
+    const signal = query.mock.calls[1][3]!;
+    act(() => result.current.updateViewport(latestViewport, 17));
+    expect(signal.aborted).toBe(false);
+    await settle(() => response.resolve(refreshedCells));
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(result.current).toMatchObject({ cells: refreshedCells, loading: false, error: null });
+  });
+
   it("keeps the newest result when an older query ignores abort and resolves late", async () => {
     const oldResponse = deferred<HeatmapCell[]>();
     const latestResponse = deferred<HeatmapCell[]>();

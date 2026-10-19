@@ -71,6 +71,45 @@ describe("API request outcomes", () => {
     await expect(api.post("/test", {})).rejects.toMatchObject({ kind: "business", status: 409, code: "duplicate" });
   });
 
+  it("preserves a structured HTTP error body for service-specific conflict validation", async () => {
+    const body = { status: "duplicate", message: "五分钟内已提交过附近路段。" };
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(body, 409));
+    const { api } = await import("./api");
+    await expect(api.post("/test", {})).rejects.toMatchObject({ status: 409, responseBody: body });
+  });
+
+  it("keeps an unvalidated successful duplicate as a business failure", async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({ status: "duplicate", message: "已记录。" }));
+    const { api } = await import("./api");
+    await expect(api.post("/test", {})).rejects.toMatchObject({ kind: "business", code: "duplicate" });
+  });
+
+  it("passes successful duplicates and their actual HTTP status to an explicit validator", async () => {
+    const body = { status: "duplicate", counted: false };
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(body, 200));
+    const { api } = await import("./api");
+    const check = vi.fn((value: unknown, status?: number) => value !== null && status === 200);
+    const validate = (value: unknown, status?: number): value is typeof body => check(value, status);
+    await expect(api.post("/test", {}, { validate })).resolves.toEqual(body);
+    expect(check).toHaveBeenCalledWith(body, 200);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("classifies a duplicate rejected by an explicit validator as a format failure", async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({ status: "duplicate", counted: true }, 200));
+    const { api } = await import("./api");
+    await expect(api.post("/test", {}, { validate: (_value): _value is never => false }))
+      .rejects.toMatchObject({ kind: "format" });
+  });
+
+  it("does not let a validator turn success:false into a successful write", async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({ success: false, code: "rate_limited", message: "操作过于频繁。" }));
+    const { api } = await import("./api");
+    await expect(api.post("/test", {}, { validate: (_value): _value is unknown => true }))
+      .rejects.toMatchObject({ kind: "business", code: "rate_limited" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects HTML within a JSON error message", async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse({ code: "invalid_request", message: "错误 <script>secret</script>" }, 400));
     const { api } = await import("./api");

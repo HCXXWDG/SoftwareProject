@@ -133,6 +133,8 @@ export default function App() {
       {trends.refreshError && <p role="status">显示上次趋势，刷新失败：{trends.refreshError}</p>}
       <button type="button" disabled={trends.status === "loading" || trends.refreshing} onClick={() => { void reloadTrends(); }}>重试或刷新趋势</button>
       {trends.status === "empty" && <p>暂无通勤记录。</p>}
+      {(trends.data?.unknownSourceCommutes ?? 0) > 0 && <p>含 {trends.data!.unknownSourceCommutes} 次来源待确认的通勤，不能视为真实路线评分。</p>}
+      {(trends.data?.excludedDemoCommutes ?? 0) > 0 && <p>已从趋势中排除 {trends.data!.excludedDemoCommutes} 次演示通勤。</p>}
       {trends.data && <TrendPanel trend={trends.data} />}
       <button type="button" disabled aria-describedby="commute-disabled-reason">完成本次通勤</button>
       <p id="commute-disabled-reason">{capabilities.completeReason}</p>

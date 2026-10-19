@@ -9,6 +9,7 @@
 - [成员 A 开发准备书](docs/project/member-a-preparation.md)
 - [成员 A 实施记录与剩余依赖](docs/project/member-a-worklog.md)
 - [成员 A 真实接口验收与修复](docs/project/member-a-acceptance.md)
+- [成员 A 对 D 新契约的接入与验收](docs/project/member-a-contract-integration.md)
 - [成员 A 对 B/C/D 的接口交接清单](docs/project/member-a-handoff-checklist.md)
 - [开发任务入口](https://github.com/HCXXWDG/SoftwareProject/issues)（结合任务分工书确认任务与认领状态）
 

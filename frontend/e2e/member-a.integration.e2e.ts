@@ -1,5 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 
+const evidence = process.env.MEMBER_A_EVIDENCE_DIR ?? "../../artifacts/member-a-acceptance";
+const dContracts = Boolean(process.env.MEMBER_A_BACKEND_DIR);
+
 const api = (page: Page, path: string, method = "GET") => page.waitForResponse((response) =>
   new URL(response.url()).pathname === `/api/v1/${path}` && response.request().method() === method);
 
@@ -12,12 +15,19 @@ async function enterMap(page: Page) {
   const result = await response.json();
   const heatmap = api(page, "heatmap");
   const trends = api(page, "commutes/trends");
+  const history = api(page, "routes/history");
   await page.getByRole("button", { name: "进入地图", exact: true }).click();
   expect((await heatmap).status()).toBe(200);
   expect((await trends).status()).toBe(200);
+  const historyResponse = await history;
+  expect(historyResponse.status()).toBe(200);
   await expect(page.getByTestId("offline-map")).toBeVisible();
   await expect(page.getByText(/底图：离线底图/)).toContainText("数据服务：可连接");
-  return result;
+  // Offline-map setup can replace the first viewport request during debounce.
+  // Wait for the actual page to leave its blocking loading state before gestures.
+  await expect(page.locator(".map-page__loading")).toHaveCount(0);
+  await expect(page.locator(".map-surface__loading")).toHaveCount(0);
+  return { ...result, historyRecords: await historyResponse.json() };
 }
 
 async function openFeedback(page: Page, xRatio = 0.45, yRatio = 0.75) {
@@ -43,7 +53,14 @@ test("真实接口 初始查询 选路 返回与刷新恢复", async ({ page }, 
   expect(result.routes.length).toBeGreaterThan(0);
   await expect(page.getByText("路线来源与评分状态待确认")).toBeVisible();
   await expect(page.getByRole("button", { name: "完成本次通勤" })).toBeDisabled();
-  await expect(page.getByRole("region", { name: "最近查询" })).toContainText("暂无查询历史");
+  const recent = page.getByRole("region", { name: "最近查询" });
+  if (dContracts) {
+    expect(result.historyRecords.length).toBeGreaterThan(0);
+    await expect(recent.getByRole("button", { name: "重新规划", exact: true })).toHaveCount(result.historyRecords.length);
+  } else {
+    expect(result.historyRecords).toEqual([]);
+    await expect(recent).toContainText("暂无查询历史");
+  }
   const last = result.routes[result.routes.length - 1];
   const choice = page.getByRole("button", { name: `选择 ${last.label}`, exact: true });
   await choice.click(); await expect(choice).toHaveAttribute("aria-pressed", "true");
@@ -60,7 +77,7 @@ test("真实接口 初始查询 选路 返回与刷新恢复", async ({ page }, 
   await expect(page.getByRole("heading", { name: "路线预览" })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole("group", { name: "选择终点" })).toBeVisible();
-  await page.screenshot({ path: "../../artifacts/member-a-acceptance/navigation.png", fullPage: true });
+  await page.screenshot({ path: `${evidence}/navigation.png`, fullPage: true });
   await info.attach("actual-comparison", { body: JSON.stringify({ routeCount: result.routes.length, sourceFieldsAbsent: !result.routeSource }), contentType: "application/json" });
 });
 
@@ -74,7 +91,9 @@ test("真实接口 反馈新增后刷新与重复反馈", async ({ page }) => {
   await expect(page.getByTestId("emoji-fountain")).toHaveCount(0, { timeout: 3000 });
   await openFeedback(page); const again = await chooseFeedback(page); const repeated = api(page, "reports", "POST");
   await again.getByRole("button", { name: "提交反馈", exact: true }).click();
-  expect((await repeated).status()).toBe(409);
+  const duplicateResponse = await repeated;
+  expect(duplicateResponse.status()).toBe(dContracts ? 200 : 409);
+  if (dContracts) expect(await duplicateResponse.json()).toMatchObject({ status: "duplicate", code: "report_duplicate", counted: false });
   await expect(page.getByText("这条反馈已提交过，无需重复提交。")).toBeVisible();
   await expect(page.getByTestId("emoji-fountain")).toHaveCount(0);
 });
@@ -164,6 +183,6 @@ for (const width of [390, 320]) {
     await expect(panel.getByRole("button", { name: "提交反馈", exact: true })).toBeInViewport();
     await panel.getByRole("button", { name: "关闭反馈面板" }).click();
     await expect(panel).toHaveCount(0);
-    await page.screenshot({ path: `../../artifacts/member-a-acceptance/live-mobile-${width}.png`, fullPage: true });
+    await page.screenshot({ path: `${evidence}/live-mobile-${width}.png`, fullPage: true });
   });
 }

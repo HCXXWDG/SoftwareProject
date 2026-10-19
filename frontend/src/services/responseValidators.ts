@@ -43,7 +43,7 @@ export function isHeatmapCells(value: unknown): value is HeatmapCell[] {
   return Array.isArray(value) && value.every((cell) => record(cell)
     && text(cell.cellId) && point(cell.center) && score(cell.score)
     && confidence(cell.confidence) && count(cell.count)
-    && text(cell.dominantTag) && ["NOISE", "CROWD", "SUN", "ODOR", "OTHER"].includes(cell.dominantTag));
+    && text(cell.dominantTag) && ["NOISE", "CROWD", "SUN", "ODOR", "QUIET", "SHADE", "OPEN", "OTHER"].includes(cell.dominantTag));
 }
 
 type AlternativeFields = "alternativeLabel" | "alternativeScore" | "alternativeDurationRatio";
@@ -65,7 +65,7 @@ interface TrendSummaryResponse {
   direction: "unknown" | "stable" | "improving" | "worsening";
   sampleSufficient: boolean;
 }
-export type TrendResultResponse = Omit<TrendResult, "points"> & {
+export type TrendResultResponse = Omit<TrendResult, "points" | "summary"> & {
   points: (Omit<TrendPoint, "averageStress"> & { averageStress?: number | null })[];
   summary?: TrendSummaryResponse;
 };
@@ -82,11 +82,29 @@ export function isTrendResult(value: unknown): value is TrendResultResponse {
     && typeof value.summary.sampleSufficient === "boolean";
 }
 
-export interface ReportResponse {
-  status: "created" | "duplicate";
+export type ReportResponse = {
+  status: "created";
+  code?: "report_created";
+  counted?: true;
   message: string;
-}
+} | {
+  status: "duplicate";
+  code?: "report_duplicate";
+  counted?: false;
+  message: string;
+};
 
-export function isReportResponse(value: unknown): value is ReportResponse {
-  return record(value) && value.status === "created" && text(value.message);
+/** D04 result fields must agree; legacy bodies are accepted only at their original HTTP status. */
+export function isReportResponse(value: unknown, status?: number): value is ReportResponse {
+  if (!record(value) || !text(value.message) || value.success === false) return false;
+  const legacy = value.code === undefined && value.counted === undefined;
+  if (value.status === "created") {
+    return (status === undefined || status === 201)
+      && (legacy || (value.code === "report_created" && value.counted === true));
+  }
+  if (value.status === "duplicate") {
+    return legacy ? status === undefined || status === 409
+      : (status === undefined || status === 200) && value.code === "report_duplicate" && value.counted === false;
+  }
+  return false;
 }

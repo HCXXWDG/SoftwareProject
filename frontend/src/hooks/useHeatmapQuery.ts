@@ -39,9 +39,18 @@ export function useHeatmapQuery(enabled: boolean, onBackend: (status: BackendSta
     const bounds = bbox.split(",").map(Number);
     if (bounds.length !== 4 || !bounds.every(Number.isFinite) || bounds[0] >= bounds[2] || bounds[1] >= bounds[3]
       || !Number.isFinite(zoom)) return;
+    const previousBounds = viewport.current.bbox.split(",").map(Number);
+    if (zoom === viewport.current.zoom && bounds.every((value, index) => value === previousBounds[index])) return;
     viewport.current = { bbox, zoom };
     clearTimeout(timer.current);
-    if (active.current) timer.current = setTimeout(() => { void refresh(); }, 300);
+    // The old response is obsolete as soon as the viewport changes, including during debounce.
+    ++version.current;
+    controller.current?.abort();
+    controller.current = undefined;
+    if (active.current) {
+      setLoading(true); setError(null);
+      timer.current = setTimeout(() => { void refresh(); }, 300);
+    }
   }, [refresh]);
   useEffect(() => {
     if (enabled) void refresh();

@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 import { fileURLToPath } from "node:url";
 
 const frontend = fileURLToPath(new URL(".", import.meta.url));
-const backend = fileURLToPath(new URL("../backend", import.meta.url));
+const backend = process.env.MEMBER_A_BACKEND_DIR ?? fileURLToPath(new URL("../backend", import.meta.url));
 // Use isolated local demo services. Package the backend JAR before running this suite.
 export default defineConfig({
   testDir: "./e2e",

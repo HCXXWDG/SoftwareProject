@@ -11,13 +11,15 @@ export class ApiError extends Error {
   readonly kind: ApiErrorKind;
   readonly status?: number;
   readonly code?: string;
+  readonly responseBody?: unknown;
 
-  constructor(kind: ApiErrorKind, message: string, details: { status?: number; code?: string } = {}) {
+  constructor(kind: ApiErrorKind, message: string, details: { status?: number; code?: string; responseBody?: unknown } = {}) {
     super(message);
     this.name = "ApiError";
     this.kind = kind;
     this.status = details.status;
     this.code = details.code;
+    this.responseBody = details.responseBody;
   }
 }
 
@@ -25,7 +27,7 @@ export function isRequestCancelled(error: unknown): boolean {
   return error instanceof ApiError && error.kind === "cancelled";
 }
 
-export type ResponseValidator<T> = (value: unknown) => value is T;
+export type ResponseValidator<T> = (value: unknown, status?: number) => value is T;
 
 export interface ApiRequestOptions<T> {
   signal?: AbortSignal;
@@ -110,7 +112,7 @@ function responseError(status: number, body: unknown): ApiError {
     : `服务器请求失败（HTTP ${status}），请稍后重试。`;
   const message = status >= 500 ? fallback
     : safeServerMessage(record?.message) ?? (code ? messages[code] : undefined) ?? fallback;
-  return new ApiError(code && status < 500 ? "business" : "http", message, { status, code });
+  return new ApiError(code && status < 500 ? "business" : "http", message, { status, code, responseBody: body });
 }
 
 function isAbortSignal(value: unknown): value is AbortSignal {
@@ -169,10 +171,10 @@ async function request<T>(path: string, init: RequestInit, options: ApiRequestOp
       let body: unknown;
       try { body = await res.json(); }
       catch { throw new ApiError("format", "服务器返回了无法解析的响应，请稍后重试。"); }
-      if (isRecord(body) && (body.status === "duplicate" || body.success === false)) {
+      if (isRecord(body) && (body.success === false || (body.status === "duplicate" && !options.validate))) {
         throw responseError(body.status === "duplicate" ? 409 : 400, body);
       }
-      if (options.validate && !options.validate(body)) {
+      if (options.validate && !options.validate(body, res.status)) {
         throw new ApiError("format", "服务器返回的数据格式不完整，请稍后重试或联系项目成员核对接口。");
       }
       return body as T;
