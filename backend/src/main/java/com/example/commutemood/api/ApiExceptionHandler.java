@@ -1,6 +1,9 @@
 package com.example.commutemood.api;
 
+import com.example.commutemood.application.DemoResultRejectedException;
 import com.example.commutemood.application.RateLimitExceededException;
+import com.example.commutemood.application.SnapshotExpiredException;
+import com.example.commutemood.application.SnapshotMissingException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -33,6 +36,21 @@ public class ApiExceptionHandler {
     @ExceptionHandler(RateLimitExceededException.class)
     public ResponseEntity<Map<String, Object>> rateLimited(RateLimitExceededException exception) {
         return response(HttpStatus.TOO_MANY_REQUESTS, "rate_limited", exception.getMessage());
+    }
+
+    @ExceptionHandler(SnapshotMissingException.class)
+    public ResponseEntity<Map<String, Object>> snapshotMissing(SnapshotMissingException exception) {
+        return response(HttpStatus.NOT_FOUND, "snapshot_not_found", exception.getMessage());
+    }
+
+    @ExceptionHandler(SnapshotExpiredException.class)
+    public ResponseEntity<Map<String, Object>> snapshotExpired(SnapshotExpiredException exception) {
+        return response(HttpStatus.GONE, "snapshot_expired", exception.getMessage());
+    }
+
+    @ExceptionHandler(DemoResultRejectedException.class)
+    public ResponseEntity<Map<String, Object>> demoResultRejected(DemoResultRejectedException exception) {
+        return response(HttpStatus.UNPROCESSABLE_ENTITY, "demo_result_not_allowed", exception.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

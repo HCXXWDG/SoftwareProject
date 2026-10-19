@@ -1,7 +1,12 @@
 package com.example.commutemood.api;
 
 import com.example.commutemood.CommuteMoodApplication;
+import com.example.commutemood.application.DeviceIdentityService;
 import com.example.commutemood.config.DemoGeography;
+import com.example.commutemood.domain.GeoPoint;
+import com.example.commutemood.domain.RouteComparison;
+import com.example.commutemood.domain.ScoredRoute;
+import com.example.commutemood.repository.RouteQueryRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -9,6 +14,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
@@ -22,6 +29,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ApiSmokeTest {
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private RouteQueryRepository routeQueryRepository;
+
+    @Autowired
+    private DeviceIdentityService identityService;
 
     @Test
     void servesActuatorInfo() throws Exception {
@@ -197,28 +210,44 @@ class ApiSmokeTest {
     }
 
     @Test
-    void acceptsCompletedCommute() throws Exception {
+    void acceptsCompletedCommuteFromSnapshotAndIsIdempotent() throws Exception {
+        String deviceId = "api-smoke-commute-device";
+        String deviceHash = identityService.hash(deviceId);
+        ScoredRoute fast = new ScoredRoute(
+                "route-fast", "最快路线 A", 1500, 1080, 40.0, 62.0, 0.72, true, false, List.of());
+        ScoredRoute calm = new ScoredRoute(
+                "route-calm", "少心累路线 B", 1700, 1210, 20.0, 43.0, 0.68, false, true, List.of());
+        RouteComparison comparison = new RouteComparison(
+                List.of(fast, calm), "route-fast", "route-calm", "ok", true);
+        UUID snapshotId = routeQueryRepository.save(
+                deviceHash,
+                new GeoPoint(116.392, 39.905),
+                new GeoPoint(116.405, 39.912),
+                comparison);
+        String operationId = UUID.randomUUID().toString();
+        String payload = """
+                {"snapshotId":"%s","operationId":"%s","routeId":"route-fast","endStressLevel":25}
+                """.formatted(snapshotId, operationId);
+
+        // 首次提交：201，评分/预计秒数取自快照而非前端
         mockMvc.perform(post("/api/v1/commutes/complete")
-                        .header("X-Device-Id", "api-smoke-commute-device")
+                        .header("X-Device-Id", deviceId)
                         .contentType("application/json")
-                        .content("""
-                                {
-                                  "routeId":"route-fast",
-                                  "routeLabel":"最快路线 A",
-                                  "endStressLevel":25,
-                                  "durationMinutes":18,
-                                  "selectedScore":62,
-                                  "fastestScore":62,
-                                  "alternativeLabel":"少心累路线 B",
-                                  "alternativeScore":43,
-                                  "alternativeDurationRatio":1.12,
-                                  "confidence":0.72,
-                                  "completedAt":"%s"
-                                }
-                                """.formatted(Instant.now())))
-                .andExpect(status().isOk())
+                        .content(payload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("created"))
                 .andExpect(jsonPath("$.routeId").value("route-fast"))
+                .andExpect(jsonPath("$.selectedScore").value(62.0))
+                .andExpect(jsonPath("$.estimatedSeconds").value(1080))
                 .andExpect(jsonPath("$.endStressLevel").value(25));
+
+        // 相同操作 ID 重复提交：200 duplicate，趋势不重复计数
+        mockMvc.perform(post("/api/v1/commutes/complete")
+                        .header("X-Device-Id", deviceId)
+                        .contentType("application/json")
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("duplicate"));
     }
 
     @Test
