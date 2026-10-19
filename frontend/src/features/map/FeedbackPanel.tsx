@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { EmotionTag } from "../../types";
 
 const STRESS_LEVELS = [
@@ -14,6 +14,9 @@ const EMOTION_TAGS: { value: EmotionTag; emoji: string; label: string }[] = [
   { value: "CROWD", emoji: "👥", label: "拥挤" },
   { value: "SUN", emoji: "☀️", label: "暴晒" },
   { value: "ODOR", emoji: "👃", label: "异味" },
+  { value: "QUIET", emoji: "🤫", label: "安静" },
+  { value: "SHADE", emoji: "🌳", label: "树荫" },
+  { value: "OPEN", emoji: "🏞️", label: "开阔" },
   { value: "OTHER", emoji: "💭", label: "其他" },
 ];
 
@@ -22,6 +25,7 @@ interface FeedbackPanelProps {
   onSubmit: (stressLevel: number, tag: EmotionTag) => void;
   onCancel: () => void;
   submitting: boolean;
+  "data-position"?: string;
 }
 
 export function FeedbackPanel({
@@ -29,9 +33,11 @@ export function FeedbackPanel({
   onSubmit,
   onCancel,
   submitting,
+  "data-position": dataPosition,
 }: FeedbackPanelProps) {
   const [stressLevel, setStressLevel] = useState<number | null>(null);
   const [tag, setTag] = useState<EmotionTag | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const canSubmit = stressLevel !== null && tag !== null && !submitting;
 
@@ -41,11 +47,57 @@ export function FeedbackPanel({
     }
   };
 
+  // Keyboard handler: Escape to close
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !submitting) {
+        onCancel();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel, submitting]);
+
+  // Focus trap: keep focus within panel
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    const focusableElements = panel.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    const handleTabKey = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+
+      if (event.shiftKey) {
+        if (document.activeElement === firstElement) {
+          event.preventDefault();
+          lastElement.focus();
+        }
+      } else {
+        if (document.activeElement === lastElement) {
+          event.preventDefault();
+          firstElement.focus();
+        }
+      }
+    };
+
+    panel.addEventListener("keydown", handleTabKey);
+    firstElement?.focus();
+
+    return () => panel.removeEventListener("keydown", handleTabKey);
+  }, []);
+
   return (
     <div
       aria-label="情绪反馈面板"
       className="map-surface__feedback-panel"
+      data-position={dataPosition}
       data-testid="feedback-panel"
+      ref={panelRef}
       role="dialog"
       style={{ left: `${position.x}px`, top: `${position.y}px` }}
     >

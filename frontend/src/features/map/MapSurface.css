@@ -229,6 +229,7 @@
   z-index: 6;
   display: grid;
   min-width: 220px;
+  max-width: calc(100vw - 24px);
   gap: 10px;
   padding: 12px 14px;
   border: 1px solid rgba(38, 73, 89, 0.16);
@@ -238,6 +239,21 @@
   background: rgba(255, 255, 255, 0.97);
   box-shadow: 0 10px 32px rgba(30, 58, 73, 0.24);
   backdrop-filter: blur(10px);
+}
+
+/* Prevent panel from going off-screen on right edge */
+.map-surface__feedback-panel[data-position="right"] {
+  transform: translate(calc(-100% - 12px), calc(-100% - 12px));
+}
+
+/* Prevent panel from going off-screen on top edge */
+.map-surface__feedback-panel[data-position="bottom"] {
+  transform: translate(12px, 12px);
+}
+
+/* Prevent panel from going off-screen on both right and top */
+.map-surface__feedback-panel[data-position="bottom-right"] {
+  transform: translate(calc(-100% - 12px), 12px);
 }
 
 .map-surface__feedback-header {
@@ -448,4 +464,121 @@
 .map-surface__route-legend-item--selected {
   font-weight: 700;
   color: #183848;
+}
+
+/* ── Mobile Responsiveness ── */
+@media (max-width: 390px) {
+  .map-surface__mode-badge {
+    top: 8px;
+    left: 8px;
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
+  .map-surface__loading {
+    top: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .map-surface__route-legend {
+    left: 8px;
+    bottom: 48px;
+    padding: 6px 8px;
+    gap: 3px;
+  }
+
+  .map-surface__route-legend-item {
+    font-size: 10px;
+  }
+
+  .map-surface__feedback-panel {
+    min-width: 200px;
+    max-width: calc(100vw - 16px);
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .map-surface__feedback-header {
+    font-size: 12px;
+  }
+
+  .map-surface__feedback-group legend {
+    font-size: 10px;
+  }
+
+  .map-surface__feedback-emoji {
+    font-size: 16px;
+  }
+
+  .map-surface__feedback-label {
+    font-size: 9px;
+  }
+
+  .map-surface__feedback-submit {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .map-surface__zoom-controls {
+    right: 8px;
+    bottom: 12px;
+    width: 34px;
+  }
+
+  .map-surface__zoom-controls button,
+  .map-surface__zoom-controls span {
+    min-height: 30px;
+  }
+
+  .map-surface__heat-point {
+    width: 28px;
+    height: 28px;
+  }
+
+  .map-surface__cell-details {
+    min-width: 120px;
+    padding: 7px 9px;
+    font-size: 11px;
+  }
+
+  .map-surface__cell-details strong {
+    font-size: 12px;
+  }
+}
+
+/* Ensure no horizontal overflow on very narrow screens */
+@media (max-width: 320px) {
+  .map-surface__feedback-buttons {
+    gap: 3px;
+  }
+
+  .map-surface__feedback-btn {
+    padding: 3px 4px;
+  }
+
+  .map-surface__feedback-emoji {
+    font-size: 14px;
+  }
+
+  .map-surface__feedback-label {
+    font-size: 8px;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .map-surface__feedback-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .map-surface__zoom-controls button {
+    min-height: 44px;
+  }
+
+  .map-surface__heat-point {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }

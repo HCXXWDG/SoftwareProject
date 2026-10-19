@@ -170,10 +170,27 @@ export function MapSurface({
   const {
     longPressPosition: _lpPos,
     clearLongPress,
-    handlePointerDown,
+    handlePointerDown: originalHandlePointerDown,
     handlePointerMove,
     handlePointerUp,
   } = useLongPress(handleLongPress);
+
+  // Wrap handlePointerDown to ignore events from feedback panel and buttons
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent) => {
+      // Don't trigger long press if clicking on feedback panel or its children
+      const target = event.target as HTMLElement;
+      if (target.closest(".map-surface__feedback-panel")) {
+        return;
+      }
+      // Don't trigger long press if clicking on buttons or interactive elements
+      if (target.closest("button, a, input, select, textarea")) {
+        return;
+      }
+      originalHandlePointerDown(event);
+    },
+    [originalHandlePointerDown],
+  );
 
   const handleFeedbackSubmit = useCallback(
     async (stressLevel: number, tag: EmotionTag) => {
@@ -213,6 +230,32 @@ export function MapSurface({
     setSubmitting(false);
     clearLongPress();
   }, [clearLongPress]);
+
+  // Calculate panel position attribute to prevent off-screen rendering
+  const getPanelPositionAttribute = useCallback(() => {
+    if (!feedbackPosition || !mapHostRef.current) {
+      return "";
+    }
+    const container = mapHostRef.current;
+    const rect = container.getBoundingClientRect();
+    const panelWidth = 240; // Approximate panel width
+    const panelHeight = 280; // Approximate panel height
+    const margin = 12;
+
+    const isNearRight = feedbackPosition.x + panelWidth + margin > rect.width;
+    const isNearTop = feedbackPosition.y - panelHeight - margin < 0;
+
+    if (isNearRight && isNearTop) {
+      return "bottom-right";
+    }
+    if (isNearRight) {
+      return "right";
+    }
+    if (isNearTop) {
+      return "bottom";
+    }
+    return "";
+  }, [feedbackPosition]);
 
   const handleFountainComplete = useCallback(() => {
     setFountainPosition(null);
@@ -262,6 +305,7 @@ export function MapSurface({
 
       {feedbackPosition && (
         <FeedbackPanel
+          data-position={getPanelPositionAttribute()}
           position={feedbackPosition}
           submitting={submitting}
           onCancel={handleFeedbackCancel}
