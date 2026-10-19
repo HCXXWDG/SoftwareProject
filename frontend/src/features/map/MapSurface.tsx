@@ -58,6 +58,8 @@ export function MapSurface({
   origin,
   destination,
   viewportConstraint,
+  feedbackEnabled = true,
+  onModeChange,
 }: MapSurfaceProps) {
   const mapHostRef = useRef<HTMLDivElement>(null);
   const adapterRef = useRef<MapAdapter | null>(null);
@@ -321,6 +323,29 @@ export function MapSurface({
         <div aria-live="polite" className="map-surface__loading" role="status">
           正在更新情绪热力图
         </div>
+      )}
+
+      {feedbackEnabled && !feedbackPosition && mode === "amap" && (
+        <button
+          aria-label="打开反馈面板"
+          className="map-surface__feedback-button"
+          onClick={() => {
+            // Use center of viewport as default feedback point
+            const viewport = adapterRef.current?.getViewport();
+            const center = viewport
+              ? {
+                  longitude: (viewport.bounds.west + viewport.bounds.east) / 2,
+                  latitude: (viewport.bounds.south + viewport.bounds.north) / 2,
+                }
+              : { longitude: 120.27351, latitude: 31.475328 };
+            const projected = projector(center);
+            setFeedbackGeoPoint(center);
+            setFeedbackPosition(projected);
+          }}
+          type="button"
+        >
+          反馈
+        </button>
       )}
     </section>
   );

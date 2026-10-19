@@ -532,3 +532,30 @@
   font-weight: 700;
   color: #183848;
 }
+
+/* ── Feedback Button ─ */
+.map-surface__feedback-button {
+  position: absolute;
+  z-index: 10;
+  right: 12px;
+  bottom: 56px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 20px;
+  background: #2368ff;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(35, 104, 255, 0.3);
+  transition: background 150ms ease, transform 150ms ease;
+}
+
+.map-surface__feedback-button:hover {
+  background: #1a56d6;
+  transform: translateY(-1px);
+}
+
+.map-surface__feedback-button:active {
+  transform: translateY(0);
+}

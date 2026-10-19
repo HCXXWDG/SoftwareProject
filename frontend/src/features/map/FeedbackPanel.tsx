@@ -12,8 +12,11 @@ const STRESS_LEVELS = [
 const EMOTION_TAGS: { value: EmotionTag; emoji: string; label: string }[] = [
   { value: "NOISE", emoji: "🔊", label: "噪音" },
   { value: "CROWD", emoji: "👥", label: "拥挤" },
-  { value: "SUN", emoji: "☀️", label: "暴晒" },
-  { value: "ODOR", emoji: "👃", label: "异味" },
+  { value: "SUN", emoji: "️", label: "暴晒" },
+  { value: "ODOR", emoji: "", label: "异味" },
+  { value: "QUIET", emoji: "🤫", label: "安静" },
+  { value: "SHADE", emoji: "🌳", label: "树荫" },
+  { value: "OPEN", emoji: "", label: "开阔" },
   { value: "OTHER", emoji: "💭", label: "其他" },
 ];
 

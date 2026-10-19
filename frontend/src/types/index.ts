@@ -1,5 +1,5 @@
 /** 情绪标签 */
-export type EmotionTag = "NOISE" | "CROWD" | "SUN" | "ODOR" | "OTHER";
+export type EmotionTag = "NOISE" | "CROWD" | "SUN" | "ODOR" | "QUIET" | "SHADE" | "OPEN" | "OTHER";
 
 /** 地理坐标 */
 export interface GeoPoint {
