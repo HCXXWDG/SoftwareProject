@@ -5,6 +5,7 @@ import com.example.commutemood.domain.EmotionTag;
 import com.example.commutemood.domain.GeoBounds;
 import com.example.commutemood.domain.GeoPoint;
 import com.example.commutemood.repository.EmotionReportRepository;
+import com.example.commutemood.repository.ReportDeduplication;
 import com.example.commutemood.repository.ReportScope;
 import com.example.commutemood.repository.SaveOutcome;
 import org.slf4j.Logger;
@@ -33,6 +34,31 @@ public class JdbcEmotionReportRepository implements EmotionReportRepository {
               AND location && ST_MakeEnvelope(?, ?, ?, ?, 4326)
             """;
 
+    /**
+     * 同一设备的事务级咨询锁，锁在事务结束时自动释放。
+     *
+     * <p>{@code pg_advisory_xact_lock} 本身返回 void，JDBC 无法把它读成数值，
+     * 所以外面包一层子查询固定返回 1，既拿到锁又能正常取值。</p>
+     */
+    private static final String DEVICE_LOCK_SQL =
+            "SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext(?)) AS acquired) AS device_lock";
+
+    /**
+     * 去重计数。时间窗与半径直接取自 {@link ReportDeduplication}，
+     * 与内存实现共用同一份口径，避免 demo 与 postgres 行为分叉。
+     */
+    private static final String COUNT_DUPLICATE_SQL = """
+            SELECT count(*)
+            FROM emotion_report
+            WHERE device_hash = ?
+              AND reported_at BETWEEN ?::timestamptz - interval '%1$d minutes'
+                                  AND ?::timestamptz + interval '%1$d minutes'
+              AND ST_DWithin(location::geography,
+                  ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, %2$s)
+            """.formatted(
+            ReportDeduplication.WINDOW.toMinutes(),
+            ReportDeduplication.RADIUS_METERS);
+
     private final JdbcTemplate jdbcTemplate;
 
     public JdbcEmotionReportRepository(JdbcTemplate jdbcTemplate) {
@@ -42,15 +68,11 @@ public class JdbcEmotionReportRepository implements EmotionReportRepository {
     @Override
     @Transactional
     public SaveOutcome save(EmotionReport report) {
-        Integer duplicateCount = jdbcTemplate.queryForObject("""
-                SELECT count(*)
-                FROM emotion_report
-                WHERE device_hash = ?
-                  AND reported_at BETWEEN ?::timestamptz - interval '5 minutes'
-                                      AND ?::timestamptz + interval '5 minutes'
-                  AND ST_DWithin(location::geography,
-                      ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, 25)
-                """, Integer.class,
+        // 事务级咨询锁：把同一设备的“查重 + 写入”串行化，
+        // 否则两个并发请求会同时查不到重复、各自插入一条，重复反馈被计成新增。
+        jdbcTemplate.queryForObject(DEVICE_LOCK_SQL, Integer.class, report.deviceHash());
+
+        Integer duplicateCount = jdbcTemplate.queryForObject(COUNT_DUPLICATE_SQL, Integer.class,
                 report.deviceHash(),
                 Timestamp.from(report.reportedAt()),
                 Timestamp.from(report.reportedAt()),

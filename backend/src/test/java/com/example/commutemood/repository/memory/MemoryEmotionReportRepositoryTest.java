@@ -11,8 +11,14 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -109,6 +115,43 @@ class MemoryEmotionReportRepositoryTest {
                 report("device-real-1", 120.2700, 31.4800, 75, EmotionTag.NOISE, NOW.plus(1, ChronoUnit.MINUTES), false));
 
         assertThat(outcome).isEqualTo(SaveOutcome.DUPLICATE);
+    }
+
+    @Test
+    void reportsFurtherThanDedupRadiusBothCount() {
+        MemoryEmotionReportRepository fresh = new MemoryEmotionReportRepository();
+        double offset = 40.0 / 111_320.0; // 约 40 米，超过 25 米去重半径
+
+        assertThat(fresh.save(report("device-a", 120.2700, 31.4800, 50, EmotionTag.NOISE, NOW, false)))
+                .isEqualTo(SaveOutcome.CREATED);
+        assertThat(fresh.save(report("device-a", 120.2700, 31.4800 + offset, 50, EmotionTag.NOISE, NOW, false)))
+                .isEqualTo(SaveOutcome.CREATED);
+        assertThat(fresh.findWithin(BOUNDS, NOW.minus(7, ChronoUnit.DAYS), ReportScope.REAL_ONLY)).hasSize(2);
+    }
+
+    @Test
+    void concurrentSubmitsFromSameDeviceAreCountedOnce() throws Exception {
+        MemoryEmotionReportRepository fresh = new MemoryEmotionReportRepository();
+        int threads = 16;
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<SaveOutcome>> futures = new ArrayList<>();
+        for (int index = 0; index < threads; index++) {
+            futures.add(pool.submit(() -> {
+                start.await();
+                return fresh.save(report("device-concurrent", 120.2700, 31.4800, 50, EmotionTag.NOISE, NOW, false));
+            }));
+        }
+
+        start.countDown();
+        List<SaveOutcome> outcomes = new ArrayList<>();
+        for (Future<SaveOutcome> future : futures) {
+            outcomes.add(future.get(10, TimeUnit.SECONDS));
+        }
+        pool.shutdownNow();
+
+        assertThat(outcomes).filteredOn(outcome -> outcome == SaveOutcome.CREATED).hasSize(1);
+        assertThat(fresh.findWithin(BOUNDS, NOW.minus(7, ChronoUnit.DAYS), ReportScope.REAL_ONLY)).hasSize(1);
     }
 
     private EmotionReport report(

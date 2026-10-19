@@ -3,9 +3,13 @@ package com.example.commutemood.repository.jdbc;
 import com.example.commutemood.domain.EmotionReport;
 import com.example.commutemood.domain.EmotionTag;
 import com.example.commutemood.domain.GeoBounds;
+import com.example.commutemood.domain.GeoPoint;
+import com.example.commutemood.repository.ReportDeduplication;
 import com.example.commutemood.repository.ReportScope;
+import com.example.commutemood.repository.SaveOutcome;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
@@ -17,9 +21,12 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 class JdbcEmotionReportRepositoryTest {
@@ -114,6 +121,82 @@ class JdbcEmotionReportRepositoryTest {
         EmotionReport unknown = rowMapper.mapRow(resultSet(id, "LEGACY_TAG", true, reportedAt), 1);
         assertThat(unknown.tag()).isEqualTo(EmotionTag.OTHER);
         assertThat(unknown.simulated()).isTrue();
+    }
+
+    @Test
+    void saveTakesPerDeviceLockBeforeDuplicateCheckAndInsert() {
+        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        when(jdbcTemplate.queryForObject(contains("pg_advisory_xact_lock"), eq(Integer.class), any()))
+                .thenReturn(0);
+        when(jdbcTemplate.queryForObject(contains("count(*)"), eq(Integer.class), any(), any(), any(), any(), any()))
+                .thenReturn(0);
+        JdbcEmotionReportRepository repository = new JdbcEmotionReportRepository(jdbcTemplate);
+        EmotionReport record = report();
+
+        assertThat(repository.save(record)).isEqualTo(SaveOutcome.CREATED);
+
+        InOrder inOrder = inOrder(jdbcTemplate);
+        inOrder.verify(jdbcTemplate).queryForObject(contains("pg_advisory_xact_lock"), eq(Integer.class),
+                eq(record.deviceHash()));
+        inOrder.verify(jdbcTemplate).queryForObject(contains("count(*)"), eq(Integer.class),
+                eq(record.deviceHash()), any(), any(), any(), any());
+        inOrder.verify(jdbcTemplate).update(contains("INSERT INTO device_profile"), eq(record.deviceHash()));
+        inOrder.verify(jdbcTemplate).update(contains("INSERT INTO emotion_report"),
+                eq(record.id()), eq(record.deviceHash()), eq(record.stressLevel()), eq(record.tag().name()),
+                eq(record.location().longitude()), eq(record.location().latitude()),
+                eq(Timestamp.from(record.reportedAt())), eq(record.simulated()));
+    }
+
+    @Test
+    void duplicateSaveSkipsEveryWrite() {
+        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        when(jdbcTemplate.queryForObject(contains("pg_advisory_xact_lock"), eq(Integer.class), any()))
+                .thenReturn(0);
+        when(jdbcTemplate.queryForObject(contains("count(*)"), eq(Integer.class), any(), any(), any(), any(), any()))
+                .thenReturn(1);
+        JdbcEmotionReportRepository repository = new JdbcEmotionReportRepository(jdbcTemplate);
+
+        assertThat(repository.save(report())).isEqualTo(SaveOutcome.DUPLICATE);
+
+        // 重复反馈不能写入，否则会被当成新增反馈计数
+        verify(jdbcTemplate).queryForObject(contains("pg_advisory_xact_lock"), eq(Integer.class), any());
+        verify(jdbcTemplate).queryForObject(contains("count(*)"), eq(Integer.class), any(), any(), any(), any(), any());
+        verifyNoMoreInteractions(jdbcTemplate);
+    }
+
+    @Test
+    void duplicateCheckSqlUsesSharedPolicyConstants() {
+        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        when(jdbcTemplate.queryForObject(contains("pg_advisory_xact_lock"), eq(Integer.class), any()))
+                .thenReturn(0);
+        when(jdbcTemplate.queryForObject(any(String.class), eq(Integer.class), any(), any(), any(), any(), any()))
+                .thenReturn(1);
+        JdbcEmotionReportRepository repository = new JdbcEmotionReportRepository(jdbcTemplate);
+
+        repository.save(report());
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbcTemplate).queryForObject(sql.capture(), eq(Integer.class), any(), any(), any(), any(), any());
+        assertThat(sql.getAllValues()).anySatisfy(statement -> {
+            assertThat(statement)
+                    .as("SQL 去重窗口必须与 ReportDeduplication.WINDOW 同源")
+                    .contains("interval '" + ReportDeduplication.WINDOW.toMinutes() + " minutes'");
+            assertThat(statement)
+                    .as("SQL 去重半径必须与 ReportDeduplication.RADIUS_METERS 同源")
+                    .contains(String.valueOf(ReportDeduplication.RADIUS_METERS));
+            assertThat(statement).contains("ST_DWithin(location::geography");
+        });
+    }
+
+    private EmotionReport report() {
+        return new EmotionReport(
+                UUID.randomUUID(),
+                "device-hash",
+                new GeoPoint(120.2700, 31.4800),
+                50,
+                EmotionTag.NOISE,
+                Instant.parse("2026-10-19T08:00:00Z"),
+                false);
     }
 
     private ResultSet resultSet(UUID id, String tag, boolean simulated, Instant reportedAt) throws Exception {

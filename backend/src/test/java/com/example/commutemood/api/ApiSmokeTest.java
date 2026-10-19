@@ -138,6 +138,93 @@ class ApiSmokeTest {
     }
 
     @Test
+    void duplicateReportReturnsOkWithStableCodeAndIsNotCounted() throws Exception {
+        String payload = """
+                {
+                  "location":{"longitude":%.4f,"latitude":%.4f},
+                  "stressLevel":75,
+                  "tag":"CROWD",
+                  "reportedAt":"%s"
+                }
+                """.formatted(
+                DemoGeography.REPORT_LONGITUDE + 0.05,
+                DemoGeography.REPORT_LATITUDE + 0.05,
+                Instant.now());
+
+        mockMvc.perform(post("/api/v1/reports")
+                        .header("X-Device-Id", "api-smoke-duplicate-device")
+                        .contentType("application/json")
+                        .content(payload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("created"))
+                .andExpect(jsonPath("$.code").value("report_created"))
+                .andExpect(jsonPath("$.counted").value(true));
+
+        // 同设备、同地点、同时间窗：200 duplicate，不重复计数
+        mockMvc.perform(post("/api/v1/reports")
+                        .header("X-Device-Id", "api-smoke-duplicate-device")
+                        .contentType("application/json")
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("duplicate"))
+                .andExpect(jsonPath("$.code").value("report_duplicate"))
+                .andExpect(jsonPath("$.counted").value(false));
+    }
+
+    @Test
+    void rateLimitedReportReturnsStableCode() throws Exception {
+        String deviceId = "api-smoke-rate-limit-device";
+        for (int index = 0; index < 10; index++) {
+            mockMvc.perform(post("/api/v1/reports")
+                            .header("X-Device-Id", deviceId)
+                            .contentType("application/json")
+                            .content("""
+                                    {
+                                      "location":{"longitude":%.4f,"latitude":%.4f},
+                                      "stressLevel":50,
+                                      "tag":"NOISE"
+                                    }
+                                    """.formatted(
+                                    DemoGeography.REPORT_LONGITUDE - 0.20 + index * 0.01,
+                                    DemoGeography.REPORT_LATITUDE - 0.20)))
+                    .andExpect(status().isCreated());
+        }
+
+        mockMvc.perform(post("/api/v1/reports")
+                        .header("X-Device-Id", deviceId)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "location":{"longitude":%.4f,"latitude":%.4f},
+                                  "stressLevel":50,
+                                  "tag":"NOISE"
+                                }
+                                """.formatted(
+                                DemoGeography.REPORT_LONGITUDE + 0.30,
+                                DemoGeography.REPORT_LATITUDE + 0.30)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("rate_limited"));
+    }
+
+    @Test
+    void rejectsInvalidReportStressLevelWithStableCode() throws Exception {
+        mockMvc.perform(post("/api/v1/reports")
+                        .header("X-Device-Id", "api-smoke-invalid-stress-device")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "location":{"longitude":%.4f,"latitude":%.4f},
+                                  "stressLevel":30,
+                                  "tag":"NOISE"
+                                }
+                                """.formatted(
+                                DemoGeography.REPORT_LONGITUDE,
+                                DemoGeography.REPORT_LATITUDE)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_request"));
+    }
+
+    @Test
     void servesHeatmapFromDemoSeed() throws Exception {
         mockMvc.perform(get("/api/v1/heatmap")
                         .param("bbox", DemoGeography.HEATMAP_BBOX)
