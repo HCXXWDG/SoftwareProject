@@ -37,12 +37,13 @@ describe("RoutePanel", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders two route cards", () => {
+  it("renders two route cards with valid scores", () => {
     render(
       <RoutePanel
         routes={[routeFast, routeCalm]}
         selectedRouteId="route-fast"
         onSelectRoute={vi.fn()}
+        scoringStatus="valid"
       />,
     );
 
@@ -50,6 +51,21 @@ describe("RoutePanel", () => {
     expect(screen.getByText("少心累路线 B")).toBeInTheDocument();
     expect(screen.getByText("最快")).toBeInTheDocument();
     expect(screen.getByText("少心累")).toBeInTheDocument();
+    expect(screen.getByText("67")).toBeInTheDocument(); // stressExposure
+    expect(screen.getByText("50")).toBeInTheDocument(); // stressScore
+  });
+
+  it("hides score badges when scoringStatus is insufficient", () => {
+    render(
+      <RoutePanel
+        routes={[routeFast, routeCalm]}
+        onSelectRoute={vi.fn()}
+        scoringStatus="insufficient"
+      />,
+    );
+
+    expect(screen.queryByText("少心累")).not.toBeInTheDocument();
+    expect(screen.getAllByText("评分待确认")).toHaveLength(2);
   });
 
   it("formats distance and duration", () => {
@@ -57,6 +73,7 @@ describe("RoutePanel", () => {
       <RoutePanel
         routes={[routeFast, routeCalm]}
         onSelectRoute={vi.fn()}
+        scoringStatus="valid"
       />,
     );
 
@@ -73,6 +90,7 @@ describe("RoutePanel", () => {
         routes={[routeFast, routeCalm]}
         selectedRouteId="route-fast"
         onSelectRoute={onSelectRoute}
+        scoringStatus="valid"
       />,
     );
 
@@ -86,6 +104,7 @@ describe("RoutePanel", () => {
         routes={[routeFast, routeCalm]}
         selectedRouteId="route-fast"
         onSelectRoute={vi.fn()}
+        scoringStatus="valid"
       />,
     );
 
@@ -93,5 +112,17 @@ describe("RoutePanel", () => {
     const calmCard = screen.getByRole("button", { name: /选择 少心累路线 B/ });
     expect(fastCard).toHaveAttribute("aria-pressed", "true");
     expect(calmCard).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("shows source warning when routeSource is unknown", () => {
+    render(
+      <RoutePanel
+        routes={[routeFast]}
+        onSelectRoute={vi.fn()}
+        routeSource="unknown"
+      />,
+    );
+
+    expect(screen.getByText("路线来源与评分状态待确认")).toBeInTheDocument();
   });
 });

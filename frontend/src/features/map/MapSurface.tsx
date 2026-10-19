@@ -34,12 +34,16 @@ export interface MapSurfaceProps {
   routes: ScoredRoute[];
   selectedRouteId?: string;
   loading: boolean;
-  onFeedbackSubmit: (draft: MapFeedbackDraft) => Promise<void>;
+  onFeedbackSubmit: (draft: MapFeedbackDraft) => Promise<void | { status: "created" | "duplicate" }>;
   onRouteSelect: (routeId: string) => void;
   onViewportChange: (bbox: string, zoom: number) => void;
   origin?: GeoPoint;
   destination?: GeoPoint;
   viewportConstraint?: MapViewportConstraint;
+  /** A 统一派生操作能力；不以底图模式推断后端状态。 */
+  feedbackEnabled?: boolean;
+  /** 底图模式变化时通知 A，用于独立管理底图与后端状态。 */
+  onModeChange?: (mode: MapMode) => void;
 }
 
 type MapMode = "loading" | "amap" | "offline";
@@ -58,6 +62,8 @@ export function MapSurface({
   origin,
   destination,
   viewportConstraint,
+  feedbackEnabled = true,
+  onModeChange,
 }: MapSurfaceProps) {
   const mapHostRef = useRef<HTMLDivElement>(null);
   const adapterRef = useRef<MapAdapter | null>(null);
@@ -73,6 +79,11 @@ export function MapSurface({
     (point: ProjectedPoint) => GeoPoint
   >(() => unavailableUnprojector);
   const [viewportRevision, setViewportRevision] = useState(0);
+
+  // Notify A when base map mode changes (independent from backend state)
+  useEffect(() => {
+    onModeChange?.(mode);
+  }, [mode, onModeChange]);
 
   // Feedback panel state
   const [feedbackPosition, setFeedbackPosition] =
@@ -162,9 +173,12 @@ export function MapSurface({
   );
 
   // Long-press handler: screen position -> GeoPoint -> show feedback panel
-  // 校园外长按不弹出反馈面板
+  // 校园外长按不弹出反馈面板；提交中或禁用时不响应
   const handleLongPress = useCallback(
     (position: LongPressPosition) => {
+      if (!feedbackEnabled || submitting) {
+        return;
+      }
       const container = mapHostRef.current;
       if (!container) {
         return;
@@ -184,7 +198,7 @@ export function MapSurface({
       setFeedbackGeoPoint(geoPoint);
       setFeedbackPosition(relativePoint);
     },
-    [unprojector, viewportConstraint],
+    [unprojector, viewportConstraint, feedbackEnabled, submitting],
   );
 
   const {
@@ -197,26 +211,28 @@ export function MapSurface({
 
   const handleFeedbackSubmit = useCallback(
     async (stressLevel: number, tag: EmotionTag) => {
-      if (!feedbackGeoPoint || !feedbackPosition) {
+      if (!feedbackGeoPoint || !feedbackPosition || !feedbackEnabled) {
         return;
       }
       setSubmitting(true);
       try {
-        await feedbackSubmitRef.current({
+        const result = await feedbackSubmitRef.current({
           location: feedbackGeoPoint,
           stressLevel: stressLevel as MapFeedbackDraft["stressLevel"],
           tag,
         });
-        // Show emoji fountain on success
-        const emojiMap: Record<number, string> = {
-          0: "😊",
-          25: "🙂",
-          50: "😐",
-          75: "😟",
-          100: "😫",
-        };
-        setFountainPosition(feedbackPosition);
-        setFountainEmoji(emojiMap[stressLevel] ?? "✨");
+        // Show emoji fountain only for new submissions, not duplicates
+        if (result?.status !== "duplicate") {
+          const emojiMap: Record<number, string> = {
+            0: "😊",
+            25: "🙂",
+            50: "😐",
+            75: "😟",
+            100: "😫",
+          };
+          setFountainPosition(feedbackPosition);
+          setFountainEmoji(emojiMap[stressLevel] ?? "✨");
+        }
       } finally {
         setSubmitting(false);
         setFeedbackPosition(null);
@@ -224,7 +240,7 @@ export function MapSurface({
         clearLongPress();
       }
     },
-    [feedbackGeoPoint, feedbackPosition, clearLongPress],
+    [feedbackGeoPoint, feedbackPosition, clearLongPress, feedbackEnabled],
   );
 
   const handleFeedbackCancel = useCallback(() => {

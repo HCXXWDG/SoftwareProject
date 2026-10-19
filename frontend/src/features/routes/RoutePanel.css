@@ -87,3 +87,17 @@
   font-size: 10px;
   color: #607888;
 }
+
+.route-panel__source-warning {
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: #fff8e1;
+  color: #7c5e00;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.route-panel__stat-value--pending {
+  color: #90a4ae;
+}
