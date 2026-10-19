@@ -12,6 +12,8 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 @Profile("postgres")
@@ -26,7 +28,8 @@ public class JdbcRouteQueryRepository implements RouteQueryRepository {
 
     @Override
     @Transactional
-    public void save(String deviceHash, GeoPoint origin, GeoPoint destination, RouteComparison comparison) {
+    public UUID save(String deviceHash, GeoPoint origin, GeoPoint destination, RouteComparison comparison) {
+        UUID snapshotId = UUID.randomUUID();
         jdbcTemplate.update("""
                         INSERT INTO device_profile(device_hash)
                         VALUES (?)
@@ -34,18 +37,43 @@ public class JdbcRouteQueryRepository implements RouteQueryRepository {
                         DO UPDATE SET last_seen_at = now()
                         """, deviceHash);
         jdbcTemplate.update("""
-                        INSERT INTO route_query(device_hash, origin, destination, result_json)
+                        INSERT INTO route_query(id, device_hash, origin, destination, result_json)
                         VALUES (
+                            ?,
                             ?,
                             ST_SetSRID(ST_MakePoint(?, ?), 4326),
                             ST_SetSRID(ST_MakePoint(?, ?), 4326),
                             CAST(? AS jsonb)
                         )
                         """,
+                snapshotId,
                 deviceHash,
                 origin.longitude(), origin.latitude(),
                 destination.longitude(), destination.latitude(),
                 toJson(comparison));
+        return snapshotId;
+    }
+
+    @Override
+    public Optional<RouteQueryHistory> findSnapshotById(UUID id, String deviceHash) {
+        return jdbcTemplate.query("""
+                        SELECT id,
+                               ST_X(origin) AS origin_longitude,
+                               ST_Y(origin) AS origin_latitude,
+                               ST_X(destination) AS destination_longitude,
+                               ST_Y(destination) AS destination_latitude,
+                               result_json::text AS result_json,
+                               created_at
+                        FROM route_query
+                        WHERE id = ? AND device_hash = ?
+                        """,
+                (rs, rowNum) -> new RouteQueryHistory(
+                        rs.getObject("id", java.util.UUID.class),
+                        new GeoPoint(rs.getDouble("origin_longitude"), rs.getDouble("origin_latitude")),
+                        new GeoPoint(rs.getDouble("destination_longitude"), rs.getDouble("destination_latitude")),
+                        fromJson(rs.getString("result_json")),
+                        rs.getTimestamp("created_at").toInstant()),
+                id, deviceHash).stream().findFirst();
     }
 
     @Override
