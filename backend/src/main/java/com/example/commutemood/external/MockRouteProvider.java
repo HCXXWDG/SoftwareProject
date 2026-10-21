@@ -23,6 +23,9 @@ public class MockRouteProvider implements RouteProvider {
         double dx = destination.longitude() - origin.longitude();
         double dy = destination.latitude() - origin.latitude();
         double distance = GeoMath.distanceMeters(origin, destination);
+        if (distance < 1) {
+            return List.of();
+        }
         double bearing = Math.atan2(dx, dy);
 
         // 垂直于行进方向的单位向量
@@ -88,8 +91,9 @@ public class MockRouteProvider implements RouteProvider {
             // 路径长度调整（提前少量打弯再回归）
             double along = t + Math.sin(t * Math.PI * 1.5) * t * (1.0 - t) * 0.06 * (ratio - 1.0);
 
-            double lng = origin.longitude() + dx * along + perpLng * wave * amplitude * distance;
-            double lat = origin.latitude() + dy * along + perpLat * wave * amplitude * distance;
+            double scale = Math.min(1.0, distance / 300.0);
+            double lng = origin.longitude() + dx * along + perpLng * wave * amplitude * scale;
+            double lat = origin.latitude() + dy * along + perpLat * wave * amplitude * scale;
 
             points.add(new GeoPoint(
                     Math.round(lng * 10_000_000.0) / 10_000_000.0,
