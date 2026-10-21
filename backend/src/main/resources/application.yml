@@ -41,6 +41,8 @@ app:
   device-hash-salt: ${DEVICE_HASH_SALT:local-demo-salt-change-before-deploy}
   amap:
     web-key: ${AMAP_WEB_KEY:}
+  heatmap:
+    default-scope: ${HEATMAP_DEFAULT_SCOPE:REAL_ONLY}
   routing:
     demo-enabled: ${ROUTE_DEMO_ENABLED:false}
     endpoint-tolerance-meters: ${ROUTE_ENDPOINT_TOLERANCE_METERS:150}

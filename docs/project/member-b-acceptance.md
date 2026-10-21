@@ -17,7 +17,25 @@
 | B04 | 各原因分支、可解释差值、持久化成功后返回 snapshotId；RouteSnapshotFlowTest 由 compare 直接拿 ID，经 D02 完成/重放/归属校验 |
 | B05 | clean verify、API 运行检查、OpenAPI、算法及接口说明；未运行项分列如下 |
 
-## 本次实际运行
+## PR #67 审阅修订
+
+依据 D 的[审阅意见](https://github.com/HCXXWDG/SoftwareProject/pull/67#issuecomment-6314103530)，本轮只完成 B 范围的修复，并同步 D05 的 `08174e1`。没有修改 A/C 页面或 D 的通勤/仓储/迁移文件。
+
+- 热力图默认范围改为配置：demo 为 ALL，其余为 REAL_ONLY；显式 scope 优先。默认读取不再过滤掉全部演示种子；真实评分和刷新缓存保持 REAL_ONLY。
+- 路线提供器无配置且禁止演示、上游异常或超时，HTTP 返回 `503 route_provider_unavailable`；真实无路线保留 200 + NO_ROUTE。失败不保存快照，也不泄漏上游异常。
+- 契约说明及 PR 回复已同步；此变更需要 A 按服务错误处理 503，而非展示空路线列表。
+
+| 本轮检查 | 实际结果 |
+| --- | --- |
+| 修复前回归 | 9 项中 4 项按预期失败：无 scope 的 demo 热力为 0、三种不可用提供器错误返回 200 |
+| 修复后针对性测试 | 10/10，通过 demo 默认读取、显式模拟范围、基础默认真实范围/覆盖与非法枚举、503 与真正无路线分离 |
+| `mvnw.cmd --batch-mode --no-transfer-progress clean verify` | 207 项，199 通过、0 失败/错误、8 跳过（追加 PostGIS 范围用例前） |
+| 追加 PostGIS 范围回归后的 `mvnw.cmd -o --batch-mode --no-transfer-progress verify` | 208 项，199 实际通过、0 失败/错误、9 项因无 Docker 跳过；JAR/JaCoCo 成功 |
+| 真实库范围回归 | 新增 postgres 未传 scope 只读 REAL、显式 ALL 标 MIXED、刷新仅缓存 REAL；本机跳过，须以本次 Backend CI 结果为准 |
+
+**仍阻塞，不能宣称通勤闭环完成**：当前 DEMO 422、无有效评分 400 尚未移除。已[明确交给 D](https://github.com/HCXXWDG/SoftwareProject/pull/67#issuecomment-6318258809)实施 demo 部署允许 DEMO 写入但趋势排除、无评分首次通勤可记录；必须同时处理 `double` 解箱、NOT NULL 评分列、JDBC null 回读、DTO/趋势判空及新增迁移，不能用 0 填补缺失分数。D 的联调提交完成后 B 再复核快照链路，本 PR 保持草稿。
+
+## 首次交付验证（审阅修订前）
 
 | 检查 | 结果 |
 | --- | --- |
@@ -49,6 +67,6 @@
 
 服务启动沿用 `backend/mvnw.cmd spring-boot:run`。postgres 部署默认关闭模拟回退，配置 Web Service Key 后按真实步行服务工作；仅明确演示场景设置 ROUTE_DEMO_ENABLED=true。配置项详见[路线契约](member-b-route-contract.md)。不得把真实 Key 写入文档、提交或日志。
 
-前端旧契约可能假设分数与 leastStressfulRouteId 必定存在，必须采用空值/状态分支；这也是保留草稿 PR、等待跨成员审查的原因。D02 已有的 legacy UNKNOWN 写入过渡被收紧为必须重新规划，旧记录读取仍兼容。
+前端旧契约可能假设分数与 leastStressfulRouteId 必定存在，必须采用空值/状态分支；这也是保留草稿 PR、等待跨成员审查的原因。当前严格通勤门禁尚待 D 按审阅修订，旧记录读取仍兼容；不得把现有测试通过等同于该已知产品阻塞已解决。
 
 本轮不修改已执行的 V1–V5，不新增迁移、不改评分权重、不整理用户环境文件。回滚应关闭草稿 PR，合并后通过 revert 回滚 B 提交，保留 D 的先行快照和幂等功能。

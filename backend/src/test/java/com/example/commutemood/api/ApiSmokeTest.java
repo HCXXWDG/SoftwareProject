@@ -229,10 +229,21 @@ class ApiSmokeTest {
         mockMvc.perform(get("/api/v1/heatmap")
                         .param("bbox", DemoGeography.HEATMAP_BBOX)
                         .param("zoom", "16")
-                        .param("scope", "SIMULATED_ONLY")
                         .param("hours", "168"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(org.hamcrest.Matchers.greaterThan(0)))
                 .andExpect(jsonPath("$[0].cellId").exists());
+    }
+
+    @Test
+    void explicitSimulatedHeatmapScopeOverridesDemoDefault() throws Exception {
+        mockMvc.perform(get("/api/v1/heatmap")
+                        .param("bbox", DemoGeography.HEATMAP_BBOX)
+                        .param("scope", "SIMULATED_ONLY"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(org.hamcrest.Matchers.greaterThan(0)))
+                .andExpect(jsonPath("$[*].feedbackSource").value(
+                        org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is("DEMO"))));
     }
 
     @Test
@@ -246,7 +257,9 @@ class ApiSmokeTest {
                         .param("zoom", "16")
                         .param("hours", "168"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].cellId").exists());
+                .andExpect(jsonPath("$[0].cellId").exists())
+                .andExpect(jsonPath("$[*].feedbackSource").value(
+                        org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is("REAL"))));
     }
 
     @Test

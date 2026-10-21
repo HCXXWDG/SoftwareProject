@@ -1,3 +1,5 @@
 app:
+  heatmap:
+    default-scope: ${HEATMAP_DEFAULT_SCOPE:ALL}
   routing:
     demo-enabled: ${ROUTE_DEMO_ENABLED:true}

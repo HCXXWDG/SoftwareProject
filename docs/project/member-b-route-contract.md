@@ -51,7 +51,20 @@
 }
 ```
 
-真实但没有反馈时为 `REAL + NONE + INSUFFICIENT_DATA`；真实路线加演示/混合反馈也不能变成有效真实推荐。无候选返回 `NO_ROUTE`；外部失败为 `SERVICE_UNAVAILABLE`。二者均无快照 ID，不是 500 或模拟路线。
+真实但没有反馈时为 `REAL + NONE + INSUFFICIENT_DATA`；真实路线加演示/混合反馈也不能变成有效真实推荐。正常查询但无候选返回 HTTP 200 + `NO_ROUTE`；服务未配置且禁止演示、外部超时或失败返回 HTTP 503 + `route_provider_unavailable`。二者均无快照 ID，不伪装成模拟成功。
+
+503 沿用项目错误格式（`timestamp/status/code/message`），不返回上游 URI、Key 或原始异常。A 应把它当作可重试的服务错误，而不是无路线：
+
+```json
+{
+  "timestamp":"2026-10-21T00:00:00Z",
+  "status":503,
+  "code":"route_provider_unavailable",
+  "message":"步行路线服务暂不可用，请重试或明确选择演示模式。"
+}
+```
+
+`RouteComparisonService` 内部仍用 `SERVICE_UNAVAILABLE` 表示失败；由 `RouteController` 映射 HTTP 错误，不改变真实无路线的响应或成功比较字段。
 
 ## 算法与原因
 
@@ -77,7 +90,9 @@
 
 ## 热力图来源与详情
 
-`GET /api/v1/heatmap` 默认 `scope=REAL_ONLY`。显式演示请求 `scope=SIMULATED_ONLY`；调试混合范围用 `ALL`，每个单元明确为 `REAL`、`DEMO` 或 `MIXED`。路线评分只查询 REAL_ONLY，演示路线只查询 SIMULATED_ONLY。`POST /heatmap/refresh` 固定缓存真实数据，不将演示数据写进真实热力缓存。
+`GET /api/v1/heatmap` 未带 `scope` 时使用 `app.heatmap.default-scope`：基础配置（含 postgres）为 `REAL_ONLY`，demo profile 为 `ALL`，可用 `HEATMAP_DEFAULT_SCOPE` 覆盖。这样现有前端不传 scope 的演示请求也能看到种子热力，不需 A 修改请求。显式 `scope=REAL_ONLY` / `SIMULATED_ONLY` / `ALL` 始终优先于配置；非法枚举返回 400。每个单元明确标记 `REAL`、`DEMO` 或 `MIXED`，混合展示不代表真实有效评分。
+
+此配置只影响 HTTP 读取默认值。`HeatmapService` 三参数方法、真实路线评分和 `POST /heatmap/refresh` 仍固定 `REAL_ONLY`；演示路线评分显式查询 `SIMULATED_ONLY`。不能因为 demo 地图默认显示所有来源，就将模拟证据写进真实热力缓存或真实评分。
 
 每个单元追加 `feedbackSource`、`updatedAt`（参与该单元聚合的最新反馈时间）、`windowHours`（本次查询窗口）。`count` 和 `dominantTag` 保持不变，中文标签由 C 显示。日期不由前端虚构。当前缓存表没有改 schema，读接口仍从报告计算。
 
@@ -85,9 +100,13 @@
 
 只使用 `snapshotId`，不同时创造 `comparisonId`。通过 D 的现有接口保存来源、状态、版本、候选折线、评分和预计秒数；读取时使用外层 `RouteQueryHistory.id` 与设备归属。仓储不需要新增迁移。
 
-仅在 D 预留的 `CommuteService.resolveRouteSource` 接入点消费来源：DEMO 保持 `422 demo_result_not_allowed`；非 REAL、反馈非 REAL、评分非 VALID 或未知旧快照返回 `400 invalid_request`，提示重新规划。有效真实快照沿用 D 的 30 分钟有效期、404/410、幂等与冲突规则。历史旧记录仍可按 D05 规则读取，不能据此伪造新写入资格。
+**当前实现与未解决阻塞**：B 原先在 D 预留的 `CommuteService.resolveRouteSource` 接入点加入严格门禁，当前 DEMO 仍返回 `422 demo_result_not_allowed`，缺有效真实评分仍返回 `400 invalid_request`。D 的审阅指出这会阻断演示与首次通勤，B 已确认需要修正；本轮不将其标记为已解决。有效真实快照仍沿用 D 的 30 分钟有效期、404/410、幂等与冲突规则。
 
-- A：更新公共类型及响应校验，接受可空指数、可选选择 ID 和新状态；用 snapshotId 接入 D02；演示热力显式请求 scope。
+**待 D 实施的交接口径**（[PR 回复](https://github.com/HCXXWDG/SoftwareProject/pull/67#issuecomment-6318258809)）：demo 部署允许记录明确标记 DEMO 的通勤，由读侧排除并累计 `excludedDemoCommutes`；生产可通过独立配置拒绝 DEMO。真实路线但反馈不足时允许保存用户感受与预计秒数，缺少的算法分数保持 null，不补 0，也不宣称 VALID。评分是否有效与通勤是否发生分开处理；来源/缺失标记由 D 的记录契约承接。
+
+不能只删除门禁或返回 UNKNOWN：当前 `CommuteRecord.selectedScore/fastestScore` 是 primitive double、V1 两列为 NOT NULL、JDBC 回读用 getDouble，趋势仍有分数减法。D 需一起完成可空模型/DTO、JDBC、null-safe 趋势与新增迁移（不改已执行版本），并补 demo 排除、首次通勤、幂等、空分数不变 0 的内存/PostGIS 测试。B 不并行修改 D 的这些文件，等待其联调提交后再复核。
+
+- A：更新公共类型及响应校验，接受可空指数、可选选择 ID 和新状态；用 snapshotId 接入 D02；对 `503 route_provider_unavailable` 提供服务错误/重试提示。演示热力可不传 scope。
 - C：分别展示环境指数与综合指数，空值不显示成零；热力详情可读来源、时间和样本数。
-- D：复核来源接入点与真实库快照回读；共享 E2E 按新契约区分 DEMO 拒绝和受控 REAL 完成链路。
+- D：按上述审阅交接完成通勤放行/可空分数，复核真实库快照回读；共享 E2E 区分 demo 排除与真实完成，不把趋势不增长误判为演示写入失败。已同步 D05 的 `08174e1`，非 REAL 来源不会被静默当作已验证来源。
 - 所有人：契约审查完成前不合并本分支；本轮没有改 A/C 页面，也未改 D 的迁移编号、仓储或趋势算法。
