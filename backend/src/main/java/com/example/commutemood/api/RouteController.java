@@ -29,7 +29,7 @@ public class RouteController {
     }
 
     @PostMapping("/compare")
-    @Operation(summary = "Compare candidate routes")
+    @Operation(summary = "Compare validated walking routes", description = "Returns route/feedback sources, scoring status, recommendation reason and a device-owned snapshotId. Demo results cannot complete real commutes.")
     public RouteComparison compare(
             @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
             @Valid @RequestBody RouteCompareRequest request
@@ -37,7 +37,7 @@ public class RouteController {
         return routeComparisonService.compare(
                 deviceId,
                 new GeoPoint(request.origin().longitude(), request.origin().latitude()),
-                new GeoPoint(request.destination().longitude(), request.destination().latitude()));
+                new GeoPoint(request.destination().longitude(), request.destination().latitude()), request.demo());
     }
 
     @GetMapping("/history")

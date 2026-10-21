@@ -229,13 +229,18 @@ class ApiSmokeTest {
         mockMvc.perform(get("/api/v1/heatmap")
                         .param("bbox", DemoGeography.HEATMAP_BBOX)
                         .param("zoom", "16")
+                        .param("scope", "SIMULATED_ONLY")
                         .param("hours", "168"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].cellId").exists());
     }
 
     @Test
-    void refreshesHeatmapCacheFromDemoSeed() throws Exception {
+    void refreshesHeatmapCacheFromRealReports() throws Exception {
+        emotionReportRepository.save(new com.example.commutemood.domain.EmotionReport(UUID.randomUUID(),
+                identityService.hash("cache-test"), new GeoPoint(DemoGeography.REPORT_LONGITUDE,
+                DemoGeography.REPORT_LATITUDE), 25, com.example.commutemood.domain.EmotionTag.QUIET,
+                java.time.Instant.now(), false));
         mockMvc.perform(post("/api/v1/heatmap/refresh")
                         .param("bbox", DemoGeography.HEATMAP_BBOX)
                         .param("zoom", "16")
@@ -285,7 +290,10 @@ class ApiSmokeTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.routes.length()").value(3))
                 .andExpect(jsonPath("$.fastestRouteId").value("route-fast"))
-                .andExpect(jsonPath("$.leastStressfulRouteId").value("route-calm"))
+                .andExpect(jsonPath("$.leastStressfulRouteId").doesNotExist())
+                .andExpect(jsonPath("$.routeSource").value("DEMO"))
+                .andExpect(jsonPath("$.scoringStatus").value("UNAVAILABLE"))
+                .andExpect(jsonPath("$.routes[0].stressScore").doesNotExist())
                 .andExpect(jsonPath("$.recommendation").exists());
     }
 
@@ -377,7 +385,12 @@ class ApiSmokeTest {
         ScoredRoute calm = new ScoredRoute(
                 "route-calm", "少心累路线 B", 1700, 1210, 20.0, 43.0, 0.68, false, true, List.of());
         RouteComparison comparison = new RouteComparison(
-                List.of(fast, calm), "route-fast", "route-calm", "ok", true);
+                List.of(fast, calm), "route-fast", "route-calm", "ok", true,
+                com.example.commutemood.domain.RouteSource.REAL,
+                com.example.commutemood.domain.FeedbackSource.REAL,
+                com.example.commutemood.domain.ScoringStatus.VALID,
+                com.example.commutemood.domain.RecommendationReason.RECOMMENDED,
+                "walking-distance-v2", "WALKING", null, null);
         UUID snapshotId = routeQueryRepository.save(
                 deviceHash,
                 new GeoPoint(116.392, 39.905),
@@ -492,7 +505,12 @@ class ApiSmokeTest {
         ScoredRoute calm = new ScoredRoute(
                 "route-calm", "少心累路线 B", 1700, 1210, 20.0, 43.0, 0.68, false, true, List.of());
         RouteComparison comparison = new RouteComparison(
-                List.of(fast, calm), "route-fast", "route-calm", "ok", true);
+                List.of(fast, calm), "route-fast", "route-calm", "ok", true,
+                com.example.commutemood.domain.RouteSource.REAL,
+                com.example.commutemood.domain.FeedbackSource.REAL,
+                com.example.commutemood.domain.ScoringStatus.VALID,
+                com.example.commutemood.domain.RecommendationReason.RECOMMENDED,
+                "walking-distance-v2", "WALKING", null, null);
         UUID snapshotId = routeQueryRepository.save(
                 deviceHash,
                 new GeoPoint(116.392, 39.905),
@@ -532,7 +550,12 @@ class ApiSmokeTest {
         ScoredRoute calm = new ScoredRoute(
                 "route-calm", "少心累路线 B", 1700, 1210, 20.0, 43.0, 0.68, false, true, List.of());
         RouteComparison comparison = new RouteComparison(
-                List.of(fast, calm), "route-fast", "route-calm", "ok", true);
+                List.of(fast, calm), "route-fast", "route-calm", "ok", true,
+                com.example.commutemood.domain.RouteSource.REAL,
+                com.example.commutemood.domain.FeedbackSource.REAL,
+                com.example.commutemood.domain.ScoringStatus.VALID,
+                com.example.commutemood.domain.RecommendationReason.RECOMMENDED,
+                "walking-distance-v2", "WALKING", null, null);
         UUID snapshotId = routeQueryRepository.save(
                 deviceHash,
                 new GeoPoint(116.392, 39.905),

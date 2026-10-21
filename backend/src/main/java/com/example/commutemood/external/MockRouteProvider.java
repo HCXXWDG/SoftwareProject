@@ -63,9 +63,9 @@ public class MockRouteProvider implements RouteProvider {
         int scenicDuration = Math.max(180, (int) (fastDuration * 1.28));
 
         return List.of(
-                new RouteCandidate("route-fast", "最快路线 A", fastDist, fastDuration, fastest, 68.0),
-                new RouteCandidate("route-calm", "少心累路线 B", calmDist, calmDuration, calmer, 28.0),
-                new RouteCandidate("route-scenic", "风景路线 C", scenicDist, scenicDuration, scenic, null));
+                new RouteCandidate("route-fast", "演示步行路线 A", fastDist, fastDuration, fastest, 68.0),
+                new RouteCandidate("route-calm", "演示步行路线 B", calmDist, calmDuration, calmer, 28.0),
+                new RouteCandidate("route-scenic", "演示步行路线 C", scenicDist, scenicDuration, scenic, null));
     }
 
     /**

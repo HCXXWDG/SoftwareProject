@@ -53,13 +53,14 @@ class PostgisIntegrationTest {
         mockMvc.perform(get("/api/v1/heatmap")
                         .param("bbox", DemoGeography.HEATMAP_BBOX)
                         .param("zoom", "16")
+                        .param("scope", "SIMULATED_ONLY")
                         .param("hours", "168"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].cellId").exists());
     }
 
     @Test
-    void comparesRoutesWithDistinctRecommendations() throws Exception {
+    void missingExternalConfigurationDoesNotReturnUnlabelledDemoRoutes() throws Exception {
         mockMvc.perform(post("/api/v1/routes/compare")
                         .header("X-Device-Id", "postgis-integration-device")
                         .contentType("application/json")
@@ -74,8 +75,8 @@ class PostgisIntegrationTest {
                                 DemoGeography.DESTINATION_LONGITUDE,
                                 DemoGeography.DESTINATION_LATITUDE)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.fastestRouteId").value("route-fast"))
-                .andExpect(jsonPath("$.leastStressfulRouteId").value("route-calm"));
+                .andExpect(jsonPath("$.routeSource").value("UNAVAILABLE"))
+                .andExpect(jsonPath("$.routes.length()").value(0));
     }
 
     @Test
@@ -118,6 +119,13 @@ class PostgisIntegrationTest {
 
     @Test
     void refreshesHeatmapCacheIntoPostgis() throws Exception {
+        mockMvc.perform(post("/api/v1/reports")
+                        .header("X-Device-Id", "postgis-cache-device")
+                        .contentType("application/json")
+                        .content("""
+                                {"location":{"longitude":%.7f,"latitude":%.7f},"stressLevel":25,"tag":"QUIET"}
+                                """.formatted(DemoGeography.REPORT_LONGITUDE, DemoGeography.REPORT_LATITUDE)))
+                .andExpect(status().isCreated());
         mockMvc.perform(post("/api/v1/heatmap/refresh")
                         .param("bbox", DemoGeography.HEATMAP_BBOX)
                         .param("zoom", "16")

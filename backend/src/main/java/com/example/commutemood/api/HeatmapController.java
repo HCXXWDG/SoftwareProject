@@ -3,6 +3,7 @@ package com.example.commutemood.api;
 import com.example.commutemood.application.HeatmapService;
 import com.example.commutemood.domain.GeoBounds;
 import com.example.commutemood.domain.HeatmapCell;
+import com.example.commutemood.repository.ReportScope;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,9 +29,10 @@ public class HeatmapController {
     public List<HeatmapCell> get(
             @RequestParam String bbox,
             @RequestParam(defaultValue = "16") int zoom,
-            @RequestParam(defaultValue = "168") int hours
+            @RequestParam(defaultValue = "168") int hours,
+            @RequestParam(defaultValue = "REAL_ONLY") ReportScope scope
     ) {
-        return heatmapService.getHeatmap(parseBounds(bbox), zoom, hours);
+        return heatmapService.getHeatmap(parseBounds(bbox), zoom, hours, scope);
     }
 
     @PostMapping("/refresh")

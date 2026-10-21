@@ -18,5 +18,6 @@ public enum RouteSource {
     /** 演示/模拟路线，不得进入真实统计。 */
     DEMO,
     /** 来源未知（历史数据或快照未携带来源），按未知口径处理。 */
-    UNKNOWN
+    UNKNOWN,
+    UNAVAILABLE
 }

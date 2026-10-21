@@ -176,12 +176,23 @@ public class CommuteService {
     /**
      * 解析快照的路线来源。
      *
-     * <p>TODO(B04)：路线领域模型/快照目前未携带来源字段，"拒绝演示结果进入真实统计"依赖 B
-     * 在快照中提供来源（真实/演示）与评分版本。B 交付后，此处改为从快照读取真实来源即可，
-     * 其余流程无需改动。在来源可用前统一按 {@link RouteSource#UNKNOWN} 处理：既不冒充真实
-     * （REAL），也不误杀 demo 完成流程；UNKNOWN 是否计入真实统计由趋势侧（D05）按未知口径处理。
+     * <p>B04 的来源、评分状态和版本随比较快照保存。只有可验证的真实结果允许创建新通勤；
+     * 旧快照来源未知时必须重新规划。已有历史记录仍由 D05 的读侧兼容规则处理。
      */
     private RouteSource resolveRouteSource(RouteQueryHistory snapshot) {
-        return RouteSource.UNKNOWN;
+        RouteComparison comparison = snapshot.result();
+        if (comparison.routeSource() == RouteSource.DEMO) {
+            return RouteSource.DEMO;
+        }
+        if (comparison.routeSource() != RouteSource.REAL
+                || comparison.feedbackSource() != com.example.commutemood.domain.FeedbackSource.REAL
+                || comparison.scoringStatus() != com.example.commutemood.domain.ScoringStatus.VALID
+                || comparison.scoringVersion() == null || comparison.routes().isEmpty()
+                || comparison.routes().stream().anyMatch(route -> route.stressScore() == null
+                || route.stressExposure() == null || !Double.isFinite(route.stressScore())
+                || !Double.isFinite(route.stressExposure()) || route.durationSeconds() <= 0)) {
+            throw new IllegalArgumentException("路线快照没有可验证的真实评分，请重新规划后完成通勤。");
+        }
+        return RouteSource.REAL;
     }
 }

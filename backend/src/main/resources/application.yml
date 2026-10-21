@@ -41,5 +41,8 @@ app:
   device-hash-salt: ${DEVICE_HASH_SALT:local-demo-salt-change-before-deploy}
   amap:
     web-key: ${AMAP_WEB_KEY:}
+  routing:
+    demo-enabled: ${ROUTE_DEMO_ENABLED:false}
+    endpoint-tolerance-meters: ${ROUTE_ENDPOINT_TOLERANCE_METERS:150}
   cors-origins: ${APP_CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost,https://localhost}
 

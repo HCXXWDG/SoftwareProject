@@ -32,7 +32,11 @@ class CommuteServiceTest {
     private static final ScoredRoute CALM = new ScoredRoute(
             "route-calm", "少心累路线 B", 1700, 1210, 20.0, 43.0, 0.68, false, true, List.of());
     private static final RouteComparison COMPARISON = new RouteComparison(
-            List.of(FAST, CALM), "route-fast", "route-calm", "ok", true);
+            List.of(FAST, CALM), "route-fast", "route-calm", "ok", true,
+            RouteSource.REAL, com.example.commutemood.domain.FeedbackSource.REAL,
+            com.example.commutemood.domain.ScoringStatus.VALID,
+            com.example.commutemood.domain.RecommendationReason.RECOMMENDED,
+            WeightedStressRouteScoringStrategy.VERSION, "WALKING", null, null);
 
     private final MemoryCommuteRecordRepository commuteRepository = new MemoryCommuteRecordRepository();
     private final RouteQueryRepository routeQueryRepository = mock(RouteQueryRepository.class);
@@ -77,8 +81,7 @@ class CommuteServiceTest {
         assertThat(record.endStressLevel()).isEqualTo(25);
         assertThat(record.snapshotId()).isEqualTo(snapshotId);
         assertThat(record.operationId()).isEqualTo("op-1");
-        // B04 交付快照来源前统一按 UNKNOWN 存储（不冒充真实、不误杀 demo）
-        assertThat(record.routeSource()).isEqualTo(RouteSource.UNKNOWN);
+        assertThat(record.routeSource()).isEqualTo(RouteSource.REAL);
     }
 
     @Test
@@ -86,7 +89,11 @@ class CommuteServiceTest {
         ScoredRoute quick = new ScoredRoute(
                 "route-quick", "很近的路", 100, 45, 10.0, 30.0, 0.5, true, true, List.of());
         RouteComparison comparison = new RouteComparison(
-                List.of(quick), "route-quick", "route-quick", "ok", false);
+                List.of(quick), "route-quick", "route-quick", "ok", false,
+                RouteSource.REAL, com.example.commutemood.domain.FeedbackSource.REAL,
+                com.example.commutemood.domain.ScoringStatus.VALID,
+                com.example.commutemood.domain.RecommendationReason.NO_ALTERNATIVE,
+                WeightedStressRouteScoringStrategy.VERSION, "WALKING", null, null);
         UUID snapshotId = stubSnapshot(comparison, Instant.now());
 
         CommuteCompletion completion = service.complete("device-x", snapshotId, "op-1", "route-quick", 50, null);
