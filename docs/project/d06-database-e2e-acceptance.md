@@ -69,6 +69,19 @@ COMMUTE_TEST_JDBC_USERNAME=commute COMMUTE_TEST_JDBC_PASSWORD=commute_dev_passwo
 
 跳过的 5 项是 `PostgisIntegrationTest`（Testcontainers 需要 Docker，本机没有），另外 7 项是 D06 新增的两个类——两者都通过 `@EnabledIf("...IntegrationDatabase#isAvailable")` 整类跳过，**记为未运行，不计为通过**。第二轮 154/0/12 是为了证明"环境缺失时干净跳过、不误报失败"，即其他开发者在没有数据库的机器上 `./mvnw -o test` 仍然 BUILD SUCCESS。两轮结束后 `pg_namespace` 里 `LIKE 'd06%'` 的 schema 数均为 **0**，`public.commute_record` 仍是验证前的 7 行——一次性 schema 没有污染开发库。
 
+### 3.2.1 CI 上的同一套测试：154 项 0 跳过
+
+本 PR（#69，头提交 `7ad3331`）的 `Backend CI` 为 **success**，日志里 12 项数据库测试全部真实执行，**没有一项跳过**：
+
+| 测试类 | CI 结果 |
+| --- | --- |
+| `PostgisIntegrationTest` | `Tests run: 5, Failures: 0, Errors: 0, Skipped: 0`，16.67 s |
+| `DatabaseMigrationAcceptanceTest` | `Tests run: 3, Failures: 0, Errors: 0, Skipped: 0`，0.889 s |
+| `CommutePersistenceAcceptanceTest` | `Tests run: 4, Failures: 0, Errors: 0, Skipped: 0`，1.187 s |
+| 合计 | `Tests run: 154, Failures: 0, Errors: 0, Skipped: 0`，BUILD SUCCESS |
+
+CI 的 ubuntu-latest 有 Docker，所以走的是 Testcontainers `postgis/postgis:16-3.4` 路径；本机走的是 `COMMUTE_TEST_JDBC_URL` 指向的真实 PostgreSQL 16.15 + PostGIS 3.6。**两条取库路径都验证过，且结果一致**——这正是 `IntegrationDatabase` 存在的意义：本机没 Docker 不等于测试没跑，CI 有 Docker 也不等于本机开发者会被迫跳过。第 4 节里"本机未运行"的 5 项 `PostgisIntegrationTest`，据此可以判定为**在 CI 上已通过**。
+
 ### 3.3 `postgres` profile：全新建库 → 启动 → 全流程实测
 
 在一个全新空 schema `d06_live_pg` 上按第 7 节的方式启动后端（`SPRING_PROFILES_ACTIVE=postgres`，`SPRING_DATASOURCE_URL` 带 `currentSchema=d06_live_pg,public`）：
@@ -130,7 +143,7 @@ COMMUTE_TEST_JDBC_USERNAME=commute COMMUTE_TEST_JDBC_PASSWORD=commute_dev_passwo
 
 | 检查 | 状态 | 原因 |
 | --- | --- | --- |
-| `PostgisIntegrationTest`（5 项）本机 | **未运行** | 本机无 Docker，Testcontainers 起不来。该项在 CI 上是有 Docker 的：PR #65 头提交 `08174e1` 的 `Backend CI` 为 `success`，日志中 `Tests run: 147, Failures: 0, Skipped: 0`、Java 17.0.20.1、BUILD SUCCESS。**D06 新增的 7 项尚未在 CI 跑过**，随本 PR 首次验证 |
+| `PostgisIntegrationTest`（5 项）本机 | **本机未运行** | 本机无 Docker，Testcontainers 起不来，整类 `@EnabledIf` 跳过。**CI 上已实际通过**：PR #69 头提交 `7ad3331` 的 `Backend CI` 日志为 `Tests run: 5, Failures: 0, Errors: 0, Skipped: 0`（16.67 s），全量 `Tests run: 154, Failures: 0, Errors: 0, Skipped: 0`、BUILD SUCCESS。D06 新增的 7 项同样在 CI 上首次真实执行并通过（3.2.1）。因此这一行只是"本机环境缺失"，不是"该项没有验证" |
 | 前端 `npm run build` / `npm test` | **未运行** | 本机 `frontend/node_modules` 缺失，且当前前端基线被 Issue #68 阻塞（缺陷 1），先修基线再跑更有意义 |
 | Mock E2E `npm run test:e2e` | **未运行** | 同上（Playwright 依赖未安装） |
 | Full-stack E2E `npm run test:e2e:integration` | **未运行** | 同上；这也是本次改动的 `app.integration.e2e.ts` 唯一能验证它的方式，**该文件的 201 断言改动尚未经过实际运行**，只有后端真机 HTTP 结果（3.3 步骤 5）作为契约依据 |
@@ -311,7 +324,7 @@ COMMUTE_TEST_JDBC_USERNAME=commute COMMUTE_TEST_JDBC_PASSWORD=commute_dev_passwo
 2. **B**：缺陷 2（compare 无 `snapshotId`）、3（路线时长/几何不合理）、4（低置信度无标记）、6（`resolveRouteSource` 占位）都在你这边。缺陷 3 优先级最高——它会让 C05 的趋势图和答辩演示显示"一次通勤 7 小时"。缺陷 6 请直接在 PR #67 里回一句口径（demo 快照算 `DEMO` 还是 `UNKNOWN`），我按你的答复改 `resolveRouteSource` 和对应的 E2E 断言。
 3. **C**：第 8 节是给你的 4 工时清单，前置是 #68。另外 demo 与真实库的热力格数量差一倍（116 vs 55，见 3.5），演示时切 profile 地图会变稀，这是种子数据差异不是 bug；PR #57–#61 的目标分支请从 `main` 改成 `develop`，否则绕过了 develop 的 required checks。
 4. **仓库维护者**：缺陷 8 的部署前置（超级用户建扩展）建议同步进 `docs/生产部署指南.md`，D 可以在下一轮补，但需要有人复核部署文档的归属。
-5. **CI**：D06 新增的 7 项数据库测试在本 PR 之前从未在 CI 上运行过。CI 有 Docker，因此它们会走 Testcontainers 路径而不是本机 PG 路径——这是第一次验证，若 CI 上失败请按"跳过不等于通过"的口径处理，不要改成 `@Disabled`。
+5. **CI**：D06 新增的 7 项数据库测试已随本 PR（#69）在 CI 上首次真实执行，`Backend CI` 为 success、`Tests run: 154, Failures: 0, Errors: 0, Skipped: 0`——CI 有 Docker，走的是 Testcontainers 路径而非本机 PG 路径，两条取库路径都已验证（3.2.1）。后续若这些测试在 CI 上失败，请按"跳过不等于通过"的口径处理，不要改成 `@Disabled` 或放宽断言。
 
 ## 10. 验收对照
 
@@ -328,4 +341,4 @@ COMMUTE_TEST_JDBC_USERNAME=commute COMMUTE_TEST_JDBC_PASSWORD=commute_dev_passwo
 | 形成剩余缺陷 | 第 6 节（9 条，含归属与证据） |
 | 形成启动说明 | 第 7 节（数据库准备、两种 profile、前端、测试命令） |
 | 通过启动书规定的关键场景 | 第 5 节：2 条通过、5 条部分、3 条未运行；**当前不满足发布标准**，卡点是缺陷 1/2/3/4/6 |
-| 环境缺失导致跳过的检查不计为通过 | 第 4 节全部写"未运行"；集成测试用 `@EnabledIf` 整类跳过并在 `IntegrationDatabase` 的 Javadoc 里写明"跳过 ≠ 通过"；两轮 154/0/5 与 154/0/12 分别证明"有库时真跑"和"无库时干净跳过" |
+| 环境缺失导致跳过的检查不计为通过 | 第 4 节全部写"未运行"并注明原因；集成测试用 `@EnabledIf` 整类跳过并在 `IntegrationDatabase` 的 Javadoc 里写明"跳过 ≠ 通过"；三轮结果分别证明"本机有库时真跑"（154/0/5）、"无库时干净跳过"（154/0/12）与"CI 有 Docker 时 12 项全部真跑"（154/0/**0**，3.2.1） |
