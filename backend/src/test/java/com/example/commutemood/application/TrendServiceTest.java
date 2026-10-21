@@ -181,6 +181,33 @@ class TrendServiceTest {
     }
 
     @Test
+    void treatsRealSourceAsVerified() {
+        stub(List.of(record("op-1", null, RouteSource.REAL, 50, 1500, atDay(0, 8, 0))));
+
+        TrendService.TrendResult result = service.getTrends(DEVICE_ID, 7, ZONE);
+
+        assertThat(result.totalCommutes()).isEqualTo(1);
+        assertThat(result.unknownSourceCommutes()).isZero();
+        assertThat(result.excludedDemoCommutes()).isZero();
+    }
+
+    /**
+     * 判定写成"非 REAL 即未知"，因此 {@code RouteSource} 将来新增取值（例如 B 的
+     * {@code UNAVAILABLE}）或来源为 {@code null} 时，都不会被悄悄算成可验证的真实评分。
+     */
+    @Test
+    void treatsMissingSourceAsUnverifiedButStillCounted() {
+        stub(List.of(record("op-1", null, null, 50, 1500, atDay(0, 8, 0))));
+
+        TrendService.TrendResult result = service.getTrends(DEVICE_ID, 7, ZONE);
+
+        assertThat(result.totalCommutes()).isEqualTo(1);
+        assertThat(result.unknownSourceCommutes()).isEqualTo(1);
+        assertThat(result.excludedDemoCommutes()).isZero();
+        assertThat(result.points().get(6).commuteCount()).isEqualTo(1);
+    }
+
+    @Test
     void averagesEstimatedSecondsOnlyOverPresentSamples() {
         stub(List.of(
                 record("op-1", null, RouteSource.REAL, 50, 1500, atDay(0, 8, 0)),

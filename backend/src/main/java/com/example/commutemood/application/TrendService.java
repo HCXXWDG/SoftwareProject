@@ -30,8 +30,11 @@ import java.util.Objects;
  *       {@code estimatedSampleCount}；历史记录没有该字段时保持 {@code null}，
  *       不用 {@code durationMinutes} 反推、不填 0。</li>
  *   <li><b>来源筛选</b>：{@link RouteSource#DEMO} 的记录不进入任何统计，只在
- *       {@code excludedDemoCommutes} 里计数；{@link RouteSource#UNKNOWN}（历史数据）
- *       照常计入但在 {@code unknownSourceCommutes} 里显式标记，不当作真实评分。</li>
+ *       {@code excludedDemoCommutes} 里计数；<b>非 {@link RouteSource#REAL} 的其余取值</b>
+ *       （历史数据的 {@link RouteSource#UNKNOWN}、{@code null}，以及将来新增的取值）
+ *       照常计入但在 {@code unknownSourceCommutes} 里显式标记，不当作可验证的真实评分。
+ *       判定写成"不等于 REAL"而不是"等于 UNKNOWN"，这样 {@code RouteSource} 再加枚举值时
+ *       新来源不会被悄悄算成真实数据。</li>
  * </ol>
  *
  * <p>另外，{@code totalCommutes} 是"窗口内被计入的通勤次数"，等于各日 {@code commuteCount}
@@ -89,7 +92,10 @@ public class TrendService {
                 outOfWindow++;
                 continue;
             }
-            if (record.routeSource() == RouteSource.UNKNOWN) {
+            if (record.routeSource() != RouteSource.REAL) {
+                // 只有 REAL 算"来源可验证"。非 REAL（历史数据的 UNKNOWN、来源为 null，
+                // 以及将来新增的枚举取值如 UNAVAILABLE）一律按未知口径计数：照常进统计，
+                // 但显式标记，避免枚举扩展时新来源被悄悄当成真实评分。
                 unknownSource++;
             }
             counted.add(record);
@@ -237,7 +243,7 @@ public class TrendService {
      *
      * @param days                  本次窗口的自然日天数（回显，便于前端校对）
      * @param timezone              本次分桶使用的时区 ID（回显）
-     * @param unknownSourceCommutes 计入统计但来源未知（历史数据）的通勤次数
+     * @param unknownSourceCommutes 计入统计但来源不可验证（非 {@code REAL}，含历史数据）的通勤次数
      * @param excludedDemoCommutes  因来源为演示而被排除的通勤次数
      * @param deduplicatedCommutes  读侧折叠掉的重复写入条数（不增加趋势次数）
      * @param outOfWindowCommutes   完成时间落在窗口自然日之外（含未来时间）而未计入的次数
