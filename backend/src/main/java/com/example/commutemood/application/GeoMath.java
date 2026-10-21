@@ -19,26 +19,47 @@ public final class GeoMath {
         double a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2)
                 + Math.cos(lat1) * Math.cos(lat2)
                 * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+        a = Math.max(0, Math.min(1, a));
         return 2 * EARTH_RADIUS_METERS * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     public static List<GeoPoint> sampleEvery(List<GeoPoint> polyline, double spacingMeters) {
+        if (polyline == null || !Double.isFinite(spacingMeters) || spacingMeters <= 0) {
+            throw new IllegalArgumentException("Polyline and a positive finite spacing are required");
+        }
+        if (polyline.stream().anyMatch(point -> point == null)) {
+            throw new IllegalArgumentException("Polyline cannot contain null coordinates");
+        }
         if (polyline.size() < 2) {
             return List.copyOf(polyline);
         }
         List<GeoPoint> sampled = new ArrayList<>();
         sampled.add(polyline.get(0));
+        double traversed = 0;
+        double nextSample = spacingMeters;
         for (int index = 1; index < polyline.size(); index++) {
             GeoPoint start = polyline.get(index - 1);
             GeoPoint end = polyline.get(index);
             double distance = distanceMeters(start, end);
-            int segments = Math.max(1, (int) Math.ceil(distance / spacingMeters));
-            for (int segment = 1; segment <= segments; segment++) {
-                double ratio = segment / (double) segments;
+            if (distance == 0) {
+                continue;
+            }
+            // Carry the cumulative distance across vertices; vertex density cannot change weights.
+            while (nextSample <= traversed + distance) {
+                if (sampled.size() >= 100_000) {
+                    throw new IllegalArgumentException("Polyline requires too many samples");
+                }
+                double ratio = (nextSample - traversed) / distance;
                 sampled.add(new GeoPoint(
                         start.longitude() + (end.longitude() - start.longitude()) * ratio,
                         start.latitude() + (end.latitude() - start.latitude()) * ratio));
+                nextSample += spacingMeters;
             }
+            traversed += distance;
+        }
+        GeoPoint end = polyline.get(polyline.size() - 1);
+        if (distanceMeters(sampled.get(sampled.size() - 1), end) > 0.000001) {
+            sampled.add(end);
         }
         return sampled;
     }

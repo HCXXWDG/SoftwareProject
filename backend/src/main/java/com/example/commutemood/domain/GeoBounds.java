@@ -22,8 +22,8 @@ public record GeoBounds(double west, double south, double east, double north) {
             east = Math.max(east, point.longitude());
             north = Math.max(north, point.latitude());
         }
-        return new GeoBounds(west - paddingDegrees, south - paddingDegrees,
-                east + paddingDegrees, north + paddingDegrees);
+        return new GeoBounds(Math.max(-180, west - paddingDegrees), Math.max(-90, south - paddingDegrees),
+                Math.min(180, east + paddingDegrees), Math.min(90, north + paddingDegrees));
     }
 }
 
