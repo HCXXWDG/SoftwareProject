@@ -69,6 +69,7 @@ class WeightedStressRouteScoringStrategyTest {
                         1, 10, EmotionTag.OTHER)).toList();
         var first = strategy.score(new RouteCandidate("a", "a", 1000, 600, sparse), 600, cells, true);
         var second = strategy.score(new RouteCandidate("b", "b", 1000, 600, dense), 600, cells, true);
+        assertThat(second.stressExposure()).isCloseTo(first.stressExposure(), org.assertj.core.data.Offset.offset(0.1));
         assertThat(second.stressScore()).isCloseTo(first.stressScore(), org.assertj.core.data.Offset.offset(0.1));
         var zeros = cells.stream().map(cell -> new HeatmapCell(cell.cellId(), cell.center(), 0, 1, 10, EmotionTag.QUIET)).toList();
         assertThat(strategy.score(new RouteCandidate("a", "a", 1000, 600, sparse), 600, zeros, true).stressScore()).isZero();

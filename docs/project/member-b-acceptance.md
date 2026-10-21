@@ -23,6 +23,7 @@
 | --- | --- |
 | `mvnw.cmd --batch-mode --no-transfer-progress clean verify` | 干净构建通过，193 项中 188 通过、5 跳过；JAR 与 JaCoCo 成功生成 |
 | 补充 JDBC 链路后的 `mvnw.cmd -o --batch-mode --no-transfer-progress verify` | 最终 196 项，188 通过，0 失败，0 错误，8 项 PostGIS 因无 Docker 跳过 |
+| [GitHub Backend CI](https://github.com/HCXXWDG/SoftwareProject/actions/runs/39563582970) | Java 17 + Docker：196/196 通过，0 失败、0 错误、0 跳过；PostgisIntegrationTest 5/5、PostgisRouteSnapshotFlowTest 3/3 |
 | 提供器测试 | 20/20；单路线不补造、空 paths、坏耗时/折线、HTML/异常结构、传输超时、脱敏异常 |
 | B 算法/服务测试 | 累计采样、0.1 分几何稳定、有效零分、无穷/NaN 热力数据、来源混入、全部推荐分支、保存失败与返回空 ID |
 | B/D API 联调 | 3/3；真实受控路线 + 真实反馈 → compare ID → 30 秒通勤 201 → 同键重放 200 → 趋势只计 1；他设备 404；DEMO 422；无有效评分 400 |
@@ -37,6 +38,12 @@
 - 本机未安装可用 Docker/本地 PostGIS，Testcontainers 跳过不计通过。已有 PostgisIntegrationTest 5 项，新增 PostgisRouteSnapshotFlowTest 复用 B/D 链路 3 项；真实库由 GitHub Backend CI 在有 Docker 的运行器验证，以实际日志为准。
 - 没有使用真实高德凭据请求在线 walking 服务；官方文档核对和可控 HTTP 测试不等于真实服务权限、校园道路吸附验收。
 - 没有把 A/C 尚未合并的分支混入本交付；共享 Mock/Full-stack/PWA/Android E2E 需由 D06 配合 A/C 在新契约下执行。本轮未宣称全项 CI 或整项目完成。
+
+## PR 与跨成员检查
+
+交付为 [PR #67](https://github.com/HCXXWDG/SoftwareProject/pull/67)，契约讨论为 [Issue #66](https://github.com/HCXXWDG/SoftwareProject/issues/66)。后端 CI 已确认真实 PostGIS 8 项均执行并通过，因此本机缺 Docker 不再阻塞 B/D 的存储联调证据；它仍不能代替真实高德在线权限验证。
+
+其他检查保持独立记录：Frontend CI 仍为同步前已有的 17 个断言失败；Android APK Verification 在 `android-actions/setup-android@v3` 安装已移除的 `tools` SDK 包时失败，日志为 `Failed to find package 'tools'`。B 本轮不修改这些工作流或页面，PR 继续草稿，待 A/C 修复及 D06 联调后才能讨论发布。
 
 ## 风险、启动和回滚
 

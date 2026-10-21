@@ -135,6 +135,7 @@ class RouteComparisonServiceTest {
                         EmotionTag.QUIET, FeedbackSource.DEMO, java.time.Instant.now(), 168)));
         var result = service.compare(ORIGIN, DESTINATION);
         assertThat(result.scoringStatus()).isEqualTo(ScoringStatus.INSUFFICIENT_DATA);
+        assertThat(result.recommendationReason()).isEqualTo(RecommendationReason.INSUFFICIENT_DATA);
         assertThat(result.recommendAlternative()).isFalse();
         assertThat(result.routes()).allSatisfy(route -> assertThat(route.stressScore()).isNull());
         when(heatmap.getHeatmap(any(), anyInt(), anyInt(), any())).thenReturn(List.of());
