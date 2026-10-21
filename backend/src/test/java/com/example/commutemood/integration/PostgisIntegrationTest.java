@@ -110,8 +110,10 @@ class PostgisIntegrationTest {
                         .header("X-Device-Id", "postgis-report-device")
                         .contentType("application/json")
                         .content(payload))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.status").value("duplicate"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("duplicate"))
+                .andExpect(jsonPath("$.code").value("report_duplicate"))
+                .andExpect(jsonPath("$.counted").value(false));
     }
 
     @Test

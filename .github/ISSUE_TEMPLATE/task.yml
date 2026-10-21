@@ -1,0 +1,35 @@
+name: 开发任务
+description: 按任务分工书认领或补充开发工作
+title: "[任务编号] "
+labels: [task]
+body:
+  - type: input
+    id: role
+    attributes:
+      label: 成员角色
+      placeholder: A / B / C / D / 共同
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 工作范围
+      description: 写明具体修改和涉及模块
+    validations:
+      required: true
+  - type: input
+    id: dependencies
+    attributes:
+      label: 前置依赖
+      placeholder: 关联任务编号或 Issue
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收标准
+      placeholder: "- [ ] 可验证的完成条件"
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 测试结果和剩余问题

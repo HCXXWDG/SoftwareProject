@@ -46,6 +46,8 @@ export function RouteOverlay({
       aria-label="路线叠加层"
       className="map-surface__route-overlay"
       data-testid="route-overlay"
+      height="100%"
+      width="100%"
     >
       {sorted.map(({ route, points }) => {
         const isSelected = route.id === selectedRouteId;

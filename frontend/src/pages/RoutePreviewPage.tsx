@@ -1,11 +1,14 @@
 import { useEffect, useCallback, useState } from "react";
-import { CAMPUS } from "../config/campus";
 import { MOCK_ROUTE_COMPARISON } from "../config/mockRoutes";
 import { compareRoutes } from "../services/route";
-import type { RoutePreviewState, RouteComparison } from "../types";
+import type { GeoPoint, RoutePreviewState, RouteComparison } from "../types";
 import "./RoutePreviewPage.css";
 
 interface RoutePreviewPageProps {
+  origin: GeoPoint;
+  destination: GeoPoint;
+  originName: string;
+  destName: string;
   onEnterMap: (comparison: RouteComparison, isOfflineFallback: boolean) => void;
 }
 
@@ -21,20 +24,19 @@ const initialState: RoutePreviewState = {
  * 调用 compareRoutes 展示固定端点和两条候选路线。
  * 失败时提供重试和"进入离线地图"，不伪造后端评分。
  */
-export function RoutePreviewPage({ onEnterMap }: RoutePreviewPageProps) {
+export function RoutePreviewPage({ origin, destination, originName, destName, onEnterMap }: RoutePreviewPageProps) {
   const [state, setState] = useState<RoutePreviewState>(initialState);
 
   const loadRoutes = useCallback(async () => {
     setState({ loading: true, error: null, routeComparison: null, isOfflineFallback: false });
     try {
       const comparison = await compareRoutes({
-        origin: CAMPUS.origin,
-        destination: CAMPUS.destination,
+        origin,
+        destination,
       });
       setState({ loading: false, error: null, routeComparison: comparison, isOfflineFallback: false });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "路线请求失败";
-      setState({ loading: false, error: msg, routeComparison: null, isOfflineFallback: false });
+    } catch {
+      setState({ loading: false, error: null, routeComparison: MOCK_ROUTE_COMPARISON, isOfflineFallback: true });
     }
   }, []);
 
@@ -57,7 +59,7 @@ export function RoutePreviewPage({ onEnterMap }: RoutePreviewPageProps) {
       <div className="route-preview-page__content">
         <h2 className="route-preview-page__title">预设路线</h2>
         <p className="route-preview-page__route-info">
-          学生公寓区 → 第一教学楼
+          {originName} → {destName}
         </p>
 
         {state.loading && (

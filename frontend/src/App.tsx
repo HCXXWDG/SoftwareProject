@@ -8,13 +8,14 @@ import { TrendPanel } from "./features/trends";
 import { fetchHeatmap } from "./services/heatmap";
 import { fetchTrends, completeCommute } from "./services/commute";
 import { submitReport } from "./services/report";
-import { CAMPUS_DEFAULT_BBOX, CAMPUS, CAMPUS_VIEWPORT_CONSTRAINT, OFFLINE_HEATMAP_CELLS } from "./config/campus";
+import { CAMPUS_DEFAULT_BBOX, CAMPUS_VIEWPORT_CONSTRAINT, DEFAULT_ORIGIN, DEFAULT_DESTINATION, OFFLINE_HEATMAP_CELLS } from "./config/campus";
 import type {
   AppStage,
   MapPageState,
   HeatmapCell,
   RouteComparison,
   MapFeedbackDraft,
+  GeoPoint,
 } from "./types";
 
 const initialMapState: MapPageState = {
@@ -33,12 +34,28 @@ function App() {
   const [isOfflineFallback, setIsOfflineFallback] = useState(false);
   const [mapState, setMapState] = useState<MapPageState>(initialMapState);
   const [selectedRouteId, setSelectedRouteId] = useState<string | undefined>();
+  const [originPoint, setOriginPoint] = useState<GeoPoint>(DEFAULT_ORIGIN.point);
+  const [destPoint, setDestPoint] = useState<GeoPoint>(DEFAULT_DESTINATION.point);
+  const [originName, setOriginName] = useState<string>(DEFAULT_ORIGIN.name);
+  const [destName, setDestName] = useState<string>(DEFAULT_DESTINATION.name);
   const [userStressLevel, setUserStressLevel] = useState<number | null>(null);
   const [completingCommute, setCompletingCommute] = useState(false);
   const [completeCommuteError, setCompleteCommuteError] = useState<string | null>(null);
   const [trendRefreshWarning, setTrendRefreshWarning] = useState<string | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  /** 欢迎页选择起终点 → 进入路线预览 */
+  const handleNavigateToPreview = useCallback(
+    (origin: GeoPoint, destination: GeoPoint, oName: string, dName: string) => {
+      setOriginPoint(origin);
+      setDestPoint(destination);
+      setOriginName(oName);
+      setDestName(dName);
+      setStage("route-preview");
+    },
+    [],
+  );
 
   /** 获取热力图（自动取消旧请求，避免竞态） */
   const loadHeatmap = useCallback(async (bbox: string, zoom?: number) => {
@@ -159,9 +176,10 @@ function App() {
     [],
   );
 
-  /** 进入地图阶段时加载热力图和趋势 */
+  /** 进入地图阶段时加载热力图和趋势（离线降级时跳过） */
   useEffect(() => {
     if (stage !== "map") return;
+    if (isOfflineFallback) return; // 离线模式下不请求后端数据，避免重复报错
 
     loadHeatmap(CAMPUS_DEFAULT_BBOX);
 
@@ -178,16 +196,24 @@ function App() {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       abortRef.current?.abort();
     };
-  }, [stage, loadHeatmap]);
+  }, [stage, isOfflineFallback, loadHeatmap]);
 
   // ── Stage: welcome ──
   if (stage === "welcome") {
-    return <WelcomePage onNavigateToPreview={() => setStage("route-preview")} />;
+    return <WelcomePage onNavigateToPreview={handleNavigateToPreview} />;
   }
 
   // ── Stage: route-preview ──
   if (stage === "route-preview") {
-    return <RoutePreviewPage onEnterMap={handleEnterMap} />;
+    return (
+      <RoutePreviewPage
+        origin={originPoint}
+        destination={destPoint}
+        originName={originName}
+        destName={destName}
+        onEnterMap={handleEnterMap}
+      />
+    );
   }
 
   // ── Stage: map ──
@@ -209,8 +235,8 @@ function App() {
             onFeedbackSubmit={handleFeedbackSubmit}
             onRouteSelect={handleRouteSelect}
             onViewportChange={handleViewportChange}
-            origin={CAMPUS.origin}
-            destination={CAMPUS.destination}
+            origin={originPoint}
+            destination={destPoint}
             viewportConstraint={CAMPUS_VIEWPORT_CONSTRAINT}
           />
         }
