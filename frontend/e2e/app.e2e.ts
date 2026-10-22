@@ -147,7 +147,7 @@ test.describe("Core user flow", () => {
     // Cell details should appear
     const details = page.getByTestId("heatmap-cell-details");
     await expect(details).toBeVisible();
-    await expect(details).toContainText("NOISE");
+    await expect(details).toContainText("噪音");
     await expect(details).toContainText("压力 68");
     await expect(details).toContainText("18 条反馈");
   });

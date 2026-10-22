@@ -99,7 +99,10 @@ export function isHeatmapCells(value: unknown): value is HeatmapCell[] {
   return Array.isArray(value) && value.every((cell) => record(cell)
     && text(cell.cellId) && point(cell.center) && score(cell.score)
     && confidence(cell.confidence) && count(cell.count)
-    && text(cell.dominantTag) && ["NOISE", "CROWD", "SUN", "ODOR", "QUIET", "SHADE", "OPEN", "OTHER"].includes(cell.dominantTag));
+    && text(cell.dominantTag) && ["NOISE", "CROWD", "SUN", "ODOR", "QUIET", "SHADE", "OPEN", "OTHER"].includes(cell.dominantTag)
+    && optionalNullable(cell.feedbackSource, source => text(source) && ["REAL", "DEMO", "MIXED", "NONE", "UNKNOWN"].includes(source))
+    && optionalNullable(cell.updatedAt, timestamp)
+    && optionalNullable(cell.windowHours, hours => count(hours) && hours > 0));
 }
 
 type AlternativeFields = "alternativeLabel" | "alternativeScore" | "alternativeDurationRatio";

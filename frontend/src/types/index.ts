@@ -15,6 +15,11 @@ export interface HeatmapCell {
   confidence: number;
   count: number;
   dominantTag: EmotionTag;
+  /** Optional on older responses; absence does not establish a real feedback source. */
+  feedbackSource?: FeedbackSource | null;
+  updatedAt?: string | null;
+  /** Aggregation window reported by the backend, not a promised expiration time. */
+  windowHours?: number | null;
 }
 
 /** 打分路线 */

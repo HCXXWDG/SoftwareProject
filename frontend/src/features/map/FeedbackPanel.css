@@ -1,0 +1,32 @@
+.map-surface__feedback-panel .map-surface__feedback-error,
+.map-surface__feedback-panel .map-surface__feedback-duplicate,
+.map-surface__feedback-panel .map-surface__feedback-disabled {
+  position: static;
+  margin: 10px 0 0;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.map-surface__feedback-panel .map-surface__feedback-error {
+  color: #991b1b;
+  background: #fff3f3;
+}
+
+.map-surface__feedback-panel .map-surface__feedback-duplicate {
+  color: #166534;
+  background: #f0fdf4;
+}
+
+.map-surface__feedback-panel .map-surface__feedback-disabled {
+  color: #475569;
+  background: #f1f5f9;
+}
+
+.map-surface__feedback-panel:focus-visible,
+.map-surface__feedback-panel button:focus-visible {
+  outline: 2px solid #2368ff;
+  outline-offset: 2px;
+}

@@ -225,7 +225,7 @@ test.describe("Mobile viewport — Pixel 7 (412×915)", () => {
 
     const details = page.getByTestId("heatmap-cell-details");
     await expect(details).toBeVisible();
-    await expect(details).toContainText("NOISE");
+    await expect(details).toContainText("噪音");
   });
 
   test("route legend visible on Android viewport", async ({ page }) => {

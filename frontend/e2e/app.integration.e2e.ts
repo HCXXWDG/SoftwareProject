@@ -35,8 +35,10 @@ function isApiResponse(
 
 async function waitForInitialApiResponses(page: Page) {
   // Set up ALL response listeners BEFORE navigating
-  const heatmapPromise = page.waitForResponse((response) =>
-    isApiResponse(response, "GET", "/api/v1/heatmap"),
+  // A viewport change can cancel the initial heatmap after its headers arrive.
+  // Accept the completed response, retaining the status/body assertions below.
+  const heatmapPromise = page.waitForResponse(async (response) =>
+    isApiResponse(response, "GET", "/api/v1/heatmap") && await response.finished() === null,
   );
   const routesPromise = page.waitForResponse((response) =>
     isApiResponse(response, "POST", "/api/v1/routes/compare"),
@@ -136,7 +138,7 @@ test.describe("Full-stack demo flow", () => {
     await mapSection.dispatchEvent("pointerup", pointer);
 
     await page.getByRole("button", { name: /压力 50/ }).click();
-    await page.getByRole("button", { name: /原因 噪音/ }).click();
+    await page.getByRole("button", { name: /原因 安静/ }).click();
 
     const reportPromise = page.waitForResponse((response) =>
       isApiResponse(response, "POST", "/api/v1/reports"),
@@ -145,6 +147,7 @@ test.describe("Full-stack demo flow", () => {
 
     const reportResponse = await reportPromise;
     expect(reportResponse.status()).toBe(201);
+    expect(reportResponse.request().postDataJSON()).toMatchObject({ stressLevel: 50, tag: "QUIET" });
     expect(await reportResponse.json()).toMatchObject({
       status: "created",
     });

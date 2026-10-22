@@ -150,7 +150,7 @@ describe("MapSurface feedback submission boundary", () => {
     expect(screen.getByTestId("emoji-fountain")).toHaveTextContent("😟");
   });
 
-  it("closes an accepted duplicate without a fountain", async () => {
+  it("keeps an accepted duplicate receipt without a fountain until explicitly closed", async () => {
     const onFeedbackSubmit = vi.fn<MapSurfaceProps["onFeedbackSubmit"]>().mockResolvedValue({ status: "duplicate" });
     await readyMap(makeProps({ onFeedbackSubmit }));
     await longPress();
@@ -158,8 +158,12 @@ describe("MapSurface feedback submission boundary", () => {
     await submit();
 
     expect(onFeedbackSubmit).toHaveBeenCalledTimes(1);
-    expect(screen.queryByTestId("feedback-panel")).not.toBeInTheDocument();
+    expect(screen.getByTestId("feedback-panel")).toBeInTheDocument();
+    expect(screen.getByText(/已记录/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "提交反馈" })).toBeDisabled();
     expect(screen.queryByTestId("emoji-fountain")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "关闭反馈面板" }));
+    expect(screen.queryByTestId("feedback-panel")).not.toBeInTheDocument();
   });
 
   it("does not offer long-press submission when feedback is unavailable", async () => {

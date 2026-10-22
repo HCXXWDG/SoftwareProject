@@ -35,6 +35,7 @@ function expectHiddenScore() {
   expect(screen.getByText("评分待确认")).toBeInTheDocument();
   expect(screen.getByText("—")).toBeInTheDocument();
   expect(screen.queryByText("综合评分")).not.toBeInTheDocument();
+  expect(screen.queryByText("环境指数")).not.toBeInTheDocument();
   expect(screen.queryByText("少心累", { exact: true })).not.toBeInTheDocument();
   expect(screen.queryByText("25", { exact: true })).not.toBeInTheDocument();
   expect(screen.queryByText("0", { exact: true })).not.toBeInTheDocument();
@@ -46,7 +47,7 @@ describe("RoutePanel", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders real scored route cards with composite scores and comfort badges", () => {
+  it("separates environment and composite scores from estimated time for trusted routes", () => {
     render(<RoutePanel routes={[routeFast, routeCalm]} selectedRouteId="route-fast" onSelectRoute={vi.fn()} {...realScores} />);
 
     expect(screen.getByText("最快路线 A")).toBeInTheDocument();
@@ -56,8 +57,12 @@ describe("RoutePanel", () => {
     const calm = within(screen.getByRole("button", { name: "选择 少心累路线 B" }));
     expect(calm.getByText("25", { exact: true })).toBeInTheDocument();
     expect(calm.getByText("综合评分")).toBeInTheDocument();
-    expect(calm.queryByText("30", { exact: true })).not.toBeInTheDocument();
-    expect(calm.getAllByText(/^(距离|时间|综合评分)$/)).toHaveLength(3);
+    expect(calm.getByText("30", { exact: true })).toBeInTheDocument();
+    expect(calm.getByText("环境指数")).toBeInTheDocument();
+    expect(calm.getAllByText(/^(距离|预计时间|环境指数|综合评分)$/)).toHaveLength(4);
+    const fast = within(screen.getByRole("button", { name: "选择 最快路线 A" }));
+    expect(fast.getByText("67", { exact: true })).toBeInTheDocument();
+    expect(fast.getByText("50", { exact: true })).toBeInTheDocument();
   });
 
   it("formats distance and duration", () => {
@@ -66,6 +71,21 @@ describe("RoutePanel", () => {
     expect(screen.getByText("12 分钟")).toBeInTheDocument();
     expect(screen.getByText("2.8 km")).toBeInTheDocument();
     expect(screen.getByText("16 分钟")).toBeInTheDocument();
+  });
+
+  it.each([1, 30, 59])("describes a scored %s-second route as less than one minute", (durationSeconds) => {
+    render(<RoutePanel routes={[{ ...routeCalm, durationSeconds }]} onSelectRoute={vi.fn()} {...realScores} />);
+    expect(screen.getByText("不足一分钟")).toBeInTheDocument();
+    expect(screen.getByText("预计时间")).toBeInTheDocument();
+    expect(screen.queryByText(/^[01] 分钟$/)).not.toBeInTheDocument();
+    expect(screen.getByText("环境指数")).toBeInTheDocument();
+    expect(screen.getByText("综合评分")).toBeInTheDocument();
+  });
+
+  it("keeps the exact one-minute boundary for a scored route", () => {
+    render(<RoutePanel routes={[{ ...routeCalm, durationSeconds: 60 }]} onSelectRoute={vi.fn()} {...realScores} />);
+    expect(screen.getByText("1 分钟")).toBeInTheDocument();
+    expect(screen.queryByText("不足一分钟")).not.toBeInTheDocument();
   });
 
   it.each([
@@ -109,8 +129,9 @@ describe("RoutePanel", () => {
 
   it.each([0, 100])("preserves the valid boundary score %s", (score) => {
     render(<RoutePanel routes={[{ ...routeCalm, stressScore: score, stressExposure: score }]} onSelectRoute={vi.fn()} {...realScores} />);
-    expect(screen.getByText(String(score), { exact: true })).toBeInTheDocument();
+    expect(screen.getAllByText(String(score), { exact: true })).toHaveLength(2);
     expect(screen.getByText("综合评分")).toBeInTheDocument();
+    expect(screen.getByText("环境指数")).toBeInTheDocument();
     expect(screen.getByText("少心累")).toBeInTheDocument();
     expect(screen.queryByText("评分待确认")).not.toBeInTheDocument();
   });
@@ -123,6 +144,16 @@ describe("RoutePanel", () => {
     expect(fast.getByText("综合评分")).toBeInTheDocument();
     expect(calm.getByText("评分待确认")).toBeInTheDocument();
     expect(calm.queryByText("少心累", { exact: true })).not.toBeInTheDocument();
+  });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, -0.1, 1.1])("hides both score displays for invalid confidence %s", (confidence) => {
+    render(<RoutePanel routes={[{ ...routeCalm, confidence }]} onSelectRoute={vi.fn()} {...realScores} />);
+    expectHiddenScore();
+  });
+
+  it.each(["INSUFFICIENT_DATA", "UNAVAILABLE"] as const)("honors the row scoring status %s", (scoringStatus) => {
+    render(<RoutePanel routes={[{ ...routeCalm, scoringStatus }]} onSelectRoute={vi.fn()} {...realScores} />);
+    expectHiddenScore();
   });
 
   it.each([true, false])("retains route selection when scores are visible: %s", (showScores) => {

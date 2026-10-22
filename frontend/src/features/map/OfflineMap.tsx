@@ -119,6 +119,7 @@ export function OfflineMap({
   };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.target instanceof Element && event.target.closest("button, input, select, textarea, a")) return;
     dragRef.current = {
       center,
       pointerId: event.pointerId,

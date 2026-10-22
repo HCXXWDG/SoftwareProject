@@ -80,11 +80,14 @@ describe("成员 A 页面编排", () => {
   });
   it("passes C01 presentation states so verified real scores, including zero, remain visible after entering the map", async () => {
     const comparison = { ...routeComparison, routeSource: "REAL", feedbackSource: "REAL", scoringStatus: "VALID",
-      routes: routeComparison.routes.map((route, index) => ({ ...route, stressScore: index === 0 ? 0 : 22 })) };
+      routes: routeComparison.routes.map((route, index) => ({ ...route,
+        stressExposure: index === 0 ? 0 : 20, stressScore: index === 0 ? 0 : 22 })) };
     installBackend((url) => url.includes("/routes/compare") ? jsonResponse(comparison) : undefined);
     render(<App />); await map();
     const panel = screen.getByTestId("route-panel");
-    expect(within(panel).getByText("0", { exact: true })).toBeInTheDocument();
+    const zeroCard = within(panel).getByRole("button", { name: /选择 路线 A/ });
+    expect(within(zeroCard).getByText("综合评分").parentElement).toHaveTextContent(/^0\s*综合评分$/);
+    expect(within(zeroCard).getByText("环境指数").parentElement).toHaveTextContent(/^0\s*环境指数$/);
     expect(within(panel).getByText("22", { exact: true })).toBeInTheDocument();
     expect(within(panel).getByText("少心累", { exact: true })).toBeInTheDocument();
     fireEvent.click(within(panel).getByRole("button", { name: /选择 路线 B/ }));

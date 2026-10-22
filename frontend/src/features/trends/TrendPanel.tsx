@@ -28,6 +28,9 @@ interface TrendPanelProps {
   onStressLevelChange?: (level: number) => void;
   /** 通勤已记录但趋势刷新失败时的警告信息 */
   trendRefreshWarning?: string | null;
+  /** Optional for hosts without A's separate query controls. */
+  onRefresh?: () => void;
+  loading?: boolean;
 }
 
 function stressColor(stress: number | null): string {
@@ -35,6 +38,74 @@ function stressColor(stress: number | null): string {
   if (stress <= 30) return "#22c55e";
   if (stress <= 60) return "#f59e0b";
   return "#ef4444";
+}
+
+/** Keep calendar spacing and break the line at missing observations. */
+function TrendChart({ points }: { points: TrendResult["points"] }) {
+  const ordered = [...points].sort((a, b) => a.date.localeCompare(b.date));
+  const dayMs = 86_400_000;
+  const width = 400;
+  const height = 120;
+  const left = 30;
+  const top = 10;
+  const chartWidth = 360;
+  const chartHeight = 90;
+  const dayOf = (date: string) => Date.parse(`${date}T00:00:00Z`);
+  const firstDay = ordered.length ? dayOf(ordered[0].date) : Number.NaN;
+  const lastDay = ordered.length ? dayOf(ordered[ordered.length - 1].date) : Number.NaN;
+  const dateSpan = lastDay - firstDay;
+  const xOf = (day: number) => dateSpan > 0
+    ? left + (day - firstDay) / dateSpan * chartWidth
+    : left + chartWidth / 2;
+
+  let previousDay: number | null = null;
+  const plotted = ordered.flatMap((point) => {
+    const day = dayOf(point.date);
+    const stress = point.averageStress;
+    if (!Number.isFinite(day) || stress == null || !Number.isFinite(stress) || stress < 0 || stress > 100) {
+      previousDay = null;
+      return [];
+    }
+    const command = previousDay !== null && day - previousDay === dayMs ? "L" : "M";
+    previousDay = day;
+    return [{ point, stress, x: xOf(day), y: top + chartHeight * (1 - stress / 100), command }];
+  });
+
+  if (!plotted.length || !Number.isFinite(firstDay) || !Number.isFinite(lastDay)) {
+    return <p className="trend-panel__empty-text" role="status">暂无可绘制的压力数据</p>;
+  }
+
+  const pathData = plotted.map(({ x, y, command }) => `${command} ${x} ${y}`).join(" ");
+  const tickDays = [...new Set([
+    firstDay,
+    firstDay + Math.floor(dateSpan / dayMs / 2) * dayMs,
+    lastDay,
+  ])];
+
+  return (
+    <svg className="trend-panel__chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="七日通勤趋势折线图">
+      <desc>仅连接相邻日期的压力记录；没有数据的日期保留空缺。</desc>
+      {[100, 50, 0].map((stress) => {
+        const y = top + chartHeight * (1 - stress / 100);
+        return <g key={stress}>
+          <text x={5} y={y + 4} fontSize="10" fill="#64748b" aria-hidden="true">{stress}</text>
+          <line x1={left} y1={y} x2={left + chartWidth} y2={y} stroke="#e2e8f0" />
+        </g>;
+      })}
+      <path d={pathData} fill="none" stroke="#3b82f6" strokeWidth="2" />
+      {plotted.map(({ point, stress, x, y }) => (
+        <circle key={point.date} cx={x} cy={y} r="4" fill={stressColor(point.averageStress)} stroke="#fff" strokeWidth="2">
+          <title>{point.date}: 平均压力 {Math.round(stress)}, {point.commuteCount} 次通勤</title>
+        </circle>
+      ))}
+      {tickDays.map((day) => (
+        <text key={day} x={xOf(day)} y={height - 5} fontSize="9" fill="#64748b"
+          textAnchor={dateSpan === 0 ? "middle" : day === firstDay ? "start" : day === lastDay ? "end" : "middle"}>
+          {new Date(day).toISOString().slice(5, 10)}
+        </text>
+      ))}
+    </svg>
+  );
 }
 
 export function TrendPanel({
@@ -46,7 +117,15 @@ export function TrendPanel({
   userStressLevel = null,
   onStressLevelChange,
   trendRefreshWarning = null,
+  onRefresh,
+  loading = false,
 }: TrendPanelProps) {
+  const refreshButton = onRefresh && (
+    <button className="trend-panel__refresh-btn" onClick={onRefresh} disabled={loading}
+      type="button" aria-label="刷新趋势数据">
+      {loading ? "刷新中…" : "刷新"}
+    </button>
+  );
   /** 压力档位选择器（用户结束通勤后填写真实感受） */
   const stressSelector = onStressLevelChange && (
     <fieldset
@@ -93,6 +172,7 @@ export function TrendPanel({
     return (
       <div className="trend-panel trend-panel--empty" data-testid="trend-panel">
         <p className="trend-panel__empty-text">暂无通勤趋势数据</p>
+        {refreshButton}
         {stressSelector}
         {error && (
           <p className="trend-panel__error" role="alert">
@@ -116,7 +196,10 @@ export function TrendPanel({
         <span className="trend-panel__count">
           共 {trend.totalCommutes} 次通勤
         </span>
+        {refreshButton}
       </div>
+
+      <TrendChart points={trend.points} />
 
       {trend.points?.length > 0 && (
         <table className="trend-panel__table">

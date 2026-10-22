@@ -28,13 +28,6 @@ export function MapPage({ state, mapSlot }: MapPageProps) {
         </div>
       )}
 
-      {loading && (
-        <div className="map-page__loading" role="status">
-          <span className="map-page__spinner" />
-          <span>正在加载热力图数据…</span>
-        </div>
-      )}
-
       {!loading && !error && hasData && (
         <div className="map-page__summary" role="status" aria-label="数据摘要">
           <span className="map-page__badge">{heatmapCells.length}</span>
@@ -42,6 +35,13 @@ export function MapPage({ state, mapSlot }: MapPageProps) {
         </div>
       )}
 
+      <div className="map-page__viewport">
+      {loading && !mapSlot && (
+        <div className="map-page__loading" role="status">
+          <span className="map-page__spinner" />
+          <span>正在加载热力图数据…</span>
+        </div>
+      )}
       {mapSlot ?? (
         <div className="map-page__placeholder">
           <span role="img" aria-label="map">
@@ -50,6 +50,7 @@ export function MapPage({ state, mapSlot }: MapPageProps) {
           <span>地图区域 — 等待地图交互组件注入</span>
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -130,7 +130,8 @@ export default function App() {
     </section>
     <MapPage state={{ heatmapCells: heatmap.cells, loading: heatmap.loading, error: heatmap.error, routeComparison: comparison, trend: trends.data }}
       mapSlot={<MapSurface heatmapCells={heatmap.cells} routes={displayRoutes} selectedRouteId={selectedRouteId}
-        loading={heatmap.loading} onFeedbackSubmit={handleFeedbackSubmit} feedbackEnabled={capabilities.canReport}
+          loading={heatmap.loading} onFeedbackSubmit={handleFeedbackSubmit} feedbackEnabled={capabilities.canReport}
+          onFeedbackOpen={() => { setFeedbackNotice(null); setFeedbackSaved(false); }}
         onRouteSelect={(id) => { if (comparison.routes.some((r) => r.id === id)) setSelectedRouteId(id); }}
         onViewportChange={heatmap.updateViewport} onModeChange={setBaseMap}
         origin={selection.origin} destination={selection.destination} viewportConstraint={CAMPUS_VIEWPORT_CONSTRAINT} />} />

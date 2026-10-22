@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { EmotionTag } from "../../types";
+import "./FeedbackPanel.css";
 
 const STRESS_LEVELS = [
   { value: 0, emoji: "😊", label: "轻松" },
@@ -14,8 +15,19 @@ const EMOTION_TAGS: { value: EmotionTag; emoji: string; label: string }[] = [
   { value: "CROWD", emoji: "👥", label: "拥挤" },
   { value: "SUN", emoji: "☀️", label: "暴晒" },
   { value: "ODOR", emoji: "👃", label: "异味" },
+  { value: "QUIET", emoji: "🤫", label: "安静" },
+  { value: "SHADE", emoji: "🌳", label: "树荫" },
+  { value: "OPEN", emoji: "🏞️", label: "开阔" },
   { value: "OTHER", emoji: "💭", label: "其他" },
 ];
+
+function focusableElements(panel: HTMLElement): HTMLElement[] {
+  return Array.from(panel.querySelectorAll<HTMLElement>(
+    "button, [href], input, select, textarea, [tabindex]",
+  )).filter((element) => element.tabIndex >= 0
+    && !element.matches(":disabled")
+    && !element.closest("[hidden], [inert]"));
+}
 
 interface FeedbackPanelProps {
   position: { x: number; y: number };
@@ -23,6 +35,9 @@ interface FeedbackPanelProps {
   onCancel: () => void;
   submitting: boolean;
   submissionEnabled?: boolean;
+  error?: string | null;
+  isDuplicate?: boolean;
+  "data-position"?: string;
 }
 
 export function FeedbackPanel({
@@ -31,11 +46,71 @@ export function FeedbackPanel({
   onCancel,
   submitting,
   submissionEnabled = true,
+  error,
+  isDuplicate = false,
+  "data-position": dataPosition,
 }: FeedbackPanelProps) {
   const [stressLevel, setStressLevel] = useState<number | null>(null);
   const [tag, setTag] = useState<EmotionTag | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
-  const canSubmit = stressLevel !== null && tag !== null && !submitting && submissionEnabled;
+  const canSubmit = stressLevel !== null && tag !== null
+    && !submitting && !isDuplicate && submissionEnabled;
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    const previousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement : null;
+    if (panel) (focusableElements(panel)[0] ?? panel).focus();
+    return () => {
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, []);
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!submitting) onCancel();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      // Selection and submitting state can enable or disable buttons after mount.
+      const elements = focusableElements(panel);
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      const active = document.activeElement;
+      if (!first) {
+        event.preventDefault();
+        panel.focus();
+      } else if (!elements.includes(active as HTMLElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel, submitting]);
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    const active = document.activeElement;
+    // Browsers may blur a control as soon as it becomes disabled.
+    if (panel && (submitting || isDuplicate || active === panel
+      || (active instanceof HTMLElement && panel.contains(active) && active.matches(":disabled")))) {
+      (focusableElements(panel)[0] ?? panel).focus();
+    }
+  }, [submitting, isDuplicate, submissionEnabled]);
 
   const handleSubmit = () => {
     if (canSubmit) {
@@ -45,11 +120,15 @@ export function FeedbackPanel({
 
   return (
     <div
+      aria-busy={submitting}
       aria-label="情绪反馈面板"
       className="map-surface__feedback-panel"
+      data-position={dataPosition}
       data-testid="feedback-panel"
+      ref={panelRef}
       role="dialog"
       style={{ left: `${position.x}px`, top: `${position.y}px` }}
+      tabIndex={-1}
     >
       <div className="map-surface__feedback-header">
         <span>这里感觉怎样？</span>
@@ -64,7 +143,7 @@ export function FeedbackPanel({
         </button>
       </div>
 
-      <fieldset className="map-surface__feedback-group" disabled={submitting}>
+      <fieldset className="map-surface__feedback-group" disabled={submitting || isDuplicate}>
         <legend>压力等级</legend>
         <div className="map-surface__feedback-buttons">
           {STRESS_LEVELS.map(({ value, emoji, label }) => (
@@ -84,7 +163,7 @@ export function FeedbackPanel({
         </div>
       </fieldset>
 
-      <fieldset className="map-surface__feedback-group" disabled={submitting}>
+      <fieldset className="map-surface__feedback-group" disabled={submitting || isDuplicate}>
         <legend>主要原因</legend>
         <div className="map-surface__feedback-buttons">
           {EMOTION_TAGS.map(({ value, emoji, label }) => (
@@ -113,7 +192,17 @@ export function FeedbackPanel({
       >
         {submitting ? "提交中…" : "提交反馈"}
       </button>
-      {!submissionEnabled && <p role="status">反馈服务暂不可用，草稿已保留，请恢复连接后提交。</p>}
+      {error && <p className="map-surface__feedback-error" role="alert">{error}</p>}
+      {isDuplicate && (
+        <p className="map-surface__feedback-duplicate" role="status">
+          五分钟内附近路段的反馈已记录，无需重复提交。
+        </p>
+      )}
+      {!submissionEnabled && (
+        <p className="map-surface__feedback-disabled" role="status">
+          反馈服务暂不可用，草稿已保留，请恢复连接后提交。
+        </p>
+      )}
     </div>
   );
 }
