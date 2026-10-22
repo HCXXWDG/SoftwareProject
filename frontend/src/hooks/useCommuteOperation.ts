@@ -87,7 +87,9 @@ export function useCommuteOperation(options: Options = {}) {
     let receipt: CommuteCompletion;
     try { receipt = await completeCommute(operation.request); }
     catch (failure) {
-      const needsReconciliation = failure instanceof ApiError && [404, 410].includes(failure.status ?? 0);
+      const needsReconciliation = failure instanceof ApiError
+        && (failure.status === 404 && failure.code === "snapshot_not_found"
+          || failure.status === 410 && failure.code === "snapshot_expired");
       const message = needsReconciliation
         ? "路线快照已失效，但不能据此判断上次通勤是否保存。请先核对记录，当前保留原操作信息。"
         : failure instanceof Error ? failure.message : "通勤结果尚待确认，请重试原操作。";

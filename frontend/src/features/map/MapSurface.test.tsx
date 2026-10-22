@@ -88,13 +88,12 @@ describe("MapSurface", () => {
     );
 
     const point = await screen.findByRole("button", {
-      name: "查看热力点 cell-1",
+      name: "热力点 压力100 NOISE",
     });
     expect(point).toHaveAttribute("data-testid", "heatmap-point");
-    expect(point).toHaveStyle({
-      backgroundColor: "rgb(239, 68, 68)",
-      opacity: "0.18",
-    });
+    // 热点用径向渐变呈现压力色（score 100 → rgb(220, 38, 38)），透明度由置信度决定
+    expect(point).toHaveStyle({ opacity: "0.18" });
+    expect(point.style.background).toContain("rgb(220, 38, 38)");
 
     fireEvent.click(point);
 
@@ -224,7 +223,7 @@ describe("MapSurface", () => {
 
     expect(constructorSpy).toHaveBeenCalledTimes(1);
     expect(
-      await screen.findByRole("button", { name: "查看热力点 cell-1" }),
+      await screen.findByRole("button", { name: "热力点 压力100 NOISE" }),
     ).toBeInTheDocument();
 
     unmount();

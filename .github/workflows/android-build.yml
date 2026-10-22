@@ -167,8 +167,11 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      # v3 会执行 `sdkmanager tools`，而 `tools` 包早已从 Android SDK 仓库下架，
+      # 在 ubuntu-latest 上必然以 `Warning: Failed to find package 'tools'` + exit 1 失败。
+      # 同文件里 Android Build job 用的就是 v4 且一直是绿的，这里对齐到 v4。
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Install required SDK platform
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
