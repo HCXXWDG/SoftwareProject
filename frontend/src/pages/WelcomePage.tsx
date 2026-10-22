@@ -4,6 +4,10 @@ import type { GeoPoint } from "../types";
 import "./WelcomePage.css";
 
 interface WelcomePageProps {
+  initialOriginId?: string;
+  initialDestinationId?: string;
+  initialOrigin?: Waypoint;
+  initialDestination?: Waypoint;
   onNavigateToPreview: (
     origin: GeoPoint,
     destination: GeoPoint,
@@ -12,16 +16,20 @@ interface WelcomePageProps {
   ) => void;
 }
 
-export function WelcomePage({ onNavigateToPreview }: WelcomePageProps) {
-  const [originId, setOriginId] = useState<string | null>("dorm");
-  const [destId, setDestId] = useState<string | null>("teaching");
+export function WelcomePage({ onNavigateToPreview, initialOriginId = "dorm", initialDestinationId = "teaching", initialOrigin, initialDestination }: WelcomePageProps) {
+  const [originId, setOriginId] = useState(initialOrigin?.id ?? initialOriginId);
+  const [destId, setDestId] = useState(initialDestination?.id ?? initialDestinationId);
+  const options = [...WAYPOINTS];
+  for (const point of [initialOrigin, initialDestination]) {
+    if (point && !options.some((option) => option.id === point.id)) options.push(point);
+  }
 
-  const origin = WAYPOINTS.find((w) => w.id === originId);
-  const destination = WAYPOINTS.find((w) => w.id === destId);
-  const canGo = origin != null && destination != null && originId !== destId;
+  const origin = options.find((w) => w.id === originId);
+  const destination = options.find((w) => w.id === destId);
+  const canGo = origin != null && destination != null && (origin.point.longitude !== destination.point.longitude || origin.point.latitude !== destination.point.latitude);
 
   const handleGo = () => {
-    if (!origin || !destination) return;
+    if (!origin || !destination || !canGo) return;
     onNavigateToPreview(origin.point, destination.point, origin.name, destination.name);
   };
 
@@ -29,6 +37,7 @@ export function WelcomePage({ onNavigateToPreview }: WelcomePageProps) {
     <button
       key={w.id}
       className={`welcome-page__point ${selected ? "welcome-page__point--selected" : ""}`}
+      aria-pressed={selected}
       onClick={() => onSelect(w.id)}
       type="button"
     >
@@ -46,15 +55,15 @@ export function WelcomePage({ onNavigateToPreview }: WelcomePageProps) {
 
         <div className="welcome-page__section">
           <p className="welcome-page__label">选择起点</p>
-          <div className="welcome-page__grid">
-            {WAYPOINTS.map((w) => renderPoint(w, w.id === originId, (id) => setOriginId(id)))}
+          <div className="welcome-page__grid" role="group" aria-label="选择起点">
+            {options.map((w) => renderPoint(w, w.id === originId, (id) => setOriginId(id)))}
           </div>
         </div>
 
         <div className="welcome-page__section">
           <p className="welcome-page__label">选择终点</p>
-          <div className="welcome-page__grid">
-            {WAYPOINTS.map((w) => renderPoint(w, w.id === destId, (id) => setDestId(id)))}
+          <div className="welcome-page__grid" role="group" aria-label="选择终点">
+            {options.map((w) => renderPoint(w, w.id === destId, (id) => setDestId(id)))}
           </div>
         </div>
 

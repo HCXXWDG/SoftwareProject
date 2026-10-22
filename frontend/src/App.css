@@ -1,6 +1,9 @@
-/* App 容器 */
-.app {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
+.app-toolbar, .app-status, .app-route-choices { padding: 14px 18px; background: #fff; border-bottom: 1px solid #d9e1e8; }
+.app-toolbar, .app-route-choices { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.app-toolbar button, .app-status button, .app-route-choices button { padding: 9px 13px; border: 1px solid #aac0d7; border-radius: 8px; background: #f3f7fc; color: #173a64; }
+.app-route-choices button[aria-pressed="true"] { background: #173a64; color: white; }
+.app-status p { margin: 5px 0; }
+button:disabled { cursor: not-allowed; opacity: .6; }
+.app-route-choices p { width: 100%; color: #526575; }
+@media (max-width: 420px) { .app-toolbar, .app-status, .app-route-choices { padding: 10px; } }
+.app { display: flex; flex-direction: column; min-height: 100vh; }

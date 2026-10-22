@@ -37,9 +37,9 @@ const MOCK_ROUTES = {
       fastest: true,
       leastStressful: false,
       polyline: [
-        { longitude: 120.2735, latitude: 31.4753 },
+        { longitude: 120.273510, latitude: 31.475328 },
         { longitude: 120.2738, latitude: 31.478 },
-        { longitude: 120.2743, latitude: 31.4833 },
+        { longitude: 120.274319, latitude: 31.483275 },
       ],
     },
     {
@@ -53,16 +53,23 @@ const MOCK_ROUTES = {
       fastest: false,
       leastStressful: true,
       polyline: [
-        { longitude: 120.2735, latitude: 31.4753 },
+        { longitude: 120.273510, latitude: 31.475328 },
         { longitude: 120.274, latitude: 31.48 },
-        { longitude: 120.2743, latitude: 31.4833 },
+        { longitude: 120.274319, latitude: 31.483275 },
       ],
     },
   ],
   fastestRouteId: "route-fast",
   leastStressfulRouteId: "route-calm",
-  recommendation: "明天试少心累路线 B。",
+  recommendation: "本次推荐少心累路线 B。",
   recommendAlternative: true,
+  routeSource: "REAL",
+  feedbackSource: "REAL",
+  scoringStatus: "VALID",
+  snapshotId: "00000000-0000-4000-8000-000000000001",
+  scoringVersion: "walking-distance-v2",
+  travelMode: "WALKING",
+  recommendationReason: "RECOMMENDED",
 };
 
 const MOCK_TRENDS = {
@@ -72,6 +79,7 @@ const MOCK_TRENDS = {
 };
 
 async function mockAPI(page: Page) {
+  await page.route("**/api/v1/routes/history*", route => route.fulfill({ json: [] }));
   await page.route("**/api/v1/heatmap*", (route) =>
     route.fulfill({ json: MOCK_HEATMAP }),
   );
@@ -82,17 +90,19 @@ async function mockAPI(page: Page) {
     route.fulfill({ json: MOCK_TRENDS }),
   );
   await page.route("**/api/v1/reports", (route) =>
-    route.fulfill({ status: 201, json: { status: "ok", message: "created" } }),
+    route.fulfill({ status: 201, json: { status: "created", code: "report_created", counted: true, message: "反馈已保存" } }),
   );
 }
 
 async function navigateToMap(page: Page) {
-  await page.getByRole("button", { name: "查看预设路线" }).click();
+  await page.getByRole("button", { name: "查看路线" }).click();
   await expect(page.getByRole("button", { name: "进入地图" })).toBeVisible({
     timeout: 10_000,
   });
   await page.getByRole("button", { name: "进入地图" }).click();
-  await expect(page.locator("[data-map-mode]").first()).toBeVisible();
+  await expect(page.locator("[data-map-mode]").first()).toHaveAttribute("data-map-mode", /amap|offline/);
+  await expect(page.locator(".map-page__loading")).toHaveCount(0);
+  await expect(page.getByText("正在更新情绪热力图", { exact: true })).toHaveCount(0);
 }
 
 /**
@@ -198,7 +208,9 @@ test.describe("Campus boundary enforcement", () => {
     await zoomIn.click();
 
     // Map should still be visible after zoom
-    await expect(page.locator("[data-map-mode]").first()).toBeVisible();
+    await expect(page.locator("[data-map-mode]").first()).toHaveAttribute("data-map-mode", /amap|offline/);
+    await expect(page.locator(".map-page__loading")).toHaveCount(0);
+    await expect(page.getByText("正在更新情绪热力图", { exact: true })).toHaveCount(0);
   });
 
   test("route overlay renders campus-area polylines", async ({ page }) => {

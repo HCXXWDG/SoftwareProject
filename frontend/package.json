@@ -14,7 +14,10 @@
     "cap:open": "npx cap open android",
     "test:e2e": "playwright test",
     "test:e2e:integration": "playwright test --config playwright.integration.config.ts",
-    "test:pwa": "playwright test --config playwright.pwa.config.ts"
+    "test:pwa": "playwright test --config playwright.pwa.config.ts",
+    "test:e2e:member-a": "playwright test --config playwright.member-a.config.ts",
+    "test:e2e:member-a-contracts": "playwright test --config playwright.member-a-contracts.config.ts",
+    "test:e2e:member-a-commute": "playwright test --config playwright.member-a-commute.config.ts"
   },
   "dependencies": {
     "@capacitor/core": "^8.4.0",
