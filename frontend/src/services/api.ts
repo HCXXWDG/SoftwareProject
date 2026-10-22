@@ -101,6 +101,7 @@ function responseError(status: number, body: unknown): ApiError {
     invalid_request: "提交的信息有误，请检查后重试。",
     duplicate: "五分钟内已提交过附近路段，请稍后再试。",
     rate_limited: "操作过于频繁，请稍后再试。",
+    route_provider_unavailable: "步行路线服务暂时不可用，请重试或查看匹配的演示路线。",
   };
   const fallback = status >= 500 ? "服务暂时不可用，请稍后重试。"
     : status === 401 ? "当前身份已失效，请刷新页面后重试。"
@@ -110,7 +111,7 @@ function responseError(status: number, body: unknown): ApiError {
     : status === 429 ? messages.rate_limited
     : status === 400 ? messages.invalid_request
     : `服务器请求失败（HTTP ${status}），请稍后重试。`;
-  const message = status >= 500 ? fallback
+  const message = status >= 500 ? (code ? messages[code] : undefined) ?? fallback
     : safeServerMessage(record?.message) ?? (code ? messages[code] : undefined) ?? fallback;
   return new ApiError(code && status < 500 ? "business" : "http", message, { status, code, responseBody: body });
 }

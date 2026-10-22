@@ -82,6 +82,25 @@ describe("RoutePreviewPage", () => {
     render(<RoutePreviewPage {...baseProps} onEnterMap={vi.fn()} />);
     expect(await screen.findByText("心累指数 0")).toBeInTheDocument();
   });
+  it("allows a nullable demo result into the map without inventing scores or comfort labels", async () => {
+    const demo: RouteComparison = { ...routeComparison, routeSource: "DEMO", feedbackSource: "NONE", scoringStatus: "UNAVAILABLE",
+      leastStressfulRouteId: null, recommendation: "", recommendAlternative: false,
+      routes: routeComparison.routes.map((route) => ({ ...route, stressExposure: null, stressScore: null, leastStressful: false })) };
+    request.mockResolvedValue(demo);
+    const enter = vi.fn(); render(<RoutePreviewPage {...baseProps} onEnterMap={enter} />);
+    expect(await screen.findByText("演示路线 · 评分不可用")).toBeInTheDocument();
+    expect(screen.queryByText(/心累指数|最少心累/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "进入地图" }));
+    expect(enter).toHaveBeenCalledWith(demo, true);
+  });
+  it("distinguishes a provider outage from a successful empty route result", async () => {
+    request.mockRejectedValue(new ApiError("http", "步行路线服务暂时不可用，请重试或查看匹配的演示路线。", { status: 503, code: "route_provider_unavailable" }));
+    render(<RoutePreviewPage {...baseProps} onEnterMap={vi.fn()} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("步行路线服务暂时不可用");
+    expect(screen.getByRole("button", { name: "重试" })).toBeEnabled();
+    expect(screen.queryByText(/没有可用路线/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "进入地图" })).not.toBeInTheDocument();
+  });
   it("returns to endpoint selection through the supplied navigation action", () => {
     request.mockReturnValue(new Promise(() => {}));
     const back = vi.fn(); render(<RoutePreviewPage {...baseProps} onEnterMap={vi.fn()} onBack={back} />);

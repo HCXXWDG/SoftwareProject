@@ -3,12 +3,15 @@ import type { BackendStatus, BaseMapMode, RouteComparison } from "../types";
 /** 底图离线与 API 离线分别判断；缺少来源信息时不认定真实评分。 */
 export function tripCapabilities(comparison: RouteComparison | null, backend: BackendStatus, baseMap: BaseMapMode) {
   const showScores = comparison?.routeSource === "REAL"
-    && comparison.feedbackSource === "REAL" && comparison.scoringStatus === "VALID";
+    && comparison.feedbackSource === "REAL" && comparison.scoringStatus === "VALID"
+    && comparison.routes.length > 0 && comparison.routes.every((route) =>
+      route.stressExposure != null && Number.isFinite(route.stressExposure)
+      && route.stressScore != null && Number.isFinite(route.stressScore));
   return {
     baseMap, canRefresh: backend !== "unavailable", canReport: backend === "available", showScores,
-    // D01/D02 尚未提供快照和幂等协议，禁止旧客户端评分写入。
+    // D 的通勤放行及可空评分契约待联合验收，不能仅凭 snapshotId 开放写入。
     canComplete: false,
-    completeReason: comparison?.routeSource === "DEMO" ? "演示路线不能记录为真实通勤。"
+    completeReason: comparison?.routeSource === "DEMO" ? "演示通勤记录尚待接口联调，不会计入真实趋势。"
       : "当前路线暂不支持记录通勤，可继续查看路线和历史趋势。",
   };
 }

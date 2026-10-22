@@ -23,26 +23,44 @@ export interface ScoredRoute {
   label: string;
   distanceMeters: number;
   durationSeconds: number;
-  stressExposure: number;
-  stressScore: number;
+  stressExposure: number | null;
+  stressScore: number | null;
   confidence: number;
   fastest: boolean;
   leastStressful: boolean;
   polyline: GeoPoint[];
+  scoringStatus?: ScoringStatus;
+}
+
+export type RouteSource = "REAL" | "DEMO" | "UNAVAILABLE" | "UNKNOWN";
+export type FeedbackSource = "REAL" | "DEMO" | "MIXED" | "NONE" | "UNKNOWN";
+export type ScoringStatus = "VALID" | "INSUFFICIENT_DATA" | "UNAVAILABLE";
+
+export interface RecommendationDetails {
+  extraDurationSeconds: number;
+  durationRatio: number;
+  environmentImprovement: number | null;
+  compositeImprovement: number | null;
+  dataCoverage: number;
 }
 
 /** 路线对比结果 */
 export interface RouteComparison {
   routes: ScoredRoute[];
-  fastestRouteId: string;
-  leastStressfulRouteId: string;
+  fastestRouteId: string | null;
+  leastStressfulRouteId: string | null;
   recommendation: string;
   recommendAlternative: boolean;
   /** 待 B/D 契约确认；旧接口缺少时保持未知。 */
-  routeSource?: "REAL" | "DEMO" | "UNAVAILABLE";
-  feedbackSource?: "REAL" | "DEMO" | "NONE";
-  scoringStatus?: "VALID" | "INSUFFICIENT_DATA" | "UNAVAILABLE";
+  routeSource?: RouteSource;
+  feedbackSource?: FeedbackSource;
+  scoringStatus?: ScoringStatus;
+  /** Legacy field is retained as received; it is never a substitute for snapshotId. */
   comparisonId?: string;
+  snapshotId?: string | null;
+  scoringVersion?: string | null;
+  travelMode?: "WALKING" | null;
+  recommendationDetails?: RecommendationDetails | null;
   recommendationReason?: string;
 }
 

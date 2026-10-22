@@ -66,6 +66,13 @@ describe("RoutePanel", () => {
     expect(screen.getByText("16 分钟")).toBeInTheDocument();
   });
 
+  it("does not turn a missing score into zero or a comfort badge", () => {
+    render(<RoutePanel routes={[{ ...routeCalm, stressScore: null, stressExposure: null }]} onSelectRoute={vi.fn()} />);
+    expect(screen.getByText("不可用")).toBeInTheDocument();
+    expect(screen.queryByText("少心累", { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText("0", { exact: true })).not.toBeInTheDocument();
+  });
+
   it("calls onSelectRoute when a card is clicked", () => {
     const onSelectRoute = vi.fn();
     render(

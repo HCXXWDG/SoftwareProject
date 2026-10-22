@@ -61,7 +61,7 @@ export function RoutePreviewPage({ origin, destination, originName, destName, on
           </div>
           <div className="route-preview-page__card-body"><span>{Math.round(route.distanceMeters)} 米</span>
             <span>预计 {formatDuration(route.durationSeconds)}</span>
-            {showScores && <span>心累指数 {Math.round(route.stressScore)}</span>}
+            {showScores && route.stressScore != null && <span>心累指数 {Math.round(route.stressScore)}</span>}
           </div>
         </div>)}</div>}
       {showScores && comparison.recommendation && <p>{comparison.recommendation}</p>}

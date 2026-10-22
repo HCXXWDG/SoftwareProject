@@ -4,7 +4,7 @@ import type { GeoPoint, RouteComparison } from "../types";
 /**
  * 后端不可用时的 Mock 路线对比数据。
  *
- * 注意：stressScore / confidence / stressExposure 均为 0。
+ * 缺失评分为 null，confidence 为 0。
  * RoutePreviewPage 应检测 isOfflineFallback 并隐藏评分展示，
  * 避免伪造后端评分。
  */
@@ -16,8 +16,8 @@ export const MOCK_ROUTE_COMPARISON: RouteComparison = {
       label: "路线 A（东侧步道）",
       distanceMeters: 850,
       durationSeconds: 600,
-      stressExposure: 0,
-      stressScore: 0,
+      stressExposure: null,
+      stressScore: null,
       confidence: 0,
       fastest: true,
       leastStressful: false,
@@ -33,8 +33,8 @@ export const MOCK_ROUTE_COMPARISON: RouteComparison = {
       label: "路线 B（蠡湖环路）",
       distanceMeters: 1100,
       durationSeconds: 780,
-      stressExposure: 0,
-      stressScore: 0,
+      stressExposure: null,
+      stressScore: null,
       confidence: 0,
       fastest: false,
       leastStressful: false,
@@ -47,7 +47,7 @@ export const MOCK_ROUTE_COMPARISON: RouteComparison = {
     },
   ],
   fastestRouteId: "mock-via-east",
-  leastStressfulRouteId: "mock-via-lake",
+  leastStressfulRouteId: null,
   recommendation: "后端暂不可用，仅显示路线走向",
   recommendAlternative: false,
 };

@@ -16,27 +16,83 @@ const point = (value: unknown): value is GeoPoint => record(value)
   && number(value.latitude) && Math.abs(value.latitude) <= 90;
 const timestamp = (value: unknown) => text(value) && value.length > 0 && Number.isFinite(Date.parse(value));
 
-function scoredRoute(value: unknown): value is ScoredRoute {
+type NullableScoreFields = "stressExposure" | "stressScore";
+export type ScoredRouteResponse = Omit<ScoredRoute, NullableScoreFields> & Partial<Pick<ScoredRoute, NullableScoreFields>>;
+type ComparisonNullableFields = "routes" | "fastestRouteId" | "leastStressfulRouteId" | "recommendationDetails";
+type RecommendationDetailsResponse = Omit<NonNullable<RouteComparison["recommendationDetails"]>, "environmentImprovement" | "compositeImprovement">
+  & Partial<Pick<NonNullable<RouteComparison["recommendationDetails"]>, "environmentImprovement" | "compositeImprovement">>;
+export type RouteComparisonResponse = Omit<RouteComparison, ComparisonNullableFields> & {
+  routes: ScoredRouteResponse[];
+  fastestRouteId?: string | null;
+  leastStressfulRouteId?: string | null;
+  recommendationDetails?: RecommendationDetailsResponse | null;
+};
+const scoringStatuses = ["VALID", "INSUFFICIENT_DATA", "UNAVAILABLE"];
+const nonemptyText = (value: unknown): value is string => text(value) && value.length > 0;
+const uuid = (value: unknown): value is string => text(value)
+  && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+
+function completeScores(value: RecordValue): boolean {
+  return score(value.stressExposure) && score(value.stressScore) && confidence(value.confidence);
+}
+
+function scoredRoute(value: unknown): value is ScoredRouteResponse {
   return record(value) && text(value.id) && value.id.length > 0 && text(value.label)
     && nonnegative(value.distanceMeters) && nonnegative(value.durationSeconds)
-    && nonnegative(value.stressExposure) && score(value.stressScore) && confidence(value.confidence)
+    && optionalNullable(value.stressExposure, score) && optionalNullable(value.stressScore, score) && confidence(value.confidence)
+    && optionalEnum(value.scoringStatus, scoringStatuses)
+    && (value.scoringStatus !== "VALID" || completeScores(value))
     && typeof value.fastest === "boolean" && typeof value.leastStressful === "boolean"
     && Array.isArray(value.polyline) && value.polyline.every(point);
 }
 
+function recommendationDetails(value: unknown): value is RecommendationDetailsResponse {
+  return record(value) && count(value.extraDurationSeconds)
+    && number(value.durationRatio) && value.durationRatio >= 1
+    && optionalNullable(value.environmentImprovement, number)
+    && optionalNullable(value.compositeImprovement, number) && confidence(value.dataCoverage);
+}
+
 /** Validate the actual backend record; future capability fields stay optional. */
-export function isRouteComparison(value: unknown): value is RouteComparison {
+export function isRouteComparison(value: unknown): value is RouteComparisonResponse {
   if (!record(value) || !Array.isArray(value.routes) || !value.routes.every(scoredRoute)
-    || !text(value.fastestRouteId) || !text(value.leastStressfulRouteId)
+    || !optionalNullable(value.fastestRouteId, text) || !optionalNullable(value.leastStressfulRouteId, text)
     || !text(value.recommendation) || typeof value.recommendAlternative !== "boolean") return false;
   const ids = new Set(value.routes.map((route) => route.id));
   if (ids.size !== value.routes.length) return false;
-  if (value.routes.length > 0 && (!ids.has(value.fastestRouteId) || !ids.has(value.leastStressfulRouteId))) return false;
-  return optionalEnum(value.routeSource, ["REAL", "DEMO", "UNAVAILABLE"])
-    && optionalEnum(value.feedbackSource, ["REAL", "DEMO", "NONE"])
-    && optionalEnum(value.scoringStatus, ["VALID", "INSUFFICIENT_DATA", "UNAVAILABLE"])
+  if (value.routes.length > 0 && (!text(value.fastestRouteId) || !ids.has(value.fastestRouteId))) return false;
+  if (text(value.fastestRouteId) && value.fastestRouteId && !ids.has(value.fastestRouteId)) return false;
+  if (text(value.leastStressfulRouteId) && value.leastStressfulRouteId && !ids.has(value.leastStressfulRouteId)) return false;
+  if (value.scoringStatus === "VALID" && (value.routes.length === 0
+    || !text(value.leastStressfulRouteId) || !ids.has(value.leastStressfulRouteId)
+    || !value.routes.every(route => completeScores(route)
+      && (route.scoringStatus === undefined || route.scoringStatus === "VALID")))) return false;
+  return optionalEnum(value.routeSource, ["REAL", "DEMO", "UNAVAILABLE", "UNKNOWN"])
+    && optionalEnum(value.feedbackSource, ["REAL", "DEMO", "MIXED", "NONE", "UNKNOWN"])
+    && optionalEnum(value.scoringStatus, scoringStatuses)
     && (value.comparisonId === undefined || (text(value.comparisonId) && value.comparisonId.length > 0))
+    && optionalNullable(value.snapshotId, uuid)
+    && optionalNullable(value.scoringVersion, nonemptyText)
+    && (value.travelMode === undefined || value.travelMode === null || value.travelMode === "WALKING")
+    && optionalNullable(value.recommendationDetails, recommendationDetails)
     && (value.recommendationReason === undefined || text(value.recommendationReason));
+}
+
+/** Normalize only nullable transport fields; missing provenance never becomes REAL or VALID. */
+export function normalizeRouteComparison(value: RouteComparisonResponse): RouteComparison {
+  const { recommendationDetails: details, ...comparison } = value;
+  return {
+    ...comparison,
+    routes: value.routes.map(route => ({ ...route,
+      stressExposure: route.stressExposure ?? null, stressScore: route.stressScore ?? null,
+    })),
+    fastestRouteId: value.fastestRouteId ?? null,
+    leastStressfulRouteId: value.leastStressfulRouteId ?? null,
+    ...(details === undefined ? {} : { recommendationDetails: details === null ? null : { ...details,
+      environmentImprovement: details.environmentImprovement ?? null,
+      compositeImprovement: details.compositeImprovement ?? null,
+    } }),
+  };
 }
 
 export function isHeatmapCells(value: unknown): value is HeatmapCell[] {

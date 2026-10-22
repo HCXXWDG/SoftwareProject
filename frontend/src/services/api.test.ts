@@ -65,6 +65,16 @@ describe("API request outcomes", () => {
     });
   });
 
+  it("keeps a walking provider outage as HTTP 503 with a safe route-specific message", async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({ status: 503, code: "route_provider_unavailable", message: "upstream secret" }, 503));
+    const { api } = await import("./api");
+    await expect(api.post("/api/v1/routes/compare", {})).rejects.toMatchObject({
+      kind: "http", status: 503, code: "route_provider_unavailable",
+      message: "步行路线服务暂时不可用，请重试或查看匹配的演示路线。",
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("normalizes the backend's duplicate status as a business code", async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse({ status: "duplicate", message: "五分钟内已提交过附近路段。" }, 409));
     const { api } = await import("./api");

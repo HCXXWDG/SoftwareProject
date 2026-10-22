@@ -98,6 +98,8 @@ export default function App() {
     origin={selection.origin} destination={selection.destination} originName={selection.originName} destName={selection.destName}
     onBack={() => navigate("welcome")} onEnterMap={enterMap} onBackendStatus={setBackend} />;
 
+  const displayRoutes = capabilities.showScores ? comparison.routes
+    : comparison.routes.map((route) => ({ ...route, leastStressful: false }));
   return <>
     <nav className="app-toolbar" aria-label="通勤导航">
       <button type="button" onClick={() => navigate("welcome")}>修改起终点</button>
@@ -114,7 +116,7 @@ export default function App() {
       {feedbackNotice && <p role={feedbackSaved ? "status" : "alert"}>{feedbackNotice}</p>}
     </section>
     <MapPage state={{ heatmapCells: heatmap.cells, loading: heatmap.loading, error: heatmap.error, routeComparison: comparison, trend: trends.data }}
-      mapSlot={<MapSurface heatmapCells={heatmap.cells} routes={comparison.routes} selectedRouteId={selectedRouteId}
+      mapSlot={<MapSurface heatmapCells={heatmap.cells} routes={displayRoutes} selectedRouteId={selectedRouteId}
         loading={heatmap.loading} onFeedbackSubmit={handleFeedbackSubmit} feedbackEnabled={capabilities.canReport}
         onRouteSelect={(id) => { if (comparison.routes.some((r) => r.id === id)) setSelectedRouteId(id); }}
         onViewportChange={heatmap.updateViewport} onModeChange={setBaseMap}

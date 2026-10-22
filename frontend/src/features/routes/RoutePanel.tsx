@@ -48,7 +48,7 @@ export function RoutePanel({
                     最快
                   </span>
                 )}
-                {route.leastStressful && (
+                {route.leastStressful && route.stressScore != null && (
                   <span className="route-panel__badge route-panel__badge--calm">
                     少心累
                   </span>
@@ -70,7 +70,7 @@ export function RoutePanel({
               </div>
               <div className="route-panel__stat">
                 <span className="route-panel__stat-value">
-                  {Math.round(route.stressScore)}
+                  {route.stressScore == null ? "不可用" : Math.round(route.stressScore)}
                 </span>
                 <span className="route-panel__stat-label">压力</span>
               </div>
