@@ -12,7 +12,7 @@ import { useHeatmapQuery } from "./hooks/useHeatmapQuery";
 import { useTripNavigation } from "./hooks/useTripNavigation";
 import { useTrendsHistory } from "./hooks/useTrendsHistory";
 import { CAMPUS_VIEWPORT_CONSTRAINT, DEFAULT_DESTINATION, DEFAULT_ORIGIN, WAYPOINTS } from "./config/campus";
-import { formatDuration, routeSourceLabel, tripCapabilities } from "./config/capabilities";
+import { formatDuration, routePanelPresentation, routeSourceLabel, tripCapabilities } from "./config/capabilities";
 import type { BackendStatus, BaseMapMode, GeoPoint, MapFeedbackDraft, RouteComparison } from "./types";
 import "./App.css";
 
@@ -121,7 +121,7 @@ export default function App() {
         onRouteSelect={(id) => { if (comparison.routes.some((r) => r.id === id)) setSelectedRouteId(id); }}
         onViewportChange={heatmap.updateViewport} onModeChange={setBaseMap}
         origin={selection.origin} destination={selection.destination} viewportConstraint={CAMPUS_VIEWPORT_CONSTRAINT} />} />
-    {capabilities.showScores ? <RoutePanel routes={comparison.routes} selectedRouteId={selectedRouteId} onSelectRoute={setSelectedRouteId} />
+    {capabilities.showScores ? <RoutePanel {...routePanelPresentation(comparison)} routes={comparison.routes} selectedRouteId={selectedRouteId} onSelectRoute={setSelectedRouteId} />
       : <nav className="app-route-choices" aria-label="路线对比">
         {comparison.routes.map((route) => <button key={route.id} type="button" aria-label={`选择 ${route.label}`}
           aria-pressed={selectedRouteId === route.id} onClick={() => setSelectedRouteId(route.id)}>

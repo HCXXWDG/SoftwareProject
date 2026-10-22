@@ -78,6 +78,20 @@ describe("成员 A 页面编排", () => {
     const complete = screen.getByRole("button", { name: "完成本次通勤" });
     expect(complete).toBeDisabled(); fireEvent.click(complete); expect(calls("/commutes/complete")).toHaveLength(0);
   });
+  it("passes C01 presentation states so verified real scores, including zero, remain visible after entering the map", async () => {
+    const comparison = { ...routeComparison, routeSource: "REAL", feedbackSource: "REAL", scoringStatus: "VALID",
+      routes: routeComparison.routes.map((route, index) => ({ ...route, stressScore: index === 0 ? 0 : 22 })) };
+    installBackend((url) => url.includes("/routes/compare") ? jsonResponse(comparison) : undefined);
+    render(<App />); await map();
+    const panel = screen.getByTestId("route-panel");
+    expect(within(panel).getByText("0", { exact: true })).toBeInTheDocument();
+    expect(within(panel).getByText("22", { exact: true })).toBeInTheDocument();
+    expect(within(panel).getByText("少心累", { exact: true })).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole("button", { name: /选择 路线 B/ }));
+    expect(screen.getByTestId("map-contract")).toHaveTextContent("r2");
+    expect(screen.getByRole("button", { name: "完成本次通勤" })).toBeDisabled();
+    expect(calls("/commutes/complete")).toHaveLength(0);
+  });
   it("selects the same route across choices and map then clears it on replanning", async () => {
     render(<App />); await map(); fireEvent.click(screen.getByRole("button", { name: /选择 路线 B/ }));
     expect(screen.getByTestId("map-contract")).toHaveTextContent("r2");

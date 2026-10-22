@@ -5,6 +5,13 @@ interface RoutePanelProps {
   routes: ScoredRoute[];
   selectedRouteId?: string;
   onSelectRoute: (routeId: string) => void;
+  /** Presentation values adapted from the canonical route/feedback contract by A. */
+  routeSource?: "real" | "mock" | "unknown";
+  scoringStatus?: "valid" | "insufficient" | "none";
+}
+
+function isValidScore(value: number | null): value is number {
+  return value != null && Number.isFinite(value) && value >= 0 && value <= 100;
 }
 
 function formatDistance(meters: number): string {
@@ -22,6 +29,8 @@ export function RoutePanel({
   routes,
   selectedRouteId,
   onSelectRoute,
+  routeSource,
+  scoringStatus,
 }: RoutePanelProps) {
   if (!routes || routes.length === 0) {
     return null;
@@ -29,8 +38,12 @@ export function RoutePanel({
 
   return (
     <div aria-label="路线对比" className="route-panel" data-testid="route-panel">
+      {routeSource === "unknown" && <p role="status">路线来源与评分状态待确认</p>}
       {routes.map((route) => {
         const isSelected = route.id === selectedRouteId;
+        const score = route.stressScore;
+        const showScore = routeSource === "real" && scoringStatus === "valid"
+          && isValidScore(route.stressExposure) && isValidScore(score);
         return (
           <button
             aria-label={`选择 ${route.label}`}
@@ -48,7 +61,7 @@ export function RoutePanel({
                     最快
                   </span>
                 )}
-                {route.leastStressful && route.stressScore != null && (
+                {route.leastStressful && showScore && (
                   <span className="route-panel__badge route-panel__badge--calm">
                     少心累
                   </span>
@@ -70,9 +83,9 @@ export function RoutePanel({
               </div>
               <div className="route-panel__stat">
                 <span className="route-panel__stat-value">
-                  {route.stressScore == null ? "不可用" : Math.round(route.stressScore)}
+                  {showScore ? Math.round(score) : "—"}
                 </span>
-                <span className="route-panel__stat-label">压力</span>
+                <span className="route-panel__stat-label">{showScore ? "综合评分" : "评分待确认"}</span>
               </div>
             </div>
           </button>
