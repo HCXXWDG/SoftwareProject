@@ -21,8 +21,8 @@ B 的提交中已经包含 #55 及 D01–D05 的依赖；本候选**没有合入
 - [x] `frontend/npm ci`、全量 Vitest 与生产构建，不删除/跳过已有断言；3 项失败如实保留。
 - [x] A 受控浏览器与 PWA 回归，保留失败证据。
 - [x] 用本候选的实际 Spring Boot 执行 A 的 D07 浏览器场景：移动端新建通勤、服务保存后丢失回执、同键显式重放；不替换 API 数据。
-- [ ] 建立指向 develop 的草稿 PR，让此前以功能分支为 base 而未触发的检查真正运行。
-- [ ] 根据实际组合结果回给 A/C/D 可复现待办，不绕过 required checks 或非作者评审。
+- [x] 建立指向 develop 的[草稿 PR #72](https://github.com/HCXXWDG/SoftwareProject/pull/72)，让此前以功能分支为 base 而未触发的检查真正运行。
+- [x] 根据实际组合结果回给 A/C/D 可复现待办，不绕过 required checks 或非作者评审。
 
 ## 执行约束
 
@@ -42,6 +42,9 @@ B 的提交中已经包含 #55 及 D01–D05 的依赖；本候选**没有合入
 | Mock E2E | 本机 Chrome 33/33，1 worker、0 重试；不计作真实后端测试 |
 | PWA | 本机 Chrome 5/5，实际 SW 接管、API 不缓存、离线重载 |
 | 实际后端 D07 浏览器 | 3/3：390/320px Demo 无评分完成 201；真实保存后丢失回执，刷新不自动写入，同键显式重放得到同 commuteId 的 200 duplicate |
+| [Backend CI](https://github.com/HCXXWDG/SoftwareProject/actions/runs/39766113292)（源码提交 4759522） | **210/210，0 失败/错误/跳过**；PostgisRouteSnapshotFlowTest 5/5 + PostgisIntegrationTest 5/5，实际应用 V6 并验证空评分回读与有效零分 |
+| [E2E CI](https://github.com/HCXXWDG/SoftwareProject/actions/runs/39766113335)（4759522） | 云端 Mock 浏览器通过；不当作实际后端验证 |
+| [Frontend CI](https://github.com/HCXXWDG/SoftwareProject/actions/runs/39766113196)（4759522） | 仍为 3 项 C 地图断言失败，与本地一致，不宣称全绿 |
 
 实际服务由本候选 JAR 在 18095 端口以隔离内存 demo 启动，空高德 Key，临时允许 5403 前端 CORS；测试完已停止。前两项不拦截 API，第三项只在真实服务保存后丢弃回执，不替换 API 数据。B 新增仓储回读与合法零分断言，不手改 A 的页面/API Client 或 D 的服务/迁移。
 
@@ -54,3 +57,5 @@ B 的提交中已经包含 #55 及 D01–D05 的依赖；本候选**没有合入
 - A/D：共享 `playwright.integration.config.ts` 会收集所有 `*.integration.e2e.ts`，但不同专用配置使用不同端口和写入开关；必须约定共享 CI 入口和默认部署能力，不能把专用 3/3 冒充共享 Full-stack E2E 全绿。
 
 尚未完成的云端检查以草稿 PR 的实际结果为准。本候选不自动关闭 #68/#70，也不自动合并原 PR。
+
+已在 #56/#57/#71 发布新的组合结果与可复现交接；B 对 D07 的来源与可空评分增量提交非作者批准，不等于批准本集成草稿或发布。以上 CI 链接绑定首次源码提交 4759522；后续报告文档提交不改变被测功能源码，仍需看 PR 当前 head 的检查。
