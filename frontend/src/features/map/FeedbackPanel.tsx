@@ -22,6 +22,7 @@ interface FeedbackPanelProps {
   onSubmit: (stressLevel: number, tag: EmotionTag) => void;
   onCancel: () => void;
   submitting: boolean;
+  submissionEnabled?: boolean;
 }
 
 export function FeedbackPanel({
@@ -29,11 +30,12 @@ export function FeedbackPanel({
   onSubmit,
   onCancel,
   submitting,
+  submissionEnabled = true,
 }: FeedbackPanelProps) {
   const [stressLevel, setStressLevel] = useState<number | null>(null);
   const [tag, setTag] = useState<EmotionTag | null>(null);
 
-  const canSubmit = stressLevel !== null && tag !== null && !submitting;
+  const canSubmit = stressLevel !== null && tag !== null && !submitting && submissionEnabled;
 
   const handleSubmit = () => {
     if (canSubmit) {
@@ -111,6 +113,7 @@ export function FeedbackPanel({
       >
         {submitting ? "提交中…" : "提交反馈"}
       </button>
+      {!submissionEnabled && <p role="status">反馈服务暂不可用，草稿已保留，请恢复连接后提交。</p>}
     </div>
   );
 }

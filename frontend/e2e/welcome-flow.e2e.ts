@@ -25,9 +25,9 @@ const MOCK_ROUTES = {
       fastest: true,
       leastStressful: false,
       polyline: [
-        { longitude: 120.2735, latitude: 31.4753 },
+        { longitude: 120.273510, latitude: 31.475328 },
         { longitude: 120.2738, latitude: 31.478 },
-        { longitude: 120.2743, latitude: 31.4833 },
+        { longitude: 120.274319, latitude: 31.483275 },
       ],
     },
     {
@@ -41,16 +41,23 @@ const MOCK_ROUTES = {
       fastest: false,
       leastStressful: true,
       polyline: [
-        { longitude: 120.2735, latitude: 31.4753 },
+        { longitude: 120.273510, latitude: 31.475328 },
         { longitude: 120.274, latitude: 31.48 },
-        { longitude: 120.2743, latitude: 31.4833 },
+        { longitude: 120.274319, latitude: 31.483275 },
       ],
     },
   ],
   fastestRouteId: "route-fast",
   leastStressfulRouteId: "route-calm",
-  recommendation: "明天试少心累路线 B。",
+  recommendation: "本次推荐少心累路线 B。",
   recommendAlternative: true,
+  routeSource: "REAL",
+  feedbackSource: "REAL",
+  scoringStatus: "VALID",
+  snapshotId: "00000000-0000-4000-8000-000000000001",
+  scoringVersion: "walking-distance-v2",
+  travelMode: "WALKING",
+  recommendationReason: "RECOMMENDED",
 };
 
 const MOCK_TRENDS = {
@@ -60,6 +67,7 @@ const MOCK_TRENDS = {
 };
 
 async function mockAPI(page: Page) {
+  await page.route("**/api/v1/routes/history*", route => route.fulfill({ json: [] }));
   await page.route("**/api/v1/heatmap*", (route) =>
     route.fulfill({ json: MOCK_HEATMAP }),
   );
@@ -70,7 +78,7 @@ async function mockAPI(page: Page) {
     route.fulfill({ json: MOCK_TRENDS }),
   );
   await page.route("**/api/v1/reports", (route) =>
-    route.fulfill({ status: 201, json: { status: "ok", message: "created" } }),
+    route.fulfill({ status: 201, json: { status: "created", code: "report_created", counted: true, message: "反馈已保存" } }),
   );
 }
 
@@ -80,7 +88,7 @@ test.describe("Welcome flow & 3-stage navigation", () => {
     await page.goto("/");
 
     // Welcome page should display the entry button
-    const entryBtn = page.getByRole("button", { name: "查看预设路线" });
+    const entryBtn = page.getByRole("button", { name: "查看路线" });
     await expect(entryBtn).toBeVisible();
 
     // Map should NOT be visible yet
@@ -94,7 +102,8 @@ test.describe("Welcome flow & 3-stage navigation", () => {
     await page.goto("/");
 
     // Click to advance to stage 2
-    await page.getByRole("button", { name: "查看预设路线" }).click();
+    await page.getByRole("button", { name: "查看路线" }).click();
+    await expect(page.getByRole("heading", { name: "路线预览", exact: true })).toBeVisible();
 
     // Route preview should load routes from API
     const enterMapBtn = page.getByRole("button", { name: "进入地图" });
@@ -119,7 +128,7 @@ test.describe("Welcome flow & 3-stage navigation", () => {
     await page.goto("/");
 
     // Navigate through all 3 stages
-    await page.getByRole("button", { name: "查看预设路线" }).click();
+    await page.getByRole("button", { name: "查看路线" }).click();
     await expect(page.getByRole("button", { name: "进入地图" })).toBeVisible({
       timeout: 10_000,
     });
@@ -150,7 +159,7 @@ test.describe("Welcome flow & 3-stage navigation", () => {
     await page.goto("/");
 
     // Stage 1: Welcome
-    await page.getByRole("button", { name: "查看预设路线" }).click();
+    await page.getByRole("button", { name: "查看路线" }).click();
 
     // Stage 2: Route preview
     await expect(page.getByRole("button", { name: "进入地图" })).toBeVisible({
@@ -159,7 +168,9 @@ test.describe("Welcome flow & 3-stage navigation", () => {
     await page.getByRole("button", { name: "进入地图" }).click();
 
     // Stage 3: Map
-    await expect(page.locator("[data-map-mode]").first()).toBeVisible();
+    await expect(page.locator("[data-map-mode]").first()).toHaveAttribute("data-map-mode", /amap|offline/);
+    await expect(page.locator(".map-page__loading")).toHaveCount(0);
+    await expect(page.getByText("正在更新情绪热力图", { exact: true })).toHaveCount(0);
 
     // Long-press for feedback
     const mapSection = page.locator("[aria-label='校园通勤情绪地图']");
@@ -196,12 +207,14 @@ test.describe("Welcome flow & 3-stage navigation", () => {
     await page.goto("/");
 
     // Navigate to map
-    await page.getByRole("button", { name: "查看预设路线" }).click();
+    await page.getByRole("button", { name: "查看路线" }).click();
     await expect(page.getByRole("button", { name: "进入地图" })).toBeVisible({
       timeout: 10_000,
     });
     await page.getByRole("button", { name: "进入地图" }).click();
-    await expect(page.locator("[data-map-mode]").first()).toBeVisible();
+    await expect(page.locator("[data-map-mode]").first()).toHaveAttribute("data-map-mode", /amap|offline/);
+    await expect(page.locator(".map-page__loading")).toHaveCount(0);
+    await expect(page.getByText("正在更新情绪热力图", { exact: true })).toHaveCount(0);
 
     const panel = page.getByTestId("route-panel");
 

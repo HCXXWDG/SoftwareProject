@@ -1,5 +1,5 @@
 /** 情绪标签 */
-export type EmotionTag = "NOISE" | "CROWD" | "SUN" | "ODOR" | "OTHER";
+export type EmotionTag = "NOISE" | "CROWD" | "SUN" | "ODOR" | "QUIET" | "SHADE" | "OPEN" | "OTHER";
 
 /** 地理坐标 */
 export interface GeoPoint {
@@ -23,22 +23,50 @@ export interface ScoredRoute {
   label: string;
   distanceMeters: number;
   durationSeconds: number;
-  stressExposure: number;
-  stressScore: number;
+  stressExposure: number | null;
+  stressScore: number | null;
   confidence: number;
   fastest: boolean;
   leastStressful: boolean;
   polyline: GeoPoint[];
+  scoringStatus?: ScoringStatus;
+}
+
+export type RouteSource = "REAL" | "DEMO" | "UNAVAILABLE" | "UNKNOWN";
+export type FeedbackSource = "REAL" | "DEMO" | "MIXED" | "NONE" | "UNKNOWN";
+export type ScoringStatus = "VALID" | "INSUFFICIENT_DATA" | "UNAVAILABLE";
+
+export interface RecommendationDetails {
+  extraDurationSeconds: number;
+  durationRatio: number;
+  environmentImprovement: number | null;
+  compositeImprovement: number | null;
+  dataCoverage: number;
 }
 
 /** 路线对比结果 */
 export interface RouteComparison {
   routes: ScoredRoute[];
-  fastestRouteId: string;
-  leastStressfulRouteId: string;
+  fastestRouteId: string | null;
+  leastStressfulRouteId: string | null;
   recommendation: string;
   recommendAlternative: boolean;
+  /** 待 B/D 契约确认；旧接口缺少时保持未知。 */
+  routeSource?: RouteSource;
+  feedbackSource?: FeedbackSource;
+  scoringStatus?: ScoringStatus;
+  /** Legacy field is retained as received; it is never a substitute for snapshotId. */
+  comparisonId?: string;
+  snapshotId?: string | null;
+  scoringVersion?: string | null;
+  travelMode?: "WALKING" | null;
+  recommendationDetails?: RecommendationDetails | null;
+  recommendationReason?: string;
 }
+
+export type BackendStatus = "unknown" | "available" | "unavailable";
+export type BaseMapMode = "loading" | "amap" | "offline";
+export interface TripEndpoints { originId: string; destinationId: string; }
 
 /** 通勤记录 */
 export interface CommuteRecord {
@@ -62,6 +90,16 @@ export interface TrendPoint {
   date: string;
   averageStress: number | null;
   commuteCount: number;
+  /** D05: server estimates only; absent on older responses. */
+  averageEstimatedSeconds?: number | null;
+  estimatedSampleCount?: number;
+}
+
+export interface TrendSummary {
+  averageStress: number | null;
+  stressDelta: number | null;
+  direction: "unknown" | "stable" | "improving" | "worsening";
+  sampleSufficient: boolean;
 }
 
 /** 趋势结果 */
@@ -69,21 +107,53 @@ export interface TrendResult {
   points: TrendPoint[];
   recommendation: string;
   totalCommutes: number;
+  summary?: TrendSummary;
+  /** D05 metadata is optional while the original backend remains supported. */
+  days?: number;
+  timezone?: string;
+  unknownSourceCommutes?: number;
+  excludedDemoCommutes?: number;
+  deduplicatedCommutes?: number;
+  outOfWindowCommutes?: number;
 }
 
-/** 提交通勤反馈 */
+/** D02 完成通勤：评分和预计时长仅由服务端快照重建。 */
 export interface CommuteCompleteRequest {
+  snapshotId: string;
+  /** 同一次通勤重试必须复用；新通勤生成新值。 */
+  operationId: string;
+  routeId: string;
+  endStressLevel: 0 | 25 | 50 | 75 | 100;
+  completedAt?: string;
+}
+
+/** D02/D07 成功响应；UNKNOWN 来源不可解释为真实评分。 */
+export interface CommuteCompletion {
+  status: "created" | "duplicate";
+  commuteId: string;
+  operationId: string;
+  snapshotId: string;
   routeId: string;
   routeLabel: string;
-  endStressLevel: number;
+  routeSource: "REAL" | "DEMO" | "UNKNOWN";
+  estimatedSeconds: number;
+  /** ceil(estimatedSeconds / 60)，不代表实测实际时长。 */
   durationMinutes: number;
-  selectedScore: number;
-  fastestScore: number;
-  alternativeLabel?: string;
-  alternativeScore?: number;
-  alternativeDurationRatio?: number;
-  confidence: number;
-  completedAt?: string;
+  /** D07 无可验证评分时为 null；响应省略键也归一为 null，真实 0 保留。 */
+  selectedScore: number | null;
+  endStressLevel: 0 | 25 | 50 | 75 | 100;
+  completedAt: string;
+  message: string;
+}
+
+/** 相同 operationId 已被其他通勤内容占用，不能当作重复成功。 */
+export interface CommuteCompletionConflict {
+  status: "conflict";
+  operationId: string;
+  existingCommuteId?: string;
+  existingSnapshotId?: string;
+  existingRouteId?: string;
+  message: string;
 }
 
 /** 提交情绪报告 */

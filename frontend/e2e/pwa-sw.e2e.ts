@@ -1,159 +1,133 @@
 import { test, expect, type Page } from "@playwright/test";
 
-/**
- * PWA Service Worker NetworkOnly 验证
- *
- * 确认 /api/**、高德脚本和地图瓦片不被 Service Worker 缓存，
- * 避免缓存旧 API 数据和地图资源。
- */
-
+/** Exercise the built application's active Service Worker rather than the Vite dev server. */
 async function mockAPI(page: Page) {
-  await page.route("**/api/v1/heatmap*", (route) =>
-    route.fulfill({
-      json: [
-        {
-          cellId: "16:133638:34976",
-          center: { longitude: 120.274, latitude: 31.479 },
-          score: 68.2,
-          confidence: 0.72,
-          count: 18,
-          dominantTag: "NOISE",
-        },
-      ],
-    }),
-  );
-  await page.route("**/api/v1/routes/compare", (route) =>
-    route.fulfill({
-      json: {
-        routes: [
-          {
-            id: "route-fast",
-            label: "最快路线 A",
-            distanceMeters: 2100,
-            durationSeconds: 720,
-            stressExposure: 67.2,
-            stressScore: 50.4,
-            confidence: 0.68,
-            fastest: true,
-            leastStressful: false,
-            polyline: [
-              { longitude: 120.2735, latitude: 31.4753 },
-              { longitude: 120.2743, latitude: 31.4833 },
-            ],
-          },
+  const network = { heatScore: 68.2, requests: [] as string[] };
+  // Context routing also sees network requests issued by the active Service Worker.
+  await page.context().route("**/api/v1/**", async route => {
+    const path = new URL(route.request().url()).pathname;
+    network.requests.push(route.request().url());
+    if (path === "/api/v1/heatmap") return route.fulfill({ json: [{
+      cellId: "16:133638:34976", center: { longitude: 120.274, latitude: 31.479 },
+      score: network.heatScore, confidence: 0.72, count: 18, dominantTag: "NOISE",
+    }] });
+    if (path === "/api/v1/routes/compare") return route.fulfill({ json: {
+      routes: [{
+        id: "route-fast", label: "路线 A", distanceMeters: 850, durationSeconds: 600,
+        stressExposure: 67.2, stressScore: 50.4, confidence: 0.68,
+        fastest: true, leastStressful: false,
+        polyline: [
+          { longitude: 120.273510, latitude: 31.475328 },
+          { longitude: 120.274319, latitude: 31.483275 },
         ],
-        fastestRouteId: "route-fast",
-        leastStressfulRouteId: "route-fast",
-        recommendation: "test",
-        recommendAlternative: false,
-      },
-    }),
-  );
-  await page.route("**/api/v1/commutes/trends*", (route) =>
-    route.fulfill({
-      json: {
-        points: [{ date: "2026-06-10", averageStress: 55, commuteCount: 3 }],
-        recommendation: "继续保持",
-        totalCommutes: 3,
-      },
-    }),
-  );
-  await page.route("**/api/v1/reports", (route) =>
-    route.fulfill({ status: 201, json: { status: "ok", message: "created" } }),
-  );
+      }],
+      fastestRouteId: "route-fast", leastStressfulRouteId: "route-fast",
+      recommendation: "当前只有一条路线", recommendAlternative: false,
+      routeSource: "REAL", feedbackSource: "REAL", scoringStatus: "VALID",
+      snapshotId: "00000000-0000-4000-8000-000000000001", scoringVersion: "walking-distance-v2",
+      travelMode: "WALKING", recommendationReason: "NO_ALTERNATIVE",
+    } });
+    if (path === "/api/v1/routes/history") return route.fulfill({ json: [] });
+    if (path === "/api/v1/commutes/trends") return route.fulfill({ json: {
+      points: [{ date: "2026-06-10", averageStress: 55, commuteCount: 3 }],
+      recommendation: "继续保持", totalCommutes: 3,
+    } });
+    if (path === "/api/v1/reports") return route.fulfill({ status: 201,
+      json: { status: "created", code: "report_created", counted: true, message: "反馈已保存" } });
+    return route.fulfill({ status: 404, json: { code: "unexpected_request", message: "本场景未配置此请求" } });
+  });
+  return network;
+}
+
+async function waitForServiceWorker(page: Page) {
+  await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
 }
 
 async function navigateToMap(page: Page) {
-  await page.getByRole("button", { name: "查看预设路线" }).click();
-  await expect(page.getByRole("button", { name: "进入地图" })).toBeVisible({
-    timeout: 10_000,
+  await page.getByRole("button", { name: "查看路线", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "路线预览", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "进入地图", exact: true }).click();
+  await expect(page.locator("[data-map-mode]").first()).toHaveAttribute("data-map-mode", /amap|offline/);
+  await expect(page.locator(".map-page__loading")).toHaveCount(0);
+}
+
+async function cacheUrls(page: Page) {
+  return page.evaluate(async () => {
+    const urls: string[] = [];
+    for (const name of await caches.keys()) {
+      const cache = await caches.open(name);
+      urls.push(...(await cache.keys()).map(request => request.url));
+    }
+    return urls;
   });
-  await page.getByRole("button", { name: "进入地图" }).click();
-  await expect(page.locator("[data-map-mode]").first()).toBeVisible();
 }
 
 test.describe("PWA Service Worker NetworkOnly", () => {
-  test("Service Worker is registered", async ({ page }) => {
+  test("registers and activates a Service Worker that controls the application", async ({ page }) => {
     await mockAPI(page);
     await page.goto("/");
-
-    const swRegistration = await page.evaluate(async () => {
-      if (!("serviceWorker" in navigator)) return null;
-      const reg = await navigator.serviceWorker.getRegistration();
-      return reg ? reg.active?.scriptURL ?? "installing" : null;
+    await waitForServiceWorker(page);
+    const registration = await page.evaluate(async () => {
+      const value = await navigator.serviceWorker.getRegistration();
+      return { state: value?.active?.state, scriptURL: value?.active?.scriptURL };
     });
-
-    expect(swRegistration).not.toBeNull();
+    expect(registration.state).toBe("activated");
+    expect(new URL(registration.scriptURL!).pathname).toBe("/sw.js");
   });
 
-  test("API responses are not served from cache (NetworkOnly)", async ({
-    page,
-  }) => {
-    await mockAPI(page);
+  test("the active Service Worker fetches fresh API data for the same URL and never caches it", async ({ page }) => {
+    const network = await mockAPI(page);
     await page.goto("/");
-
-    const apiCalls: string[] = [];
-    page.on("request", (req) => {
-      if (req.url().includes("/api/v1/heatmap")) {
-        apiCalls.push("heatmap");
-      }
-    });
-
+    await waitForServiceWorker(page);
     await navigateToMap(page);
-    await expect.poll(() => apiCalls.length).toBeGreaterThan(0);
+    const url = "/api/v1/heatmap?bbox=120.26,31.47,120.28,31.50&zoom=16&hours=168&probe=network-only";
+    const first = await page.evaluate(async target => (await fetch(target)).json(), url);
+    expect(first[0].score).toBe(68.2);
+    network.heatScore = 15.25;
+    const second = await page.evaluate(async target => (await fetch(target)).json(), url);
+    expect(second[0].score).toBe(15.25);
+    expect(network.requests.filter(request => request.includes("probe=network-only"))).toHaveLength(2);
+    expect((await cacheUrls(page)).some(cached => new URL(cached).pathname.startsWith("/api/"))).toBe(false);
   });
 
-  test("manifest is accessible and standalone", async ({ page }) => {
+  test("serves a manifest with standalone application identity", async ({ page }) => {
     await page.goto("/");
-
     const manifestLink = page.locator('link[rel="manifest"]');
-    await expect(manifestLink).toHaveAttribute("href", "manifest.webmanifest");
-
-    const response = await page.goto("/manifest.webmanifest");
-    expect(response?.status()).toBe(200);
-    const manifest = await response?.json();
-    expect(manifest?.display).toBe("standalone");
-    expect(manifest?.name).toContain("校园通勤情绪地图");
+    const href = await manifestLink.getAttribute("href");
+    expect(href).not.toBeNull();
+    expect(new URL(href!, page.url()).pathname).toBe("/manifest.webmanifest");
+    const response = await page.request.get("/manifest.webmanifest");
+    expect(response.status()).toBe(200);
+    const manifest = await response.json();
+    expect(manifest.display).toBe("standalone");
+    expect(manifest.name).toContain("校园通勤情绪地图");
   });
 
-  test("manifest includes required icons", async ({ page }) => {
-    const response = await page.goto("/manifest.webmanifest");
-    const manifest = await response?.json();
-
-    const iconSizes = manifest?.icons?.map((i: { sizes: string }) => i.sizes) ?? [];
-    expect(iconSizes).toContain("192x192");
-    expect(iconSizes).toContain("512x512");
-
-    const hasMaskable = manifest?.icons?.some(
-      (i: { purpose?: string }) => i.purpose === "maskable",
-    );
-    expect(hasMaskable).toBe(true);
+  test("includes 192/512 pixel and maskable icons backed by accessible assets", async ({ page }) => {
+    const response = await page.request.get("/manifest.webmanifest");
+    expect(response.status()).toBe(200);
+    const manifest = await response.json();
+    const icons = manifest.icons as { sizes: string; purpose?: string; src: string }[];
+    expect(icons.map(icon => icon.sizes)).toContain("192x192");
+    expect(icons.map(icon => icon.sizes)).toContain("512x512");
+    expect(icons.some(icon => icon.purpose === "maskable")).toBe(true);
+    for (const icon of icons) {
+      expect((await page.request.get(new URL(icon.src, response.url()).href)).status()).toBe(200);
+    }
   });
 
-  test("app shell is precached for offline use", async ({ page }) => {
+  test("precaches the application shell and can reload it offline without cached API responses", async ({ page }) => {
     await mockAPI(page);
     await page.goto("/");
-
-    await page.waitForLoadState("networkidle");
-
-    const cachedKeys = await page.evaluate(async () => {
-      if (!("caches" in window)) return [];
-      const cacheNames = await caches.keys();
-      const allKeys: string[] = [];
-      for (const name of cacheNames) {
-        const cache = await caches.open(name);
-        const keys = await cache.keys();
-        allKeys.push(...keys.map((k) => k.url));
-      }
-      return allKeys;
-    });
-
-    const hasAppShell = cachedKeys.some(
-      (url) => url.includes("index.html") || url.endsWith(".css") || url.endsWith(".js"),
-    );
-    expect(hasAppShell).toBe(true);
-
-    const hasApiCached = cachedKeys.some((url) => url.includes("/api/"));
-    expect(hasApiCached).toBe(false);
+    await waitForServiceWorker(page);
+    const keys = await cacheUrls(page);
+    expect(keys.some(url => url.includes("index.html") || url.endsWith(".css") || url.endsWith(".js"))).toBe(true);
+    expect(keys.some(url => new URL(url).pathname.startsWith("/api/"))).toBe(false);
+    await page.context().setOffline(true);
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "校园通勤情绪地图", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "查看路线", exact: true })).toBeEnabled();
+    await page.context().setOffline(false);
   });
 });
