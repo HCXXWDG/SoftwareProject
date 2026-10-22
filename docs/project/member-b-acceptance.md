@@ -1,6 +1,6 @@
 # 成员 B B01–B05 验收记录
 
-日期：2026-10-21。分支：`codex/member-b-route-correctness`。范围：[任务分工书](task-assignment.md) 的 B01–B05。
+日期：2026-10-21，复核更新：2026-10-22。分支：`codex/member-b-route-correctness`。范围：[任务分工书](task-assignment.md) 的 B01–B05。
 
 ## 同步与实施记录
 
@@ -34,6 +34,23 @@
 | 真实库范围回归 | 新增 postgres 未传 scope 只读 REAL、显式 ALL 标 MIXED、刷新仅缓存 REAL；本机跳过，须以本次 Backend CI 结果为准 |
 
 **仍阻塞，不能宣称通勤闭环完成**：当前 DEMO 422、无有效评分 400 尚未移除。已[明确交给 D](https://github.com/HCXXWDG/SoftwareProject/pull/67#issuecomment-6318258809)实施 demo 部署允许 DEMO 写入但趋势排除、无评分首次通勤可记录；必须同时处理 `double` 解箱、NOT NULL 评分列、JDBC null 回读、DTO/趋势判空及新增迁移，不能用 0 填补缺失分数。D 的联调提交完成后 B 再复核快照链路，本 PR 保持草稿。
+
+## 2026-10-22 集成复核与推进
+
+- `develop` 仍为 `d14ecbc`，16 个 PR 开放，协作者的提交尚未合并；不能把分支交付等同于集成完成。D06 #69 为 `788f573`，A #56 为 `545e0b1`，D 的通勤放行/可空分数尚无后续提交。
+- `develop` 和 `main` 均已保护：Frontend CI、Backend CI、E2E CI、Full-stack E2E 四项 required checks，至少一名批准，管理员也受保护。不关闭检查或绕过评审来推进。
+- [fab4837 的 Backend CI](https://github.com/HCXXWDG/SoftwareProject/actions/runs/39616196496) 实际为 208 项执行、1 失败、0 错误、0 跳过；新增 PostgisRouteSnapshotFlowTest 4/4 已通过。唯一失败是旧 PostgisIntegrationTest 仍断言无提供器返回 200，与已确认的 503 契约不符，并非新增范围测试失败。
+- 本轮同步该断言为 503 + `route_provider_unavailable`，同时断言错误体完整、无 routes/快照；测试显式关闭 Key 与演示策略，避免环境变量令无配置场景不确定。未改生产逻辑。`mvnw.cmd -o --batch-mode --no-transfer-progress verify` 再次为 208 项、199 实际通过、9 项无 Docker 跳过、0 失败/错误。
+- 独立 JAR 端口 18094 实测：DEMO compare 200、3 候选、含 snapshotId、缺少评分与 leastStressfulRouteId；直接运行 A 分支的 `isRouteComparison` 得到 false；使用同一快照完成通勤仍 422 `demo_result_not_allowed`。这是 HTTP/校验器探针，不是浏览器 Full-stack E2E；测试进程已停止。
+
+| 主责 | 合并前仍需完成 |
+| --- | --- |
+| A | 修复 #68 基线；更新 responseValidators/types 接受 NON_NULL 缺失分数、可选路线 ID、snapshotId 与完整来源枚举；接入 C01 的状态 Props，并适配 503。当前校验器要求分数与两个选择 ID 必填，只认识 comparisonId |
+| B | 修复上述遗留 PostGIS 断言，复核本次真实库 CI；继续保持缺分数不补 0、不伪造真实路线 |
+| C | #57–#61 目前仍指向 main，应协调改走 develop；C01 Props 的小写 real/mock、valid/insufficient 需与 B 的大写状态在 A/C 边界显式适配，不能直接混传；检查多 PR 合并后的组合而非仅单分支 |
+| D | 按前述交接补齐通勤放行及可空存储；#69 的 comparison() 仍用旧 5 参快照构造器，合入 B 后会成为 UNKNOWN/UNAVAILABLE，真实并发验收应使用显式 REAL/VALID/版本的受控夹具，不应为跑通测试降低来源门禁；同步 demo 排除后的 E2E 趋势断言 |
+
+推进顺序：先修公共前端基线，再对齐 B/D 通勤与 A/C 状态契约；以受保护 develop 为最终目标组装集成候选，重新执行四项 CI 与非作者评审。#52–#54 重叠和 C PR 目标分支由主改人协调，不在 B 线程批量合并或关闭。
 
 ## 首次交付验证（审阅修订前）
 

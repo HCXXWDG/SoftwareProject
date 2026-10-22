@@ -22,7 +22,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(classes = CommuteMoodApplication.class)
+@SpringBootTest(classes = CommuteMoodApplication.class,
+        properties = {"app.amap.web-key=", "app.routing.demo-enabled=false"})
 @AutoConfigureMockMvc
 @ActiveProfiles("postgres")
 @Testcontainers(disabledWithoutDocker = true)
@@ -60,7 +61,7 @@ class PostgisIntegrationTest {
     }
 
     @Test
-    void missingExternalConfigurationDoesNotReturnUnlabelledDemoRoutes() throws Exception {
+    void missingExternalConfigurationReturnsExplicitUnavailableError() throws Exception {
         mockMvc.perform(post("/api/v1/routes/compare")
                         .header("X-Device-Id", "postgis-integration-device")
                         .contentType("application/json")
@@ -74,9 +75,13 @@ class PostgisIntegrationTest {
                                 DemoGeography.ORIGIN_LATITUDE,
                                 DemoGeography.DESTINATION_LONGITUDE,
                                 DemoGeography.DESTINATION_LATITUDE)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.routeSource").value("UNAVAILABLE"))
-                .andExpect(jsonPath("$.routes.length()").value(0));
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.code").value("route_provider_unavailable"))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.routes").doesNotExist())
+                .andExpect(jsonPath("$.snapshotId").doesNotExist());
     }
 
     @Test
