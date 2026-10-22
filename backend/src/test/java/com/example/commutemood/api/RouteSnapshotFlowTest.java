@@ -4,6 +4,7 @@ import com.example.commutemood.application.GeoMath;
 import com.example.commutemood.domain.*;
 import com.example.commutemood.external.AmapRouteProvider;
 import com.example.commutemood.repository.EmotionReportRepository;
+import com.example.commutemood.repository.CommuteRecordRepository;
 import com.example.commutemood.repository.RouteQueryRepository;
 import com.example.commutemood.application.DeviceIdentityService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -29,6 +30,7 @@ class RouteSnapshotFlowTest {
     @Autowired MockMvc http;
     @Autowired ObjectMapper json;
     @Autowired EmotionReportRepository reports;
+    @Autowired CommuteRecordRepository commutes;
     @Autowired RouteQueryRepository snapshots;
     @Autowired DeviceIdentityService identities;
     @MockitoBean AmapRouteProvider provider;
@@ -93,16 +95,25 @@ class RouteSnapshotFlowTest {
         JsonNode comparison = compare(device, origin, destination, true);
         assertThat(comparison.path("routeSource").asText()).isEqualTo("DEMO");
         assertThat(comparison.path("routes").get(0).has("stressScore")).isFalse();
+        String payload = """
+                {"snapshotId":"%s","operationId":"%s","routeId":"route-fast","endStressLevel":25}
+                """.formatted(comparison.path("snapshotId").asText(), UUID.randomUUID());
         http.perform(post("/api/v1/commutes/complete").header("X-Device-Id", device)
-                        .contentType("application/json").content("""
-                                {"snapshotId":"%s","operationId":"%s","routeId":"route-fast","endStressLevel":25}
-                                """.formatted(comparison.path("snapshotId").asText(), UUID.randomUUID())))
+                        .contentType("application/json").content(payload))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("created"))
                 .andExpect(jsonPath("$.routeSource").value("DEMO"))
                 // 演示快照没有可验证评分，落库时评分留空而不是补 0
                 .andExpect(jsonPath("$.selectedScore").doesNotExist())
                 .andExpect(jsonPath("$.fastestScore").doesNotExist());
+        var stored = commutes.findByDeviceSince(identities.hash(device), Instant.EPOCH);
+        assertThat(stored).hasSize(1);
+        assertUnscored(stored.get(0), RouteSource.DEMO);
+        http.perform(post("/api/v1/commutes/complete").header("X-Device-Id", device)
+                        .contentType("application/json").content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("duplicate"))
+                .andExpect(jsonPath("$.commuteId").value(stored.get(0).id().toString()));
         // 读侧排除：真实统计与历史明细都看不到这条演示通勤
         http.perform(get("/api/v1/commutes/trends").header("X-Device-Id", device))
                 .andExpect(status().isOk())
@@ -151,7 +162,50 @@ class RouteSnapshotFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].selectedScore").doesNotExist())
+                .andExpect(jsonPath("$[0].fastestScore").doesNotExist())
+                .andExpect(jsonPath("$[0].confidence").doesNotExist())
                 .andExpect(jsonPath("$[0].routeSource").value("REAL"));
+        var stored = commutes.findByDeviceSince(identities.hash(device), Instant.EPOCH);
+        assertThat(stored).hasSize(1);
+        assertUnscored(stored.get(0), RouteSource.REAL);
+    }
+
+    @Test
+    void verifiedZeroScoresSurviveCompletionAndHistoryWithoutBecomingNull() throws Exception {
+        String device = "b04-zero-" + UUID.randomUUID();
+        GeoPoint origin = new GeoPoint(120.27, 31.481);
+        GeoPoint destination = new GeoPoint(120.2704, 31.481);
+        ScoredRoute route = new ScoredRoute("zero", "Validated zero", 40, 30,
+                0.0, 0.0, 1.0, true, true, List.of(origin, destination));
+        // A controlled server-side snapshot, not a claim about live AMap scoring.
+        RouteComparison comparison = new RouteComparison(List.of(route), "zero", "zero", "ok", false,
+                RouteSource.REAL, FeedbackSource.REAL, ScoringStatus.VALID,
+                RecommendationReason.NO_ALTERNATIVE, "walking-distance-v2", "WALKING", null, null);
+        UUID id = snapshots.save(identities.hash(device), origin, destination, comparison);
+        http.perform(post("/api/v1/commutes/complete").header("X-Device-Id", device)
+                        .contentType("application/json").content("""
+                                {"snapshotId":"%s","operationId":"%s","routeId":"zero","endStressLevel":0}
+                                """.formatted(id, UUID.randomUUID())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.selectedScore").value(0.0))
+                .andExpect(jsonPath("$.routeSource").value("REAL"));
+        var stored = commutes.findByDeviceSince(identities.hash(device), Instant.EPOCH);
+        assertThat(stored).hasSize(1);
+        assertThat(stored.get(0).selectedScore()).isZero();
+        assertThat(stored.get(0).fastestScore()).isZero();
+        assertThat(stored.get(0).confidence()).isEqualTo(1.0);
+        http.perform(get("/api/v1/commutes/history").header("X-Device-Id", device))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].selectedScore").value(0.0))
+                .andExpect(jsonPath("$[0].fastestScore").value(0.0))
+                .andExpect(jsonPath("$[0].confidence").value(1.0));
+    }
+
+    private void assertUnscored(CommuteRecord record, RouteSource source) {
+        assertThat(record.routeSource()).isEqualTo(source);
+        assertThat(record.selectedScore()).isNull();
+        assertThat(record.fastestScore()).isNull();
+        assertThat(record.confidence()).isNull();
     }
 
     private JsonNode compare(String device, GeoPoint origin, GeoPoint destination, boolean demo) throws Exception {

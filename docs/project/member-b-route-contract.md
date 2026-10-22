@@ -1,7 +1,9 @@
 # B01–B05 步行路线、评分与快照契约
 
-日期：2026-10-21。任务依据：[任务分工书](task-assignment.md)，接口讨论：[Issue #66](https://github.com/HCXXWDG/SoftwareProject/issues/66)。
+日期：2026-10-21，D07 集成修订：2026-10-22。任务依据：[任务分工书](task-assignment.md)，接口讨论：[Issue #66](https://github.com/HCXXWDG/SoftwareProject/issues/66)。
 本说明是 B 的交付契约，A/C/D 尚须评审与接入；不代表整项目验收通过。
+
+本集成候选已包含 D07 #71 的 `5b0964b` 及 A #56 的 `6c2ca7c`；通勤行为以下文 D07 口径为准，不再使用 #67 早期的 422/400 写入门禁。这不表示原 PR 或 develop 已合并。组合证据见[最小集成验收](member-b-integration-20261022.md)。
 
 ## 请求与服务策略
 
@@ -100,13 +102,15 @@
 
 只使用 `snapshotId`，不同时创造 `comparisonId`。通过 D 的现有接口保存来源、状态、版本、候选折线、评分和预计秒数；读取时使用外层 `RouteQueryHistory.id` 与设备归属。仓储不需要新增迁移。
 
-**当前实现与未解决阻塞**：B 原先在 D 预留的 `CommuteService.resolveRouteSource` 接入点加入严格门禁，当前 DEMO 仍返回 `422 demo_result_not_allowed`，缺有效真实评分仍返回 `400 invalid_request`。D 的审阅指出这会阻断演示与首次通勤，B 已确认需要修正；本轮不将其标记为已解决。有效真实快照仍沿用 D 的 30 分钟有效期、404/410、幂等与冲突规则。
+**本候选的 D07 实现**：DEMO 快照和无有效评分的真实路线允许记录，首次 201、相同内容/操作号重放 200 duplicate；DEMO 记录只增加 `excludedDemoCommutes`，不进入真实趋势和通勤历史。无真实反馈的真实路线仍记 `routeSource=REAL`，缺的是评分而非路线来源。现有 30 分钟快照有效期、404/410、幂等及冲突校验仍保留。
 
-**待 D 实施的交接口径**（[PR 回复](https://github.com/HCXXWDG/SoftwareProject/pull/67#issuecomment-6318258809)）：demo 部署允许记录明确标记 DEMO 的通勤，由读侧排除并累计 `excludedDemoCommutes`；生产可通过独立配置拒绝 DEMO。真实路线但反馈不足时允许保存用户感受与预计秒数，缺少的算法分数保持 null，不补 0，也不宣称 VALID。评分是否有效与通勤是否发生分开处理；来源/缺失标记由 D 的记录契约承接。
+D07 将 `selectedScore/fastestScore/confidence` 改为可空，V6 放宽数据库三列的 NOT NULL 并增加范围约束，JDBC 按 SQL NULL 回读、趋势判空。评分不可验证时留空，不补 0；可信有效零分仍为数值 0。评分是否有效与通勤是否发生分开处理。`ROUTE_DEMO_ENABLED` 控制能否生成演示快照，D07 没有新增独立的“生产拒绝演示通勤”开关，不将旧提案写成已实现配置。
 
-不能只删除门禁或返回 UNKNOWN：当前 `CommuteRecord.selectedScore/fastestScore` 是 primitive double、V1 两列为 NOT NULL、JDBC 回读用 getDouble，趋势仍有分数减法。D 需一起完成可空模型/DTO、JDBC、null-safe 趋势与新增迁移（不改已执行版本），并补 demo 排除、首次通勤、幂等、空分数不变 0 的内存/PostGIS 测试。B 不并行修改 D 的这些文件，等待其联调提交后再复核。
+B 在原快照 API 测试中补强仓储回读断言：DEMO/REAL 无评分保持 null；演示重放不重复计数；受控真实零分在完成和历史中均保留 0。相同测试由 PostGIS 子类复用，覆盖 V6 + JDBC；本地无 Docker 的结果不算真实库通过，须看本候选 CI。
 
-- A：更新公共类型及响应校验，接受可空指数、可选选择 ID 和新状态；用 snapshotId 接入 D02；对 `503 route_provider_unavailable` 提供服务错误/重试提示。演示热力可不传 scope。
+边界：服务仍先验证快照，再检查幂等保存；30 分钟后或快照丢失时的重试可能得到 404/410，不能据此断言原操作未保存。D06 升级/并发夹具与完整共享 E2E 尚未合入本候选，不将单条用户链路通过当作全部存储验收完成。
+
+- A：本候选已接入可空指数、可选选择 ID、snapshotId 和 D07 回执；通勤开关默认关闭，仅在验收 D07/V6 的部署中显式启用。继续保留稳定操作 ID 和 503 服务错误，不因刷新失败重复写入。
 - C：分别展示环境指数与综合指数，空值不显示成零；热力详情可读来源、时间和样本数。
-- D：按上述审阅交接完成通勤放行/可空分数，复核真实库快照回读；共享 E2E 区分 demo 排除与真实完成，不把趋势不增长误判为演示写入失败。已同步 D05 的 `08174e1`，非 REAL 来源不会被静默当作已验证来源。
-- 所有人：契约审查完成前不合并本分支；本轮没有改 A/C 页面，也未改 D 的迁移编号、仓储或趋势算法。
+- D：D07 放行与可空存储已纳入组合，待 D06 夹具升级及真库迁移/并发验收；共享 E2E 区分 demo 排除与真实完成，不把趋势不增长误判为演示写入失败。真实路线无评分仍为 REAL 的来源语义由 B 确认。
+- 所有人：契约审查完成前不合并；本轮 B 手工编辑只涉及自身快照 API 测试和交接文档，A/D 的功能代码来自其原始提交，未代写 C 功能或改写迁移版本。
