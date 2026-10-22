@@ -1,7 +1,7 @@
 import { api, ApiError } from "./api";
 import type { CommuteCompletion, CommuteCompletionConflict, CommuteCompleteRequest, TrendResult } from "../types";
 import { isCompatibleTrendResult, normalizeTrendResult, type CompatibleTrendResultResponse } from "./trendResponse";
-import { isCommuteCompleteRequest, isCommuteCompletion, isCommuteCompletionConflict, matchesCommuteRequest } from "./commuteCompletionValidators";
+import { isCommuteCompleteRequest, isCommuteCompletion, isCommuteCompletionConflict, matchesCommuteRequest, type CompatibleCommuteCompletion } from "./commuteCompletionValidators";
 
 /** A conflict retains the existing record references so a future UI can ask for review. */
 export class CommuteCompletionConflictError extends ApiError {
@@ -35,9 +35,10 @@ export async function completeCommute(
     ...(data.completedAt === undefined ? {} : { completedAt: data.completedAt }),
   };
   try {
-    const validate = (value: unknown, status?: number): value is CommuteCompletion =>
+    const validate = (value: unknown, status?: number): value is CompatibleCommuteCompletion =>
       isCommuteCompletion(value, status) && matchesCommuteRequest(value, request);
-    return await api.post<CommuteCompletion>("/api/v1/commutes/complete", request, signal, validate);
+    const result = await api.post<CompatibleCommuteCompletion>("/api/v1/commutes/complete", request, signal, validate);
+    return { ...result, selectedScore: result.selectedScore ?? null };
   } catch (error) {
     if (!(error instanceof ApiError)) throw error;
     if (error.status === 409 && isCommuteCompletionConflict(error.responseBody)) {
@@ -49,7 +50,8 @@ export async function completeCommute(
     const knownErrors: Record<string, { status: number; message: string }> = {
       snapshot_not_found: { status: 404, message: "路线快照不存在或不属于当前设备，请重新规划路线。" },
       snapshot_expired: { status: 410, message: "路线结果已过期，请重新规划后再完成通勤。" },
-      demo_result_not_allowed: { status: 422, message: "演示路线结果不计入真实通勤统计，请重新查询真实路线。" },
+      // Compatibility with B/D versions before D07; current D07 allows unscored and DEMO writes.
+      demo_result_not_allowed: { status: 422, message: "当前服务尚不支持记录演示通勤，请核对服务版本。" },
       invalid_request: { status: 400, message: "通勤提交信息有误，请检查后重试。" },
     };
     const known = error.code ? knownErrors[error.code] : undefined;

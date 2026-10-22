@@ -58,6 +58,16 @@ describe("D02 snapshot commute contract", () => {
     await expect(completeCommute({ ...input, endStressLevel: 0 })).resolves.toEqual(shortTrip);
   });
 
+  it.each(["REAL", "DEMO", "UNKNOWN"].flatMap(routeSource =>
+    ["created", "duplicate"].flatMap(status => ["missing", "null"].map(scoreShape => ({ routeSource, status, scoreShape }))),
+  ))("accepts D07 $routeSource $status with a $scoreShape score without inventing zero", async ({ routeSource, status, scoreShape }) => {
+    const { selectedScore: _score, ...withoutScore } = saved;
+    const wire = { ...withoutScore, routeSource, status, ...(scoreShape === "null" ? { selectedScore: null } : {}) };
+    vi.mocked(fetch).mockResolvedValue(response(wire, status === "created" ? 201 : 200));
+    await expect(completeCommute(input)).resolves.toEqual({ ...wire, selectedScore: null });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     { snapshotId: "7f1c2a7e-6b0d-4c33-9a1e-2d5f7b8c1e40" },
     { operationId: "another-operation" }, { routeId: "other-route" }, { endStressLevel: 100 },
@@ -78,7 +88,8 @@ describe("D02 snapshot commute contract", () => {
   it.each([
     { commuteId: "" }, { routeSource: "guessed" }, { routeSource: ["REAL"] }, { status: ["created"] }, { estimatedSeconds: 0 },
     { estimatedSeconds: 45, durationMinutes: 0.75 }, { estimatedSeconds: 45, durationMinutes: 2 },
-    { selectedScore: null }, { completedAt: "yesterday" }, { message: "" },
+    { selectedScore: -1 }, { selectedScore: 101 }, { selectedScore: NaN }, { selectedScore: Infinity }, { selectedScore: "0" },
+    { completedAt: "yesterday" }, { message: "" },
   ])("does not trust malformed completion metadata %#", (change) => {
     expect(isCommuteCompletion({ ...saved, ...change }, 201)).toBe(false);
   });
@@ -108,7 +119,7 @@ describe("D02 snapshot commute contract", () => {
   it.each([
     [404, "snapshot_not_found", "重新规划"],
     [410, "snapshot_expired", "已过期"],
-    [422, "demo_result_not_allowed", "不计入真实"],
+    [422, "demo_result_not_allowed", "服务版本"],
     [400, "invalid_request", "信息有误"],
   ])("retains the structured %s/%s failure and gives an actionable message", async (status, code, message) => {
     vi.mocked(fetch).mockResolvedValue(response({ timestamp: "2026-10-19T01:02:03Z", status, code, message: "Server error" }, status as number));

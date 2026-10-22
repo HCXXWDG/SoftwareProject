@@ -29,6 +29,17 @@ describe("API request outcomes", () => {
     expect(getDeviceIdentityState()).toEqual({ storageRestricted: false, message: null });
   });
 
+  it("binds recovery scope to the actual request device and configured API", async () => {
+    const { api, getApiRequestScope } = await import("./api");
+    const first = getApiRequestScope(); await api.get("/first");
+    expect(JSON.parse(first)[2]).toBe((vi.mocked(fetch).mock.calls[0][1]?.headers as Record<string, string>)["X-Device-Id"]);
+    expect(getApiRequestScope()).toBe(first);
+    vi.stubEnv("VITE_API_BASE_URL", "https://another-service.example"); vi.resetModules();
+    const changed = await import("./api");
+    expect(changed.getApiRequestScope()).not.toBe(first);
+    expect(JSON.parse(changed.getApiRequestScope())[2]).toBe(JSON.parse(first)[2]);
+  });
+
   it.each(["getItem", "setItem"] as const)("uses a stable session ID if storage %s throws", async (method) => {
     vi.spyOn(Storage.prototype, method).mockImplementation(() => { throw new DOMException("blocked", "SecurityError"); });
     const { api, getDeviceIdentityState } = await import("./api");

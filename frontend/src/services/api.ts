@@ -82,6 +82,11 @@ export function getDeviceIdentityState(): { storageRestricted: boolean; message:
   };
 }
 
+/** Bind uncertain writes to the exact anonymous session and configured service, never to a new server. */
+export function getApiRequestScope(): string {
+  return JSON.stringify([globalThis.location?.origin ?? "", API_BASE, deviceIdentity().id]);
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

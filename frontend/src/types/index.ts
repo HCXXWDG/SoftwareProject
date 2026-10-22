@@ -127,7 +127,7 @@ export interface CommuteCompleteRequest {
   completedAt?: string;
 }
 
-/** D02 成功响应；UNKNOWN 来源不可解释为真实评分。 */
+/** D02/D07 成功响应；UNKNOWN 来源不可解释为真实评分。 */
 export interface CommuteCompletion {
   status: "created" | "duplicate";
   commuteId: string;
@@ -139,7 +139,8 @@ export interface CommuteCompletion {
   estimatedSeconds: number;
   /** ceil(estimatedSeconds / 60)，不代表实测实际时长。 */
   durationMinutes: number;
-  selectedScore: number;
+  /** D07 无可验证评分时为 null；响应省略键也归一为 null，真实 0 保留。 */
+  selectedScore: number | null;
   endStressLevel: 0 | 25 | 50 | 75 | 100;
   completedAt: string;
   message: string;
