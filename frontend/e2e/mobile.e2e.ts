@@ -83,8 +83,8 @@ async function mockAPI(page: Page) {
 }
 
 async function navigateToMap(page: Page) {
-  await expect(page.getByRole("button", { name: "查看预设路线" })).toBeVisible();
-  await page.getByRole("button", { name: "查看预设路线" }).click();
+  await expect(page.getByRole("button", { name: "查看路线" })).toBeVisible();
+  await page.getByRole("button", { name: "查看路线" }).click();
   await expect(page.getByRole("button", { name: "进入地图" })).toBeVisible({
     timeout: 10_000,
   });
@@ -101,13 +101,13 @@ test.describe("Mobile viewport — iPhone 14 Pro (390×844)", () => {
   test("welcome page renders correctly on mobile", async ({ page }) => {
     await mockAPI(page);
     await page.goto("/");
-    await expect(page.getByRole("button", { name: "查看预设路线" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "查看路线" })).toBeVisible();
   });
 
   test("route preview is usable on narrow screen", async ({ page }) => {
     await mockAPI(page);
     await page.goto("/");
-    await page.getByRole("button", { name: "查看预设路线" }).click();
+    await page.getByRole("button", { name: "查看路线" }).click();
 
     const enterMapBtn = page.getByRole("button", { name: "进入地图" });
     await expect(enterMapBtn).toBeVisible({ timeout: 10_000 });
@@ -187,8 +187,8 @@ test.describe("Mobile viewport — Pixel 7 (412×915)", () => {
     await page.goto("/");
 
     // Stage 1: Welcome
-    await expect(page.getByRole("button", { name: "查看预设路线" })).toBeVisible();
-    await page.getByRole("button", { name: "查看预设路线" }).click();
+    await expect(page.getByRole("button", { name: "查看路线" })).toBeVisible();
+    await page.getByRole("button", { name: "查看路线" }).click();
 
     // Stage 2: Route preview
     await expect(page.getByRole("button", { name: "进入地图" })).toBeVisible({

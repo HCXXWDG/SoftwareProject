@@ -5,7 +5,11 @@ import com.example.commutemood.domain.EmotionTag;
 import com.example.commutemood.domain.GeoBounds;
 import com.example.commutemood.domain.GeoPoint;
 import com.example.commutemood.repository.EmotionReportRepository;
+import com.example.commutemood.repository.ReportDeduplication;
+import com.example.commutemood.repository.ReportScope;
 import com.example.commutemood.repository.SaveOutcome;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -18,6 +22,43 @@ import java.util.List;
 @Repository
 @Profile("postgres")
 public class JdbcEmotionReportRepository implements EmotionReportRepository {
+    private static final Logger log = LoggerFactory.getLogger(JdbcEmotionReportRepository.class);
+
+    /** 范围查询主体，来源口径由 {@link #scopeClause(ReportScope)} 追加。 */
+    private static final String SELECT_WITHIN_SQL = """
+            SELECT id, device_hash, stress_level, tag,
+                   ST_X(location) AS longitude, ST_Y(location) AS latitude,
+                   reported_at, simulated
+            FROM emotion_report
+            WHERE reported_at >= ?
+              AND location && ST_MakeEnvelope(?, ?, ?, ?, 4326)
+            """;
+
+    /**
+     * 同一设备的事务级咨询锁，锁在事务结束时自动释放。
+     *
+     * <p>{@code pg_advisory_xact_lock} 本身返回 void，JDBC 无法把它读成数值，
+     * 所以外面包一层子查询固定返回 1，既拿到锁又能正常取值。</p>
+     */
+    private static final String DEVICE_LOCK_SQL =
+            "SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext(?)) AS acquired) AS device_lock";
+
+    /**
+     * 去重计数。时间窗与半径直接取自 {@link ReportDeduplication}，
+     * 与内存实现共用同一份口径，避免 demo 与 postgres 行为分叉。
+     */
+    private static final String COUNT_DUPLICATE_SQL = """
+            SELECT count(*)
+            FROM emotion_report
+            WHERE device_hash = ?
+              AND reported_at BETWEEN ?::timestamptz - interval '%1$d minutes'
+                                  AND ?::timestamptz + interval '%1$d minutes'
+              AND ST_DWithin(location::geography,
+                  ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, %2$s)
+            """.formatted(
+            ReportDeduplication.WINDOW.toMinutes(),
+            ReportDeduplication.RADIUS_METERS);
+
     private final JdbcTemplate jdbcTemplate;
 
     public JdbcEmotionReportRepository(JdbcTemplate jdbcTemplate) {
@@ -27,15 +68,11 @@ public class JdbcEmotionReportRepository implements EmotionReportRepository {
     @Override
     @Transactional
     public SaveOutcome save(EmotionReport report) {
-        Integer duplicateCount = jdbcTemplate.queryForObject("""
-                SELECT count(*)
-                FROM emotion_report
-                WHERE device_hash = ?
-                  AND reported_at BETWEEN ?::timestamptz - interval '5 minutes'
-                                      AND ?::timestamptz + interval '5 minutes'
-                  AND ST_DWithin(location::geography,
-                      ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, 25)
-                """, Integer.class,
+        // 事务级咨询锁：把同一设备的“查重 + 写入”串行化，
+        // 否则两个并发请求会同时查不到重复、各自插入一条，重复反馈被计成新增。
+        jdbcTemplate.queryForObject(DEVICE_LOCK_SQL, Integer.class, report.deviceHash());
+
+        Integer duplicateCount = jdbcTemplate.queryForObject(COUNT_DUPLICATE_SQL, Integer.class,
                 report.deviceHash(),
                 Timestamp.from(report.reportedAt()),
                 Timestamp.from(report.reportedAt()),
@@ -63,24 +100,49 @@ public class JdbcEmotionReportRepository implements EmotionReportRepository {
     }
 
     @Override
-    public List<EmotionReport> findWithin(GeoBounds bounds, Instant since) {
-        return jdbcTemplate.query("""
-                        SELECT id, device_hash, stress_level, tag,
-                               ST_X(location) AS longitude, ST_Y(location) AS latitude,
-                               reported_at, simulated
-                        FROM emotion_report
-                        WHERE reported_at >= ?
-                          AND location && ST_MakeEnvelope(?, ?, ?, ?, 4326)
-                        """,
+    public List<EmotionReport> findWithin(GeoBounds bounds, Instant since, ReportScope scope) {
+        ReportScope effectiveScope = scope == null ? ReportScope.ALL : scope;
+        return jdbcTemplate.query(
+                SELECT_WITHIN_SQL + scopeClause(effectiveScope),
                 (rs, rowNum) -> new EmotionReport(
                         rs.getObject("id", java.util.UUID.class),
                         rs.getString("device_hash"),
                         new GeoPoint(rs.getDouble("longitude"), rs.getDouble("latitude")),
                         rs.getInt("stress_level"),
-                        EmotionTag.valueOf(rs.getString("tag")),
+                        parseTag(rs.getString("tag")),
                         rs.getTimestamp("reported_at").toInstant(),
                         rs.getBoolean("simulated")),
                 Timestamp.from(since), bounds.west(), bounds.south(), bounds.east(), bounds.north());
+    }
+
+    /**
+     * 把来源口径翻译成 SQL 片段。
+     *
+     * <p>用固定字面量拼接而不是绑定参数，是为了让 PostgreSQL 能命中
+     * {@code idx_emotion_report_real_*} 这类带 {@code WHERE simulated = FALSE} 的部分索引。</p>
+     */
+    private static String scopeClause(ReportScope scope) {
+        return switch (scope) {
+            case REAL_ONLY -> "  AND simulated = FALSE";
+            case SIMULATED_ONLY -> "  AND simulated = TRUE";
+            case ALL -> "";
+        };
+    }
+
+    /**
+     * 读取标签列，遇到当前枚举不认识的旧值时回退为 {@link EmotionTag#OTHER}，
+     * 保证历史数据不会让查询整体失败。
+     */
+    private static EmotionTag parseTag(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return EmotionTag.OTHER;
+        }
+        try {
+            return EmotionTag.valueOf(raw);
+        } catch (IllegalArgumentException ex) {
+            log.warn("Unknown emotion_report tag '{}' in database, falling back to OTHER", raw);
+            return EmotionTag.OTHER;
+        }
     }
 }
 

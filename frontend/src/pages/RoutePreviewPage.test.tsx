@@ -3,6 +3,13 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { RoutePreviewPage } from "./RoutePreviewPage";
 import { DEFAULT_ORIGIN, DEFAULT_DESTINATION } from "../config/campus";
 
+const baseProps = {
+  origin: DEFAULT_ORIGIN.point,
+  destination: DEFAULT_DESTINATION.point,
+  originName: DEFAULT_ORIGIN.name,
+  destName: DEFAULT_DESTINATION.name,
+};
+
 const mockRouteComparison = {
   routes: [
     {
@@ -52,7 +59,7 @@ describe("RoutePreviewPage", () => {
     });
 
     const onEnterMap = vi.fn();
-    render(<RoutePreviewPage onEnterMap={onEnterMap} />);
+    render(<RoutePreviewPage {...baseProps} onEnterMap={onEnterMap} />);
 
     expect(screen.getByRole("status")).toHaveTextContent("正在获取路线数据");
 
@@ -74,31 +81,29 @@ describe("RoutePreviewPage", () => {
     );
   });
 
-  it("shows retry and offline buttons on failure", async () => {
+  it("auto-falls back to mock routes on API failure", async () => {
     (globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(
       new Error("Network error"),
     );
 
     const onEnterMap = vi.fn();
-    render(<RoutePreviewPage onEnterMap={onEnterMap} />);
+    render(<RoutePreviewPage {...baseProps} onEnterMap={onEnterMap} />);
 
     await waitFor(() => {
-      expect(screen.getByRole("alert")).toBeInTheDocument();
+      expect(screen.getByText("路线 A（东侧步道）")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Network error")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "进入离线地图" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("离线模式");
   });
 
-  it("sends compareRoutes request with campus endpoints", async () => {
+  it("sends compareRoutes request with selected endpoints", async () => {
     (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockRouteComparison),
     });
 
     const onEnterMap = vi.fn();
-    render(<RoutePreviewPage onEnterMap={onEnterMap} />);
+    render(<RoutePreviewPage {...baseProps} onEnterMap={onEnterMap} />);
 
     await waitFor(() => {
       const compareCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
@@ -113,19 +118,16 @@ describe("RoutePreviewPage", () => {
     });
   });
 
-  it("enters offline map when clicking the offline button", async () => {
+  it("enters offline map when clicking the offline entry", async () => {
     (globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(
       new Error("offline"),
     );
 
     const onEnterMap = vi.fn();
-    render(<RoutePreviewPage onEnterMap={onEnterMap} />);
+    render(<RoutePreviewPage {...baseProps} onEnterMap={onEnterMap} />);
 
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "进入离线地图" })).toBeInTheDocument();
-    });
-
-    screen.getByRole("button", { name: "进入离线地图" }).click();
+    const cta = screen.getByRole("button", { name: "进入地图" });
+    cta.click();
 
     expect(onEnterMap).toHaveBeenCalledTimes(1);
     expect(onEnterMap).toHaveBeenCalledWith(

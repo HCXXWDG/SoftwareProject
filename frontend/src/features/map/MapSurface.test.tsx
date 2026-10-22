@@ -369,8 +369,8 @@ describe("MapSurface", () => {
         fastest: true,
         leastStressful: false,
         polyline: [
-          { longitude: CAMPUS.origin.longitude, latitude: CAMPUS.origin.latitude },
-          { longitude: CAMPUS.destination.longitude, latitude: CAMPUS.destination.latitude },
+          { longitude: DEFAULT_ORIGIN.point.longitude, latitude: DEFAULT_ORIGIN.point.latitude },
+          { longitude: DEFAULT_DESTINATION.point.longitude, latitude: DEFAULT_DESTINATION.point.latitude },
         ],
       },
     ];

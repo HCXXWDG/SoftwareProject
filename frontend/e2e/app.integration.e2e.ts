@@ -43,8 +43,8 @@ async function waitForInitialApiResponses(page: Page) {
 
   await page.goto("/");
 
-  // Stage 1: Welcome page — click "查看预设路线" (triggers routes/compare on preview page)
-  await page.getByRole("button", { name: "查看预设路线" }).click();
+  // Stage 1: Welcome page — click "查看路线" (triggers routes/compare on preview page)
+  await page.getByRole("button", { name: "查看路线" }).click();
 
   // Stage 2: Route preview — wait for routes, then click "进入地图"
   await expect(page.getByRole("button", { name: "进入地图" })).toBeVisible({
@@ -80,6 +80,9 @@ test.describe("Full-stack demo flow", () => {
       (await routesResponse.json()) as RouteComparisonResponse;
     const trends = (await trendsResponse.json()) as TrendResponse;
 
+    // 这条断言是「演示模式下热力图不能是空的」的唯一守门人：前端 fetchHeatmap 不带 scope，
+    // 后端 demo profile 的种子全是 simulated = true。若后端把默认 scope 设成 REAL_ONLY，
+    // 这里会拿到 [] 而失败（见 PR #67 与 Issue #68 的讨论）。请保持这条断言不被放宽。
     expect(heatmap.length).toBeGreaterThan(0);
     expect(comparison.routes.length).toBeGreaterThanOrEqual(2);
     expect(
@@ -159,7 +162,12 @@ test.describe("Full-stack demo flow", () => {
     await completeButton.click();
 
     const completeResponse = await completePromise;
-    expect(completeResponse.status()).toBe(200);
+    // D02 之后完成通勤的状态码口径：201=首次记录，200=同一 operationId 重放（返回既有结果，
+    // 趋势不重复计数），409=同一 operationId 但业务内容不同。这里走的是全新提交，必须是 201。
+    expect(completeResponse.status()).toBe(201);
+    expect(await completeResponse.json()).toMatchObject({
+      status: "created",
+    });
     expect(completeResponse.request().postDataJSON()).toMatchObject({
       routeId: alternative!.id,
       endStressLevel: 50,
@@ -169,6 +177,10 @@ test.describe("Full-stack demo flow", () => {
     expect(refreshedTrendsResponse.status()).toBe(200);
     const refreshedTrends =
       (await refreshedTrendsResponse.json()) as TrendResponse;
+    // 这条断言依赖「demo 完成的通勤计入趋势」。D05 的口径是 routeSource = DEMO 的通勤照常
+    // 入库但不计入趋势（改记在 excludedDemoCommutes 里）。目前 demo 快照解析出的来源是
+    // UNKNOWN，所以仍会计数、断言成立；若 PR #67 把 demo 快照标成 DEMO，这条要改成断言
+    // excludedDemoCommutes 递增，否则会变成假失败。
     expect(refreshedTrends.totalCommutes).toBeGreaterThan(
       trends.totalCommutes,
     );

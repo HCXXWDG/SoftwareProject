@@ -64,7 +64,7 @@ async function mockAPI(page: Page) {
 }
 
 async function navigateToMap(page: Page) {
-  await page.getByRole("button", { name: "查看预设路线" }).click();
+  await page.getByRole("button", { name: "查看路线" }).click();
   await expect(page.getByRole("button", { name: "进入地图" })).toBeVisible({
     timeout: 10_000,
   });
