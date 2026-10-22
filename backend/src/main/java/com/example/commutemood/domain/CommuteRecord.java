@@ -20,6 +20,12 @@ import java.util.UUID;
  * <p>历史数据兼容：迁移前的记录没有 {@code operationId}/{@code snapshotId}/{@code routeSource}/
  * {@code estimatedSeconds}，读取时分别落为 {@code null}/{@code null}/{@link RouteSource#UNKNOWN}/{@code null}，
  * 趋势与历史页面必须能解析这些"缺字段"记录而不报错（见 D05）。
+ *
+ * <p><b>评分可空（V6 起）</b>：{@code selectedScore}/{@code fastestScore}/{@code confidence}
+ * 都是包装类型，允许为 {@code null}。原因是路线服务可用但沿途还没有任何真实反馈时，
+ * B 的快照会给出 {@link ScoringStatus#UNAVAILABLE} 且不携带评分——这种"真实用户的第一次通勤"
+ * 必须能落库，但<b>不能补造分数</b>：写 0 会让趋势均值被假数据拉低，也会让前端把
+ * "没有评分"显示成"压力 0 分"。因此缺就是 {@code null}，由读侧跳过而不是当 0。
  */
 public record CommuteRecord(
         UUID id,
@@ -32,12 +38,12 @@ public record CommuteRecord(
         int endStressLevel,
         int durationMinutes,
         Integer estimatedSeconds,
-        double selectedScore,
-        double fastestScore,
+        Double selectedScore,
+        Double fastestScore,
         String alternativeLabel,
         Double alternativeScore,
         Double alternativeDurationRatio,
-        double confidence,
+        Double confidence,
         Instant completedAt
 ) {
     /**
@@ -51,12 +57,12 @@ public record CommuteRecord(
             String routeLabel,
             int endStressLevel,
             int durationMinutes,
-            double selectedScore,
-            double fastestScore,
+            Double selectedScore,
+            Double fastestScore,
             String alternativeLabel,
             Double alternativeScore,
             Double alternativeDurationRatio,
-            double confidence,
+            Double confidence,
             Instant completedAt
     ) {
         this(
