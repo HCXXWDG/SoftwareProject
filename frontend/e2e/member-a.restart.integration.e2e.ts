@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { stat } from "node:fs/promises";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import { createConnection } from "node:net";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -172,9 +172,13 @@ test("a saved operation keeps its identity after an isolated demo backend restar
     throw failure;
   } finally {
     const cleanup = await Promise.allSettled(owned.map(stopBackend));
+    await mkdir(testInfo.outputDir, { recursive: true });
     for (let index = 0; index < owned.length; index++) {
-      await testInfo.attach(`d07-restart-boot-${index + 1}.log`, {
-        body: Buffer.from(owned[index].logs.join("")), contentType: "text/plain",
+      const name = `d07-restart-boot-${index + 1}.log`;
+      const logPath = testInfo.outputPath(name);
+      await writeFile(logPath, owned[index].logs.join(""), "utf8");
+      await testInfo.attach(name, {
+        path: logPath, contentType: "text/plain",
       });
     }
     const failedCleanup = cleanup.find(result => result.status === "rejected");
