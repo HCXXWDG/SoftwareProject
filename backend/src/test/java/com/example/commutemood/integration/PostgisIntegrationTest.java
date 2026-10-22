@@ -22,7 +22,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(classes = CommuteMoodApplication.class)
+@SpringBootTest(classes = CommuteMoodApplication.class,
+        properties = {"app.amap.web-key=", "app.routing.demo-enabled=false"})
 @AutoConfigureMockMvc
 @ActiveProfiles("postgres")
 @Testcontainers(disabledWithoutDocker = true)
@@ -53,13 +54,14 @@ class PostgisIntegrationTest {
         mockMvc.perform(get("/api/v1/heatmap")
                         .param("bbox", DemoGeography.HEATMAP_BBOX)
                         .param("zoom", "16")
+                        .param("scope", "SIMULATED_ONLY")
                         .param("hours", "168"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].cellId").exists());
     }
 
     @Test
-    void comparesRoutesWithDistinctRecommendations() throws Exception {
+    void missingExternalConfigurationReturnsExplicitUnavailableError() throws Exception {
         mockMvc.perform(post("/api/v1/routes/compare")
                         .header("X-Device-Id", "postgis-integration-device")
                         .contentType("application/json")
@@ -73,9 +75,13 @@ class PostgisIntegrationTest {
                                 DemoGeography.ORIGIN_LATITUDE,
                                 DemoGeography.DESTINATION_LONGITUDE,
                                 DemoGeography.DESTINATION_LATITUDE)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.fastestRouteId").value("route-fast"))
-                .andExpect(jsonPath("$.leastStressfulRouteId").value("route-calm"));
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.code").value("route_provider_unavailable"))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.routes").doesNotExist())
+                .andExpect(jsonPath("$.snapshotId").doesNotExist());
     }
 
     @Test
@@ -110,12 +116,21 @@ class PostgisIntegrationTest {
                         .header("X-Device-Id", "postgis-report-device")
                         .contentType("application/json")
                         .content(payload))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.status").value("duplicate"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("duplicate"))
+                .andExpect(jsonPath("$.code").value("report_duplicate"))
+                .andExpect(jsonPath("$.counted").value(false));
     }
 
     @Test
     void refreshesHeatmapCacheIntoPostgis() throws Exception {
+        mockMvc.perform(post("/api/v1/reports")
+                        .header("X-Device-Id", "postgis-cache-device")
+                        .contentType("application/json")
+                        .content("""
+                                {"location":{"longitude":%.7f,"latitude":%.7f},"stressLevel":25,"tag":"QUIET"}
+                                """.formatted(DemoGeography.REPORT_LONGITUDE, DemoGeography.REPORT_LATITUDE)))
+                .andExpect(status().isCreated());
         mockMvc.perform(post("/api/v1/heatmap/refresh")
                         .param("bbox", DemoGeography.HEATMAP_BBOX)
                         .param("zoom", "16")

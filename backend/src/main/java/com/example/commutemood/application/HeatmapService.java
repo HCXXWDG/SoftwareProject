@@ -5,6 +5,8 @@ import com.example.commutemood.domain.EmotionTag;
 import com.example.commutemood.domain.GeoBounds;
 import com.example.commutemood.domain.GeoPoint;
 import com.example.commutemood.domain.HeatmapCell;
+import com.example.commutemood.domain.FeedbackSource;
+import com.example.commutemood.repository.ReportScope;
 import com.example.commutemood.repository.EmotionReportRepository;
 import com.example.commutemood.repository.HeatmapCellRepository;
 import org.springframework.stereotype.Service;
@@ -33,6 +35,11 @@ public class HeatmapService {
     }
 
     public List<HeatmapCell> getHeatmap(GeoBounds bounds, int zoom, int hours) {
+        return getHeatmap(bounds, zoom, hours, ReportScope.REAL_ONLY);
+    }
+
+    public List<HeatmapCell> getHeatmap(GeoBounds bounds, int zoom, int hours, ReportScope scope) {
+        if (scope == null) throw new IllegalArgumentException("Report scope is required");
         if (zoom < 10 || zoom > 20) {
             throw new IllegalArgumentException("zoom must be between 10 and 20");
         }
@@ -41,7 +48,7 @@ public class HeatmapService {
         }
 
         Instant now = Instant.now();
-        List<EmotionReport> reports = repository.findWithin(bounds, now.minus(Duration.ofHours(hours)));
+        List<EmotionReport> reports = repository.findWithin(bounds, now.minus(Duration.ofHours(hours)), scope);
         double gridSize = gridSizeForZoom(zoom);
         Map<GridKey, CellAccumulator> cells = new HashMap<>();
 
@@ -71,7 +78,7 @@ public class HeatmapService {
                     round(score),
                     round(confidence),
                     accumulator.count,
-                    dominantTag));
+                    dominantTag, accumulator.source(), accumulator.updatedAt, hours));
         }
         return result.stream()
                 .sorted(Comparator.comparing(HeatmapCell::cellId))
@@ -110,13 +117,23 @@ public class HeatmapService {
         private double weightedStress;
         private double totalWeight;
         private int count;
+        private boolean real;
+        private boolean simulated;
+        private Instant updatedAt;
         private final Map<EmotionTag, Double> tagWeights = new EnumMap<>(EmotionTag.class);
 
         void add(EmotionReport report, double weight) {
             weightedStress += report.stressLevel() * weight;
             totalWeight += weight;
             count++;
+            real |= !report.simulated();
+            simulated |= report.simulated();
+            if (updatedAt == null || report.reportedAt().isAfter(updatedAt)) updatedAt = report.reportedAt();
             tagWeights.merge(report.tag(), weight, Double::sum);
+        }
+
+        FeedbackSource source() {
+            return real && simulated ? FeedbackSource.MIXED : real ? FeedbackSource.REAL : FeedbackSource.DEMO;
         }
     }
 }

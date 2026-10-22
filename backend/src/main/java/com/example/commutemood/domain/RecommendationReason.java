@@ -1,0 +1,6 @@
+package com.example.commutemood.domain;
+
+public enum RecommendationReason {
+    RECOMMENDED, NO_ROUTE, SERVICE_UNAVAILABLE, DEMO_ONLY, INSUFFICIENT_DATA,
+    NO_ALTERNATIVE, SAME_ROUTE, DIFFERENCE_TOO_SMALL, DETOUR_TOO_LONG
+}

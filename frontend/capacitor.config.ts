@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: "校园通勤情绪地图",
   webDir: "dist",
   server: {
-    androidScheme: "https",
+    androidScheme: "http",
   },
   android: {
     allowMixedContent: false,
