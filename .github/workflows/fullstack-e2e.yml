@@ -16,6 +16,11 @@ on:
         type: string
         required: false
         default: ""
+      verify_restart:
+        description: Also verify lost-receipt recovery after restarting an isolated in-memory D07 service
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -75,6 +80,11 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
+      - name: Package backend for isolated restart acceptance
+        if: inputs.verify_restart
+        working-directory: ${{ inputs.backend_ref != '' && '.tmp/fullstack-backend/backend' || 'backend' }}
+        run: bash ./mvnw --batch-mode --no-transfer-progress -DskipTests package
+
       - name: Start demo backend
         working-directory: ${{ inputs.backend_ref != '' && '.tmp/fullstack-backend/backend' || 'backend' }}
         env:
@@ -105,6 +115,13 @@ jobs:
         working-directory: frontend
         run: npm run test:e2e:integration
 
+      - name: Verify isolated backend restart recovery
+        if: inputs.verify_restart
+        working-directory: frontend
+        env:
+          MEMBER_A_D07_BACKEND_DIR: ${{ inputs.backend_ref != '' && format('{0}/.tmp/fullstack-backend/backend', github.workspace) || format('{0}/backend', github.workspace) }}
+        run: npm run test:e2e:member-a-restart
+
       - name: Upload full-stack diagnostics
         if: always()
         uses: actions/upload-artifact@v7
@@ -113,6 +130,7 @@ jobs:
           path: |
             frontend/playwright-report/integration/
             frontend/test-results/integration/
+            frontend/test-results/member-a-restart/
             backend-demo.log
           if-no-files-found: warn
           retention-days: 14

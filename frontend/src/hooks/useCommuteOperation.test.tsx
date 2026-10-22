@@ -105,6 +105,23 @@ describe("explicit commute operation recovery (controlled service)", () => {
     expect(post.mock.calls[1][0]).toEqual(original);
   });
 
+  it.each([
+    [404, undefined], [410, undefined], [404, "unknown_endpoint"], [410, "proxy_gone"],
+    [404, "snapshot_expired"], [410, "snapshot_not_found"],
+  ])("does not relabel an unrelated %s/%s as an invalid snapshot", async (status, code) => {
+    const failure = new ApiError("http", "请求的服务暂不可用，请核对接口地址。", { status, code });
+    post.mockRejectedValueOnce(failure);
+    const { result } = renderHook(() => useCommuteOperation({ enabled: true }));
+    await begin(result);
+    const original = post.mock.calls[0][0];
+    expect(result.current.error).toBe(failure.message);
+    expect(result.current.phase).toBe("pending");
+    expect(readPendingCommute()).toMatchObject({ status: "pending", pending: { request: original } });
+    act(() => { expect(result.current.startNew()).toBe(false); });
+    await act(async () => { await result.current.retry(); });
+    expect(post.mock.calls[1][0]).toEqual(original);
+  });
+
   it("does not send or replace a restored request when the device/service scope changes", async () => {
     const pending = newPendingCommute(draft, scope); savePendingCommute(pending);
     const { result } = renderHook(() => useCommuteOperation({ enabled: true }));

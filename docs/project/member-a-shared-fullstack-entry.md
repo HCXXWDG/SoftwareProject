@@ -24,6 +24,7 @@
 | `playwright.member-a-b.config.ts` | B 固定头只读比较/地图，要求 MEMBER_A_B_API_URL，不启用通勤写入 |
 | `npm run test:e2e:member-a-commute` | D07 专用开发模式，5403页面，要求 MEMBER_A_D07_API_URL |
 | `npm run test:e2e:member-a-commute-pwa` | D07生产PWA，5404页面，build/preview及实际SW |
+| `npm run test:e2e:member-a-restart` | 独立D07内存服务重启，5405/18085；要求已打包的MEMBER_A_D07_BACKEND_DIR |
 | `npm run test:pwa` | 原PWA缓存/壳验收，4173页面 |
 
 收集范围可用 `npm run test:e2e:integration -- --list` 核对；当前为 **4 tests in 2 files**，不会混收上述历史契约或生产 PWA。各版本的专用规格仍保留，不能用当前 D07 后端强行满足相反的旧契约。
