@@ -80,7 +80,7 @@ test.describe("Welcome flow & 3-stage navigation", () => {
     await page.goto("/");
 
     // Welcome page should display the entry button
-    const entryBtn = page.getByRole("button", { name: "查看预设路线" });
+    const entryBtn = page.getByRole("button", { name: "查看路线" });
     await expect(entryBtn).toBeVisible();
 
     // Map should NOT be visible yet
@@ -94,7 +94,7 @@ test.describe("Welcome flow & 3-stage navigation", () => {
     await page.goto("/");
 
     // Click to advance to stage 2
-    await page.getByRole("button", { name: "查看预设路线" }).click();
+    await page.getByRole("button", { name: "查看路线" }).click();
 
     // Route preview should load routes from API
     const enterMapBtn = page.getByRole("button", { name: "进入地图" });
@@ -119,7 +119,7 @@ test.describe("Welcome flow & 3-stage navigation", () => {
     await page.goto("/");
 
     // Navigate through all 3 stages
-    await page.getByRole("button", { name: "查看预设路线" }).click();
+    await page.getByRole("button", { name: "查看路线" }).click();
     await expect(page.getByRole("button", { name: "进入地图" })).toBeVisible({
       timeout: 10_000,
     });
@@ -150,7 +150,7 @@ test.describe("Welcome flow & 3-stage navigation", () => {
     await page.goto("/");
 
     // Stage 1: Welcome
-    await page.getByRole("button", { name: "查看预设路线" }).click();
+    await page.getByRole("button", { name: "查看路线" }).click();
 
     // Stage 2: Route preview
     await expect(page.getByRole("button", { name: "进入地图" })).toBeVisible({
@@ -196,7 +196,7 @@ test.describe("Welcome flow & 3-stage navigation", () => {
     await page.goto("/");
 
     // Navigate to map
-    await page.getByRole("button", { name: "查看预设路线" }).click();
+    await page.getByRole("button", { name: "查看路线" }).click();
     await expect(page.getByRole("button", { name: "进入地图" })).toBeVisible({
       timeout: 10_000,
     });

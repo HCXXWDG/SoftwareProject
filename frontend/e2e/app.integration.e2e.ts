@@ -43,8 +43,8 @@ async function waitForInitialApiResponses(page: Page) {
 
   await page.goto("/");
 
-  // Stage 1: Welcome page — click "查看预设路线" (triggers routes/compare on preview page)
-  await page.getByRole("button", { name: "查看预设路线" }).click();
+  // Stage 1: Welcome page — click "查看路线" (triggers routes/compare on preview page)
+  await page.getByRole("button", { name: "查看路线" }).click();
 
   // Stage 2: Route preview — wait for routes, then click "进入地图"
   await expect(page.getByRole("button", { name: "进入地图" })).toBeVisible({
