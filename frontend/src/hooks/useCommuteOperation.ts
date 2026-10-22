@@ -6,7 +6,7 @@ import type { CommuteCompleteRequest, CommuteCompletion } from "../types";
 
 export type CommuteDraft = Pick<CommuteCompleteRequest, "snapshotId" | "routeId" | "endStressLevel">;
 interface Options {
-  /** Keep false until the backend policy and complete user flow have been jointly accepted. */
+  /** Explicit D07 deployment gate. Restoring data never grants write permission. */
   enabled?: boolean;
   /** A journey revision/snapshot key suppresses stale refresh callbacks after navigation. */
   contextKey?: string;
@@ -19,8 +19,9 @@ interface State {
   error: string | null;
   refreshWarning: string | null;
   storageWarning: string | null;
+  refreshingQueries: boolean;
 }
-const initial: State = { phase: "idle", operation: null, receipt: null, error: null, refreshWarning: null, storageWarning: null };
+const initial: State = { phase: "idle", operation: null, receipt: null, error: null, refreshWarning: null, storageWarning: null, refreshingQueries: false };
 const changedScope = "当前会话或服务地址已变化。请回到原会话与服务核对上次通勤，不会创建另一笔记录。";
 const disabled = "通勤提交仍待接口联合验收，当前不会发送请求。";
 
@@ -52,6 +53,22 @@ export function useCommuteOperation(options: Options = {}) {
     current.current = { ...current.current, ...patch };
     if (mounted.current) setState(current.current);
   }, []);
+
+  const refreshQueries = useCallback(async (receipt: CommuteCompletion, operation: PendingCommute,
+    contextKey: string | undefined, onSaved: Options["onSaved"]): Promise<boolean> => {
+    const isCurrent = () => mounted.current && operation.scope === getApiRequestScope()
+      && contextKey === latest.current.contextKey;
+    if (!isCurrent() || !onSaved) return false;
+    update({ refreshingQueries: true });
+    try {
+      await onSaved(receipt);
+      if (isCurrent()) update({ refreshWarning: null });
+      return true;
+    } catch {
+      if (isCurrent()) update({ refreshWarning: "通勤已确认，但后续查询刷新失败。请只刷新查询，无需再次提交。" });
+      return false;
+    } finally { update({ refreshingQueries: false }); }
+  }, [update]);
 
   // Called only under the synchronous begin/retry lock. Persist before every explicit POST.
   const execute = useCallback(async (operation: PendingCommute): Promise<CommuteCompletion | null> => {
@@ -87,12 +104,9 @@ export function useCommuteOperation(options: Options = {}) {
     update({ phase: sameScope ? "saved" : "blocked", operation, receipt,
       error: sameScope ? null : changedScope,
       storageWarning: remaining.status === "empty" ? null : "通勤已确认，但仍有恢复信息需核对；开始新通勤前请先确认清理结果。" });
-    if (mounted.current && sameScope && contextKey === latest.current.contextKey && onSaved) {
-      try { await onSaved(receipt); }
-      catch { update({ refreshWarning: "通勤已确认，但后续查询刷新失败。请只刷新查询，无需再次提交。" }); }
-    }
+    await refreshQueries(receipt, operation, contextKey, onSaved);
     return receipt;
-  }, [update]);
+  }, [refreshQueries, update]);
 
   const begin = useCallback(async (draft: CommuteDraft): Promise<CommuteCompletion | null> => {
     if (busy.current) return null;
@@ -152,5 +166,14 @@ export function useCommuteOperation(options: Options = {}) {
     return true;
   }, [update]);
 
-  return { ...state, begin, retry, startNew };
+  const refresh = useCallback(async (): Promise<boolean> => {
+    if (busy.current || !current.current.receipt || !current.current.operation) return false;
+    busy.current = true;
+    try {
+      return await refreshQueries(current.current.receipt, current.current.operation,
+        latest.current.contextKey, latest.current.onSaved);
+    } finally { busy.current = false; }
+  }, [refreshQueries]);
+
+  return { ...state, begin, retry, startNew, refresh };
 }

@@ -49,3 +49,22 @@ describe("A to C01 presentation contract", () => {
       expect(routeSourceLabel(comparison)).toBe("真实路线 · 暂无有效评分");
     });
 });
+
+describe("D07 recording gate is separate from scoring", () => {
+  const snapshotId = "9f1c2a7e-6b0d-4c33-9a1e-2d5f7b8c1e40";
+  it.each(["REAL", "DEMO", "UNKNOWN"] as const)("permits %s without scores only when explicitly enabled", routeSource => {
+    const unscored = { ...routeComparison, snapshotId, routeSource, feedbackSource: "NONE" as const,
+      scoringStatus: "UNAVAILABLE" as const, routes: routeComparison.routes.map(route => ({ ...route, stressScore: null, stressExposure: null })) };
+    expect(tripCapabilities(unscored, "available", "offline", true)).toMatchObject({ canComplete: true, showScores: false });
+    expect(tripCapabilities(unscored, "available", "amap", false).canComplete).toBe(false);
+  });
+  it.each([
+    { snapshotId: undefined }, { snapshotId: "not-a-snapshot" }, { routes: [] },
+    { routeSource: "UNAVAILABLE" as const }, { routeSource: undefined },
+  ])("does not accept missing/unsupported snapshot context %j", change => {
+    expect(tripCapabilities({ ...valid, snapshotId, ...change }, "available", "amap", true).canComplete).toBe(false);
+  });
+  it.each(["unknown", "unavailable"] as const)("does not create writes while backend is %s", backend => {
+    expect(tripCapabilities({ ...valid, snapshotId }, backend, "amap", true).canComplete).toBe(false);
+  });
+});

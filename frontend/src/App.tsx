@@ -6,6 +6,7 @@ import { RecentQueries } from "./pages/RecentQueries";
 import { MapSurface } from "./features/map";
 import { RoutePanel } from "./features/routes";
 import { TrendPanel } from "./features/trends";
+import { CommuteCompletionPanel } from "./features/commute/CommuteCompletionPanel";
 import { submitReport } from "./services/report";
 import { getDeviceIdentityState } from "./services/api";
 import { useHeatmapQuery } from "./hooks/useHeatmapQuery";
@@ -36,6 +37,11 @@ export default function App() {
   const { trends, history, reloadTrends, reloadHistory } = useTrendsHistory(stage === "map");
   const capabilities = tripCapabilities(comparison, backend, baseMap);
   const identity = getDeviceIdentityState();
+  const refreshAfterCommute = useCallback(async () => {
+    if (stage !== "map") return;
+    const results = await Promise.all([reloadTrends(), reloadHistory()]);
+    if (results.some(result => !result)) throw new Error("通勤后的查询尚未更新");
+  }, [stage, reloadTrends, reloadHistory]);
 
   useEffect(() => {
     ++tripEpoch.current;
@@ -86,7 +92,13 @@ export default function App() {
     } finally { feedbackLock.current = false; }
   }, [capabilities.canReport, heatmap.refresh]);
 
+  const completionPanel = <CommuteCompletionPanel comparison={comparison} selectedRouteId={selectedRouteId}
+    backend={backend} baseMap={baseMap} active={stage === "map" && comparison !== null}
+    contextKey={`${currentTrip.current}:${tripEpoch.current}:${comparison?.snapshotId ?? ""}`}
+    onSaved={refreshAfterCommute} onNewTrip={() => navigate("route-preview")} />;
+
   if (stage === "welcome") return <>
+    {completionPanel}
     <WelcomePage key={JSON.stringify(selection)}
       initialOriginId={findWaypoint(selection.origin)?.id ?? DEFAULT_ORIGIN.id}
       initialDestinationId={findWaypoint(selection.destination)?.id ?? DEFAULT_DESTINATION.id}
@@ -94,13 +106,14 @@ export default function App() {
       initialDestination={findWaypoint(selection.destination) ?? { id: "history-destination", name: selection.destName, point: selection.destination }}
       onNavigateToPreview={startPreview} />
   </>;
-  if (stage === "route-preview" || !comparison) return <RoutePreviewPage
+  if (stage === "route-preview" || !comparison) return <>{completionPanel}<RoutePreviewPage
     origin={selection.origin} destination={selection.destination} originName={selection.originName} destName={selection.destName}
-    onBack={() => navigate("welcome")} onEnterMap={enterMap} onBackendStatus={setBackend} />;
+    onBack={() => navigate("welcome")} onEnterMap={enterMap} onBackendStatus={setBackend} /></>;
 
   const displayRoutes = capabilities.showScores ? comparison.routes
     : comparison.routes.map((route) => ({ ...route, leastStressful: false }));
   return <>
+    {completionPanel}
     <nav className="app-toolbar" aria-label="通勤导航">
       <button type="button" onClick={() => navigate("welcome")}>修改起终点</button>
       <button type="button" onClick={() => navigate("route-preview")}>重新规划</button>
@@ -138,8 +151,6 @@ export default function App() {
       {(trends.data?.unknownSourceCommutes ?? 0) > 0 && <p>含 {trends.data!.unknownSourceCommutes} 次来源待确认的通勤，不能视为真实路线评分。</p>}
       {(trends.data?.excludedDemoCommutes ?? 0) > 0 && <p>已从趋势中排除 {trends.data!.excludedDemoCommutes} 次演示通勤。</p>}
       {trends.data && <TrendPanel trend={trends.data} />}
-      <button type="button" disabled aria-describedby="commute-disabled-reason">完成本次通勤</button>
-      <p id="commute-disabled-reason">{capabilities.completeReason}</p>
     </section>
     <RecentQueries state={history} onRetry={() => { void reloadHistory(); }} onReplan={(origin, destination) => {
       startPreview(origin, destination, findWaypoint(origin)?.name ?? "历史起点", findWaypoint(destination)?.name ?? "历史终点");

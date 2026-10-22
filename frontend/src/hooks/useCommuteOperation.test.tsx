@@ -1,5 +1,5 @@
 import { StrictMode } from "react";
-import { act, cleanup, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../services/api";
 import { completeCommute } from "../services/commute";
@@ -145,6 +145,32 @@ describe("explicit commute operation recovery (controlled service)", () => {
     await begin(result);
     expect(post).toHaveBeenCalledTimes(2);
     expect(post.mock.calls[1][0].operationId).not.toBe(post.mock.calls[0][0].operationId);
+  });
+
+  it("retries only queries after confirmed success and clears the refresh warning", async () => {
+    const onSaved = vi.fn().mockRejectedValueOnce(new Error("query failed")).mockResolvedValue(undefined);
+    const { result } = renderHook(() => useCommuteOperation({ enabled: true, onSaved }));
+    await begin(result);
+    expect(result.current.refreshWarning).toContain("只刷新查询");
+    await act(async () => { expect(await result.current.refresh()).toBe(true); });
+    expect(onSaved).toHaveBeenCalledTimes(2);
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(result.current.refreshWarning).toBeNull();
+    expect(result.current.phase).toBe("saved");
+  });
+
+  it("does not attach a late query-refresh failure to another journey", async () => {
+    const query = deferred<void>();
+    const onSaved = vi.fn().mockReturnValue(query.promise);
+    const { result, rerender } = renderHook(({ contextKey }) => useCommuteOperation({ enabled: true, contextKey, onSaved }),
+      { initialProps: { contextKey: "trip-a" } });
+    let attempt!: Promise<CommuteCompletion | null>;
+    act(() => { attempt = result.current.begin(draft); });
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    rerender({ contextKey: "trip-b" });
+    await act(async () => { query.reject(new Error("old refresh")); await attempt; });
+    expect(result.current.refreshWarning).toBeNull();
+    expect(post).toHaveBeenCalledTimes(1);
   });
 
   it.each(["journey", "scope"] as const)("does not refresh after an old response crosses a %s change", async changed => {
