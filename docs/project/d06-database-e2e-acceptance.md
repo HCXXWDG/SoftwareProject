@@ -15,7 +15,18 @@
 | `docs/测试/E2E测试说明.md` | 改动 | 修正「完成通勤返回 200」的过期描述为 201/200/409 三态；新增「后端数据库验收集成测试（D06）」一节，含取库顺序、跳过口径、schema 隔离理由与本机运行命令 |
 | `docs/project/d06-database-e2e-acceptance.md` | 新增 | 本文：验收记录 |
 
-未改动任何生产代码、迁移文件和仓储实现。D06 是验收组织任务，本轮发现的问题按归属回给对应成员（第 6 节），不在验收任务里顺手改别人的模块。
+### 1.1 本轮追加的交付物（验收过程中发现并修掉的 D 归属问题）
+
+| 文件 | 类型 | 内容 |
+| --- | --- | --- |
+| `backend/src/main/java/com/example/commutemood/api/ApiExceptionHandler.java` | 改动 | 错误信封重做：不再回传 `exception.getMessage()`；`MethodArgumentNotValidException` / `HttpMessageNotReadableException` / 缺参数 / 缺请求头 / 类型不匹配 / 时间非法各自组织中文文案，参数类 400 统一带 `fields`（字段名 → 原因），出口处用正则兜底把任何含 `com.example`、`org.springframework` 等特征的消息降级为通用文案（缺陷 5，证据见 3.6） |
+| `backend/src/test/java/com/example/commutemood/api/ApiErrorContractTest.java` | 新增 | 6 项防泄露守门测试：断言所有 400 响应体不含内部包名/类名/方法签名，且参数类 400 必须点名出错字段 |
+| `docs/团队协作与接口约定.md` | 改动 | 第 3 节新增「统一错误信封」：四个固定键 + `fields`、六个 `code` 对照表、前端处理建议、"错误响应不得包含实现细节"这一条硬约束 |
+| `docs/生产部署指南.md` | 改动 | 第 1.2 节新增「PostGIS 与 pgcrypto 扩展必须由超级用户先建好」：compose 路径为什么没事、托管库路径必须预先执行的四条 SQL、`currentSchema` 必须带 `public`（缺陷 8） |
+| `frontend/e2e/` 其余 5 个 spec | 改动 | 6 个 spec 共 18 处过期选择器 `查看预设路线` → `查看路线`（`app.e2e.ts` 3、`app.integration.e2e.ts` 2、`campus-boundary.e2e.ts` 1、`mobile.e2e.ts` 6、`pwa-sw.e2e.ts` 1、`welcome-flow.e2e.ts` 5）。这是 `Full-stack E2E` 卡在第一幕超时的直接原因（缺陷 1） |
+| `.github/workflows/android-build.yml` | 改动 | `Android APK Verification` job 的 `android-actions/setup-android@v3` → `@v4`（v3 会安装早已下架的 `tools` 包，必然 exit 1）（缺陷 7） |
+
+**关于"验收任务不改生产代码"这条口径的说明**：D06 首轮严格遵守，因此第 1 节原文写的是"未改动任何生产代码"。本轮之所以动了 `ApiExceptionHandler`、E2E spec 和 CI workflow，是因为这三处的归属本来就在 D（全局异常映射属 D 的 API 错误契约、`frontend/e2e/` 由 D 主改、workflow 无人认领且 D 是唯一有证据的人），而不是"顺手改别人的模块"。**B 与 A 的代码一行没动**：缺陷 2/3/4/6 全部留在第 6 节等对应成员处理，其中缺陷 2 需要 B 先改 compare 响应，A 才能改前端。
 
 ## 2. 运行环境
 
@@ -82,6 +93,20 @@ COMMUTE_TEST_JDBC_USERNAME=commute COMMUTE_TEST_JDBC_PASSWORD=commute_dev_passwo
 
 CI 的 ubuntu-latest 有 Docker，所以走的是 Testcontainers `postgis/postgis:16-3.4` 路径；本机走的是 `COMMUTE_TEST_JDBC_URL` 指向的真实 PostgreSQL 16.15 + PostGIS 3.6。**两条取库路径都验证过，且结果一致**——这正是 `IntegrationDatabase` 存在的意义：本机没 Docker 不等于测试没跑，CI 有 Docker 也不等于本机开发者会被迫跳过。第 4 节里"本机未运行"的 5 项 `PostgisIntegrationTest`，据此可以判定为**在 CI 上已通过**。
 
+### 3.2.2 本轮追加（错误信封修复 + 前端基线复核之后）
+
+上面两轮 154 是修复前的数字，保留作为历史证据。本轮又做了三件事，因此基线数字有变化：
+
+| 项目 | 结果 |
+| --- | --- |
+| 全量后端套件（不带 `COMMUTE_TEST_JDBC_URL`） | `Tests run: 160, Failures: 0, Errors: 0, Skipped: 12`，BUILD SUCCESS。相比 154 增加了 `ApiErrorContractTest` 的 6 项，跳过数不变 |
+| `ApiErrorContractTest` 单独跑 | `Tests run: 6, Failures: 0, Errors: 0, Skipped: 0` |
+| 前端 `npm test`（vitest，本机首次跑通） | `Test Files 5 failed | 10 passed (15)`、`Tests 17 failed | 71 passed (88)`，与 CI 完全一致；17 项逐项核对后**全部是断言过期，没有一项功能回归**，已按归属拆给 A（14 项）与 C（3 项），详见 Issue #68 的补充留言 |
+| `frontend/e2e` Mock 套件（本机 Playwright + Chromium） | `24 passed (18.3s)`，exit 0。D 已把 6 个 spec 里 18 处过期选择器 `查看预设路线` 换成 `查看路线` |
+| `frontend/e2e` Full-stack 套件 | 仍然失败，但**失败点从 `app.integration.e2e.ts:50` 的选择器超时后移到第 167 行的 `Expected: 201, Received: 400`**，即缺陷 2 的完成通勤契约不通。选择器问题已排除，剩下的是 A/B 的功能缺陷，不是 D 的测试问题 |
+
+前端能在本机跑起来（`npm install` 360 个包 + `npx playwright install chromium`）是本轮新增的能力，之前第 4 节把"前端 `npm test`"记为未运行，现在已实测。
+
 ### 3.3 `postgres` profile：全新建库 → 启动 → 全流程实测
 
 在一个全新空 schema `d06_live_pg` 上按第 7 节的方式启动后端（`SPRING_PROFILES_ACTIVE=postgres`，`SPRING_DATASOURCE_URL` 带 `currentSchema=d06_live_pg,public`）：
@@ -139,12 +164,31 @@ CI 的 ubuntu-latest 有 Docker，所以走的是 Testcontainers `postgis/postgi
 
 同一个 bbox/zoom/hours，demo 返回 116 格、全新 postgres 库返回 55 格。原因是 demo 由 `DemoDataInitializer` 在内存里生成种子，postgres 由 V2/V3 迁移的 SQL 生成种子，两者数量与分布不同。这不是缺陷，但意味着**答辩演示时"切到真实库热力图会变稀"是可预期的**，需要提前告知 C 和演示同学（第 9 节）。
 
+### 3.6 错误信封修复后的实测（缺陷 5 复核 + 缺陷 2 定性）
+
+`ApiExceptionHandler` 重写后，用 `demo` profile 跑在 8080 上逐条 curl 复核。左边是前端会真实发出的请求，右边是现在的响应体（`timestamp` 已省略）：
+
+| 场景 | 请求 | HTTP | 响应体 |
+| --- | --- | --- | --- |
+| 完成通勤缺快照字段 | `POST /commutes/complete`，请求体取自 `App.tsx:135-150` 的真实结构 | `400` | `{"status":400,"code":"invalid_request","message":"请求体校验失败：snapshotId、operationId","fields":{"snapshotId":"不能为null","operationId":"不能为空"}}` |
+| 枚举取值非法 | `POST /reports`，`"tag":"NOT_A_TAG"` | `400` | `{"status":400,"code":"invalid_request","message":"字段取值不合法：tag","fields":{"tag":"取值不在允许范围内，或类型不匹配"}}` |
+| 字段类型不匹配 | `POST /reports`，`"stressLevel":"很堵"` | `400` | `{"status":400,"code":"invalid_request","message":"字段取值不合法：stressLevel","fields":{"stressLevel":"取值不在允许范围内，或类型不匹配"}}` |
+| 请求体不是合法 JSON | `POST /routes/compare`，body 为 `{` | `400` | `{"status":400,"code":"invalid_request","message":"请求体不是合法的 JSON，或字段取值不在允许范围内。"}` |
+| 缺请求头 | `GET /routes/history`（不带 `X-Device-Id`） | `400` | `{"status":400,"code":"invalid_request","message":"缺少必需请求头：X-Device-Id","fields":{"X-Device-Id":"该请求头为必填"}}` |
+| 缺查询参数 | `GET /heatmap`（不带 `bbox`） | `400` | `{"status":400,"code":"invalid_request","message":"缺少必需参数：bbox","fields":{"bbox":"该参数为必填"}}` |
+| 查询参数类型错 | `GET /heatmap?bbox=…&zoom=bad` | `400` | `{"status":400,"code":"invalid_request","message":"参数格式不正确：zoom","fields":{"zoom":"取值类型或格式不符合要求"}}` |
+| 时区非法 | `GET /commutes/trends?timezone=Not/AZone` | `400` | `{"status":400,"code":"invalid_request","message":"时间或时区取值不合法。"}` |
+
+八条响应体里都没有包名、类名、方法签名或堆栈。这一组同时被 `ApiErrorContractTest`（6 项）固化成回归测试，断言方式是"整个响应体字符串不得包含 `com.example` / `org.springframework` / `org.hibernate` / `java.lang.` / `Validation failed for argument` / `rejected value` / `default message` 任一特征"——新增错误分支时如果又直接把框架消息回传，测试会立刻红。
+
+**顺带把缺陷 2 的严重程度定死了**：表格第一行就是 A 侧现在真实发出的请求体，服务端返回 400。也就是说"完成通勤"这个动作在当前前后端组合下**必然失败**，不是"多一次往返"那么轻。`Full-stack E2E` 在 `app.integration.e2e.ts:167` 断言 `Expected: 201, Received: 400`，与此完全对应（此前该 spec 卡在第 50 行的选择器超时，把这个更严重的问题挡住了；选择器已由 D 修好，见缺陷 1）。
+
 ## 4. 未运行项（按 D06 口径：环境缺失导致跳过的检查不计为通过）
 
 | 检查 | 状态 | 原因 |
 | --- | --- | --- |
 | `PostgisIntegrationTest`（5 项）本机 | **本机未运行** | 本机无 Docker，Testcontainers 起不来，整类 `@EnabledIf` 跳过。**CI 上已实际通过**：PR #69 头提交 `7ad3331` 的 `Backend CI` 日志为 `Tests run: 5, Failures: 0, Errors: 0, Skipped: 0`（16.67 s），全量 `Tests run: 154, Failures: 0, Errors: 0, Skipped: 0`、BUILD SUCCESS。D06 新增的 7 项同样在 CI 上首次真实执行并通过（3.2.1）。因此这一行只是"本机环境缺失"，不是"该项没有验证" |
-| 前端 `npm run build` / `npm test` | **未运行** | 本机 `frontend/node_modules` 缺失，且当前前端基线被 Issue #68 阻塞（缺陷 1），先修基线再跑更有意义 |
+| 前端 `npm run build` | **未运行** | 生产构建与体积检查本轮没有做；`npm test` 与两个 Playwright 套件已经在本机跑通并记入 3.2.2，构建这一项仍待补 |
 | Mock E2E `npm run test:e2e` | **未运行** | 同上（Playwright 依赖未安装） |
 | Full-stack E2E `npm run test:e2e:integration` | **未运行** | 同上；这也是本次改动的 `app.integration.e2e.ts` 唯一能验证它的方式，**该文件的 201 断言改动尚未经过实际运行**，只有后端真机 HTTP 结果（3.3 步骤 5）作为契约依据 |
 | PWA E2E `npm run test:pwa` | **未运行** | 同上 |
@@ -166,11 +210,18 @@ CI 的 ubuntu-latest 有 Docker，所以走的是 Testcontainers `postgis/postgi
 | 5 | 连续查询时只展示最后一次选择的结果 | 未运行 | 前端场景。后端 `/routes/history?limit=1` 返回最新快照，实测正常 |
 | 6 | 反馈失败保留草稿，成功后刷新当前视口；查询失败不重复写入 | 部分 | "不重复写入"已实测：同点位 5 分钟内重复上报 200 `report_duplicate` `counted=false`（3.3 步骤 2b、3.4）。**前端草稿保留与视口刷新未运行** |
 | 7 | 同一次通勤重复发送和并发发送仅增加一条记录 | **通过** | 12 线程并发只落 1 行、恰好 1 个 201 + 11 个 200（3.1 第 4 项）；真机串行重放 201→200 且 `commuteId` 相同（3.3 步骤 5/5b、3.4） |
-| 8 | 完成通勤的评分取自服务端快照，预计时长与实际时长不混淆 | **通过（口径）** | 请求体只带 `routeId` 与 `endStressLevel`，响应里的 `selectedScore=36.0`、`estimatedSeconds=26146`、`fastestScore=51.0` 全部来自快照（3.3 步骤 5）。**口径成立，但时长数值本身不可信**（缺陷 3），所以"数值合理"这一半不成立 |
+| 8 | 完成通勤的评分取自服务端快照，预计时长与实际时长不混淆 | 部分（**本轮由"通过（口径）"下调**） | 服务端口径成立：curl 直接带 `snapshotId`/`operationId`/`routeId`/`endStressLevel` 时，响应里的 `selectedScore=36.0`、`estimatedSeconds=26146`、`fastestScore=51.0` 全部来自快照（3.3 步骤 5）。**但用前端真实发出的请求体打同一个接口得到 400**（3.6 表格第一行、缺陷 2），也就是说这条场景在"用户点按钮"这个层面根本没走通，不能算通过。另外时长数值本身也不可信（缺陷 3） |
 | 9 | 模拟记录不参与真实模式统计；几何等价路线评分保持稳定 | 部分 | 反馈侧 simulated 隔离已落地。**通勤侧 `routeSource` 恒为 `UNKNOWN`（B04 未交付），"模拟通勤不进真实统计"目前无法端到端证明**（缺陷 6）。几何等价评分稳定性属 B，未验证 |
 | 10 | 返回、重新规划、趋势重试和移动端面板操作均无阻断问题 | 未运行 | 全部是浏览器/移动端交互，见第 8 节清单 |
 
-十条中 2 条可判"通过"、5 条"部分"、3 条"未运行"。**当前不满足启动书的发布标准**，主要卡点是前端基线（缺陷 1）与 B 侧的快照 ID、路线时长、来源判定三项。
+十条中 **1 条可判"通过"、6 条"部分"、3 条"未运行"**（场景 8 本轮由"通过（口径）"下调为"部分"，理由见该行）。**当前不满足启动书的发布标准**，卡点按优先级是：
+
+1. **缺陷 2 —— 完成通勤全流程 400**。B 的 compare 响应缺 `snapshotId`，A 的请求体还是 D02 之前的结构，两边互相卡住。这是唯一一个"用户点了必然失败"的核心动作，优先级高于其余全部。
+2. **缺陷 1 —— 前端基线全红**。D 已修掉自己那 18 处 E2E 选择器（Mock 套件 `24 passed`），剩下 17 项 vitest 断言过期分属 A（14）与 C（3），改法已逐项写进 Issue #68。
+3. **缺陷 3 —— 路线时长与几何不合理**（一次通勤 7 小时），污染趋势图与答辩演示。
+4. 缺陷 4（低置信度无标记）、缺陷 6（`routeSource` 恒为 `UNKNOWN`）都在 B 侧。
+
+缺陷 5（400 泄露 Java 内部细节）与缺陷 7 的 workflow 部分**本轮已由 D 修完**，不再计入卡点。
 
 ## 6. 剩余缺陷与风险
 
@@ -178,14 +229,14 @@ CI 的 ubuntu-latest 有 Docker，所以走的是 Testcontainers `postgis/postgi
 
 | # | 缺陷 | 归属 | 证据 | 影响 |
 | --- | --- | --- | --- | --- |
-| 1 | 同步分支的提交 `2151d50` 改了 `WelcomePage.tsx` 的按钮文案（`查看预设路线` → `查看路线`），但没有同步更新 8 个文件里的 26 处断言，导致 `Frontend CI`、`E2E CI`、`Full-stack E2E` 在所有从 `codex/sync-latest-20261018` 派生的分支上全红（`develop` 的 `d14ecbc` 是绿的，`Backend CI` 各处都绿） | A（`frontend/src` 与前端测试） | 已开 Issue #68，并在 PR #65/#67/#55 留言。PR #65 头提交 `08174e1` 的 checks 实测：`Backend CI` success、`Android Build` success、`Frontend CI` **failure**、`Full-stack E2E` **failure**、`E2E CI` **cancelled**、`Android APK Verification` failure | **D06 的浏览器端验收整体被阻塞**：Mock/Full-stack E2E 在修好之前跑不出可信结果。建议改组件回到旧文案或一次性改 26 处断言，不要逐条 `skip`。同时 `WelcomePage.test.tsx` 的 `起点`/`终点`/`留学生公寓` 已过期（新文案是 `选择起点`/`选择终点` + `学生公寓区`/`第一教学楼`/`图书馆`/`三食堂`），`RoutePreviewPage.test.tsx:129` 需要单独判断是不是真的离线入口回归 |
-| 2 | `POST /api/v1/routes/compare` 的响应里没有 `snapshotId`，前端只能再调一次 `GET /routes/history?limit=1` 才能拿到，多一次往返且存在"拿到别人/上一次快照"的时序风险 | B（`RouteController` / 路线 DTO） | 3.3 步骤 3 的响应键为 `fastestRouteId, leastStressfulRouteId, recommendAlternative, recommendation, routes`，无 `snapshotId` | D02 时已提出，至今未处理。`CommuteService` 的归属校验是好的，但取快照 ID 的路径不该绕历史接口 |
+| 1 | 同步分支的提交 `2151d50` 改了 `WelcomePage.tsx` 的按钮文案（`查看预设路线` → `查看路线`），但没有同步更新 8 个文件里的 26 处断言，导致 `Frontend CI`、`E2E CI`、`Full-stack E2E` 在所有从 `codex/sync-latest-20261018` 派生的分支上全红（`develop` 的 `d14ecbc` 是绿的，`Backend CI` 各处都绿） | A（`frontend/src` 与前端测试） | 已开 Issue #68，并在 PR #65/#67/#55 留言。PR #65 头提交 `08174e1` 的 checks 实测：`Backend CI` success、`Android Build` success、`Frontend CI` **failure**、`Full-stack E2E` **failure**、`E2E CI` **cancelled**、`Android APK Verification` failure | **D06 的浏览器端验收整体被阻塞**：Mock/Full-stack E2E 在修好之前跑不出可信结果。**本轮已把归属拆开**：`frontend/e2e/` 归 D 主改，其中 18 处过期选择器已由 D 修好并实测 Mock 套件 `24 passed`（3.2.2）；剩下的 17 项 vitest 失败全部在 A 的 3 个文件（14 项）与 C 的 2 个文件（3 项）里，逐项定性与改法已写进 Issue #68 的补充留言。**撤回原先"改组件回到旧文案"的建议**——逐项对着源码核对后，组件的新文案与新行为都是有意为之且功能完好，过期的是断言，所以应当改断言而不是改组件。其中 `RoutePreviewPage.test.tsx:129` 已排除"离线入口回归"的怀疑（`handleEnterOfflineMap` 仍然调用 `onEnterMap(MOCK_ROUTE_COMPARISON, true)`，只是按钮文案变成了 `进入离线地图`）；`viewport.test.ts` 的 `scoreToColor(0)` 蓝→绿一项需要 C 自己确认是有意调整还是改丢了。不要逐条 `skip` |
+| 2 | `POST /api/v1/routes/compare` 的响应里没有 `snapshotId`。**这一条已从"多一次往返"升级为"完成通勤全流程不可用"**：A 侧的 `frontend/src/App.tsx` 至今仍在发 D02 之前的请求体（`routeId/routeLabel/durationMinutes/selectedScore/fastestScore/alternativeLabel/alternativeScore/alternativeDurationRatio/confidence/completedAt`），没有 `snapshotId` 也没有 `operationId`，而 B 的 compare 响应又不提供 `snapshotId`，前端拿不到就没法补——A 与 B 互相卡住 | **B 主修**（compare 响应补 `snapshotId`）→ **A 跟进**（`types/index.ts` 的 `CommuteCompleteRequest` 与 `App.tsx` 的调用点换成快照契约） | 3.3 步骤 3 的响应键为 `fastestRouteId, leastStressfulRouteId, recommendAlternative, recommendation, routes`，无 `snapshotId`；`frontend/src/types/index.ts:75-87` 仍是旧结构；3.6 用 A 的真实请求体实测得到 400 | **点"完成通勤"必然失败**，`Full-stack E2E` 的 `app.integration.e2e.ts:167` 也因此断在 `Expected: 201, Received: 400`。D02 契约交接（任务 D02-7）时已提出，至今未落地。修复顺序只能是 B 先在 compare 响应里加 `snapshotId`，A 再改前端；D 侧的服务端契约、幂等与归属校验都已就绪，不需要再动 |
 | 3 | mock 路线的几何与时长明显不合理：起终点直线距离约 887 m，返回的三条路线却是 31516 m / 76919 m / 114678 m，时长 23345 s / 26146 s / 29881 s（6.5–8.3 小时），折线经度跨到 120.01–120.46（±20 km） | B（路线生成 / B01、B03） | 3.3 步骤 3、5 与 `p_hist.json` 的完整折线；落库后 `estimated_seconds=26146`、`duration_minutes=436` | 直接污染下游：趋势的 `averageEstimatedSeconds=26146.0`、历史的 `durationMinutes=436`，C05 的折线图和答辩演示会显示"一次通勤 7 小时"，看起来像功能坏了 |
 | 4 | `route-scenic` 的 `confidence` 只有 0.01，却照样返回 `stressScore=62.49`，响应里没有任何低置信度标记 | B（评分与采样） | 3.3 步骤 3 | 与启动书场景 4「不出现无依据的舒适标签」冲突；前端无法区分"可信评分"和"几乎没有样本的猜测" |
-| 5 | 非法枚举的 400 响应把 Java 实现细节吐给客户端：`JSON parse error: Cannot deserialize value of type com.example.commutemood.domain.EmotionTag from String "BOGUS_TAG": not one of the values accepted for Enum class: [OTHER, QUIET, ODOR, NOISE, SUN, CROWD, OPEN, SHADE]` | D 可修（全局异常映射）/ 需与 A 对齐文案 | 3.3 步骤 2e | 泄露内部类名与包名，且消息不可本地化。建议统一成「tag 必须是 CROWD/NOISE/… 之一」的稳定结构，与其他 400 一致 |
+| 5 | ~~非法枚举的 400 响应把 Java 实现细节吐给客户端~~ **已修复（本轮）**。原现象：`JSON parse error: Cannot deserialize value of type com.example.commutemood.domain.EmotionTag from String "BOGUS_TAG": ...`；同类问题还包括校验失败时回吐 `Validation failed for argument [1] in public org.springframework.http.ResponseEntity<...> com.example.commutemood.api.CommuteController.complete(java.lang.String, ...)` | D（全局异常映射） | 3.3 步骤 2e（修复前）、3.6（修复后） | 现在 `ApiExceptionHandler` 自己组织中文文案，参数类 400 统一带 `fields`（字段名 → 原因），出口处还有正则兜底：任何含 `com.example` / `org.springframework` 等特征的消息一律降级为通用文案，原文只进服务端日志。守门测试 `ApiErrorContractTest`（6 项）断言所有 400 响应体不含内部包名/类名/方法签名。契约已写进 `docs/团队协作与接口约定.md` 第 3 节「统一错误信封」 |
 | 6 | `CommuteService.resolveRouteSource` 仍是占位实现，无条件 `return RouteSource.UNKNOWN` | B（B04）→ 之后 D 对接一行 | 3.3 步骤 5 的 `routeSource:"UNKNOWN"`；趋势 `unknownSourceCommutes` 等于全部记录数 | 通勤侧的"演示数据不进真实统计"无法验证；PR #67 若把 demo 快照标成 `DEMO`，`app.integration.e2e.ts` 里"趋势计数递增"那条断言会立刻变成假失败（已在该处留注释，改成断言 `excludedDemoCommutes` 递增即可）。等 B 在 #67 回复口径后我再动这个 D 归属的文件 |
-| 7 | `Android Build` / `Android APK Verification` 在 CI 上失败，属 CI 环境问题而非功能问题；C 的 PR #57–#61 目标分支是 `main` 而不是 `develop` | C + 仓库维护者 | 各 PR 的 checks 列表 | 移动端验收没有可信的自动信号，只能靠第 8 节的人工清单；分支基线不一致会让 C 的改动绕过 develop 的 required checks |
-| 8 | 全新库上 Flyway V1 的 `CREATE EXTENSION IF NOT EXISTS postgis` 只在扩展已由超级用户装好时才是空操作；`commute` 角色 `rolsuper=f`，真·全新数据库上会在 V1 直接失败 | D（迁移）+ 部署文档 | 本机 `pg_extension`：`postgis`/`pgcrypto` 都在 `public`；`pg_roles`：`commute` 非超级用户、无 CREATEDB | 本次实测之所以通过，是因为扩展早就装好了。生产部署指南必须写明"先用超级用户建扩展"，否则第一次部署会失败（第 7 节已写入） |
+| 7 | `Android APK Verification` 在 CI 上失败，**根因已定位并由 D 修复**：`.github/workflows/android-build.yml` 第 171 行用的是 `android-actions/setup-android@v3`，v3 会执行 `sdkmanager tools`，而 `tools` 包早已从 Android SDK 仓库下架，日志为 `Warning: Failed to find package 'tools'` + `exit code 1`。同文件的 `Android Build` job 用的是 `@v4` 且一直是绿的。另：C 的 PR #57–#61 目标分支是 `main` 而不是 `develop` | D 已修（workflow）/ C + 仓库维护者（分支基线） | 各 PR 的 checks 列表；CI job 日志 | 这一项不是 required check，不阻塞合并，但会一直制造红叉噪音。分支基线不一致会让 C 的改动绕过 develop 的 required checks，且 `mergeable_state` 为 `behind`（+49 commits / 150+ files），review 时 diff 里全是别人的改动，建议改 base 到 `develop` |
+| 8 | 全新库上 Flyway V1 的 `CREATE EXTENSION IF NOT EXISTS postgis` 只在扩展已由超级用户装好时才是空操作；`commute` 角色 `rolsuper=f`，真·全新数据库上会在 V1 直接失败 | D（迁移）+ 部署文档 | 本机 `pg_extension`：`postgis`/`pgcrypto` 都在 `public`；`pg_roles`：`commute` 非超级用户、无 CREATEDB | 本次实测之所以通过，是因为扩展早就装好了。**本轮已补进 `docs/生产部署指南.md` 第 1.2 节**：写清 compose 路径为什么没事（镜像把 `POSTGRES_USER` 建成超级用户）、托管库/DBA 建库路径必须先用超级用户执行的四条 SQL、以及 `currentSchema` 必须带 `public` 否则 `geometry(Point,4326)` 与 `digest()` 解析不到。V1 本身不改（V1–V5 已上线，禁止重写），改的是文档与部署顺序 |
 | 9 | demo 与 postgres 两种 profile 的热力格数量差一倍以上（116 vs 55） | D + B（种子数据） | 3.5 | 不是缺陷，但演示时切换 profile 会让地图明显变稀，需要提前说明，避免被当成 bug 现场排查 |
 
 ## 7. 启动说明
@@ -312,7 +363,7 @@ COMMUTE_TEST_JDBC_USERNAME=commute COMMUTE_TEST_JDBC_PASSWORD=commute_dev_passwo
 19. 地图手势：单指拖动、双指缩放、长按反馈三者互不打架；长按能稳定唤出反馈表单（这是移动端最容易失败的一步，请录屏或连拍）。
 20. 路线卡片列表在窄屏下确认不溢出、按钮点击区域足够大（≥44 px）；等趋势页/历史页（A05/C05）交付后，补做"折线图不溢出、坐标轴标签不重叠、历史列表项可点击"三项。
 21. 旋转屏幕（或切换横屏模拟）确认面板与地图不出现布局断裂。
-22. 若做 Android 包体验：按 `docs/ANDROID_RELEASE.md` 与 `npm run build:android` 走一遍，记录 APK 是否可安装启动；CI 上的 `Android APK Verification` 目前因环境原因失败（缺陷 7），**不要把它当作功能失败的证据**。
+22. 若做 Android 包体验：按 `docs/ANDROID_RELEASE.md` 与 `npm run build:android` 走一遍，记录 APK 是否可安装启动；CI 上的 `Android APK Verification` 此前因 workflow 用了已下架的 `setup-android@v3` 而失败，**本轮已由 D 对齐到 `@v4`**（缺陷 7），如果仍看到红叉请贴新的 job 日志，不要再按旧结论当作环境问题忽略。
 
 ### 8.4 回填要求
 
@@ -320,11 +371,11 @@ COMMUTE_TEST_JDBC_USERNAME=commute COMMUTE_TEST_JDBC_PASSWORD=commute_dev_passwo
 
 ## 9. 需要同步的点
 
-1. **A**：`frontend/e2e/app.integration.e2e.ts` 由 D 主改，本轮把完成通勤断言从 200 改成 201 并加了三条守门人注释。A 若在 #68 的修复里也要动这个文件，请先看注释再改，避免把断言放宽回去。另外 `TrendResult` 的 6 个统计字段与 `CommuteHistoryItem` 的 `legacyRecord`/`missingFields` 已写进 `docs/团队协作与接口约定.md`，历史页可直接用。
-2. **B**：缺陷 2（compare 无 `snapshotId`）、3（路线时长/几何不合理）、4（低置信度无标记）、6（`resolveRouteSource` 占位）都在你这边。缺陷 3 优先级最高——它会让 C05 的趋势图和答辩演示显示"一次通勤 7 小时"。缺陷 6 请直接在 PR #67 里回一句口径（demo 快照算 `DEMO` 还是 `UNKNOWN`），我按你的答复改 `resolveRouteSource` 和对应的 E2E 断言。
-3. **C**：第 8 节是给你的 4 工时清单，前置是 #68。另外 demo 与真实库的热力格数量差一倍（116 vs 55，见 3.5），演示时切 profile 地图会变稀，这是种子数据差异不是 bug；PR #57–#61 的目标分支请从 `main` 改成 `develop`，否则绕过了 develop 的 required checks。
-4. **仓库维护者**：缺陷 8 的部署前置（超级用户建扩展）建议同步进 `docs/生产部署指南.md`，D 可以在下一轮补，但需要有人复核部署文档的归属。
-5. **CI**：D06 新增的 7 项数据库测试已随本 PR（#69）在 CI 上首次真实执行，`Backend CI` 为 success、`Tests run: 154, Failures: 0, Errors: 0, Skipped: 0`——CI 有 Docker，走的是 Testcontainers 路径而非本机 PG 路径，两条取库路径都已验证（3.2.1）。后续若这些测试在 CI 上失败，请按"跳过不等于通过"的口径处理，不要改成 `@Disabled` 或放宽断言。
+1. **A**：`frontend/e2e/app.integration.e2e.ts` 由 D 主改，本轮把完成通勤断言从 200 改成 201 并加了三条守门人注释；同一批 6 个 spec 里 18 处过期选择器 `查看预设路线` 也已由 D 换成 `查看路线`，**你在 #68 的修复里不用再动 `frontend/e2e/`**，只改 `src/` 下那 3 个测试文件即可，避免同时改同一批文件。另外 `TrendResult` 的 6 个统计字段与 `CommuteHistoryItem` 的 `legacyRecord`/`missingFields` 已写进 `docs/团队协作与接口约定.md`，历史页可直接用。**最要紧的一条**：`src/types/index.ts:75-87` 的 `CommuteCompleteRequest` 与 `App.tsx:135-150` 的调用点还是 D02 之前的结构，缺 `snapshotId` 和 `operationId`，所以现在点"完成通勤"必然 400（缺陷 2、3.6 表格第一行）。这一步要等 B 在 compare 响应里补上 `snapshotId` 你才能改，我已经把这条同时提给 B 了。错误响应的结构本轮也重做了：所有 400 现在带 `fields`（字段名 → 中文原因），`message` 可以直接展示给用户，不会再出现 Java 方法签名，详见契约文档第 3 节「统一错误信封」——`services/api.ts` 若要给用户更好的提示，读 `fields` 即可。
+2. **B**：缺陷 2（compare 无 `snapshotId`）、3（路线时长/几何不合理）、4（低置信度无标记）、6（`resolveRouteSource` 占位）都在你这边。**缺陷 2 现在是最高优先级**，不是"多一次往返"的性能问题：前端拿不到 `snapshotId` 就没法满足 D02 契约，"完成通勤"这个核心动作在当前前后端组合下必然 400，`Full-stack E2E` 也正卡在这里（3.6）。最小改动是在 `POST /routes/compare` 的响应里加一个 `snapshotId` 字段——服务端本来就生成了快照，只是没回传。缺陷 3 次之，它会让 C05 的趋势图和答辩演示显示"一次通勤 7 小时"。缺陷 6 请直接在 PR #67 里回一句口径（demo 快照算 `DEMO` 还是 `UNKNOWN`），我按你的答复改 `resolveRouteSource` 和对应的 E2E 断言。
+3. **C**：第 8 节是给你的 4 工时清单，前置是 #68。#68 里有 3 项归你（`MapSurface.test.tsx` 2 项 + `viewport.test.ts` 1 项），其中 `scoreToColor(0)` 由蓝改绿这一项**只有你能定**是有意调整还是改丢了。另外 demo 与真实库的热力格数量差一倍（116 vs 55，见 3.5），演示时切 profile 地图会变稀，这是种子数据差异不是 bug；PR #57–#61 的目标分支请从 `main` 改成 `develop`，否则绕过了 develop 的 required checks，而且 `mergeable_state` 是 `behind`（+49 commits），review 时 diff 里全是别人的改动。`Android APK Verification` 的红叉已由 D 修掉（workflow 里 `setup-android@v3` → `@v4`），不用再当环境问题排查。
+4. **仓库维护者**：缺陷 8 的部署前置（超级用户建扩展）**本轮已由 D 补进 `docs/生产部署指南.md` 第 1.2 节**，请复核这段的归属与措辞是否与其他部署约定冲突。另外**分支保护需要 admin 权限才能读改**：当前 token 只有 `push` + `triage`（`admin: false`），`/rulesets` 返回空、`/branches/develop/protection` 返回 404，所以 required checks 的实际配置只能靠 `.github/workflows/README.md` 的记录，无法核对。其中"最后一次推送需由其他成员批准"这一条对排期影响最大——任何人再推一次，已有 approval 就作废，建议**先把测试改完、各自推完，再统一找人批准**，不要边批准边推。
+5. **CI**：D06 新增的 7 项数据库测试已随本 PR（#69）在 CI 上首次真实执行，`Backend CI` 为 success、`Tests run: 154, Failures: 0, Errors: 0, Skipped: 0`——CI 有 Docker，走的是 Testcontainers 路径而非本机 PG 路径，两条取库路径都已验证（3.2.1）。本轮追加 `ApiErrorContractTest` 6 项后本机基线为 `160 / 0 / 12`（3.2.2）。后续若这些测试在 CI 上失败，请按"跳过不等于通过"的口径处理，不要改成 `@Disabled` 或放宽断言；`ApiErrorContractTest` 是防信息泄露的守门测试，尤其不要为了让某个 400 通过而往 `LEAK_MARKERS` 里删项。
 
 ## 10. 验收对照
 
@@ -340,5 +391,19 @@ COMMUTE_TEST_JDBC_USERNAME=commute COMMUTE_TEST_JDBC_PASSWORD=commute_dev_passwo
 | 形成未运行项 | 第 4 节（9 类检查全部标注"未运行"及原因） |
 | 形成剩余缺陷 | 第 6 节（9 条，含归属与证据） |
 | 形成启动说明 | 第 7 节（数据库准备、两种 profile、前端、测试命令） |
-| 通过启动书规定的关键场景 | 第 5 节：2 条通过、5 条部分、3 条未运行；**当前不满足发布标准**，卡点是缺陷 1/2/3/4/6 |
+| 通过启动书规定的关键场景 | 第 5 节：**1 条通过、6 条部分、3 条未运行**；**当前不满足发布标准**，卡点按优先级是缺陷 2（完成通勤必然 400）、1（前端基线）、3（路线时长）、4/6（B 侧口径） |
 | 环境缺失导致跳过的检查不计为通过 | 第 4 节全部写"未运行"并注明原因；集成测试用 `@EnabledIf` 整类跳过并在 `IntegrationDatabase` 的 Javadoc 里写明"跳过 ≠ 通过"；三轮结果分别证明"本机有库时真跑"（154/0/5）、"无库时干净跳过"（154/0/12）与"CI 有 Docker 时 12 项全部真跑"（154/0/**0**，3.2.1） |
+
+### 10.1 本轮追加的交付（D06 之外的顺手修复）
+
+D06 的验收过程里发现了一批不属于"验收"本身、但归 D 或必须由 D 牵头协调的问题，本轮一并处理：
+
+| 交付 | 内容 | 证据 |
+| --- | --- | --- |
+| 错误信封重做 | `ApiExceptionHandler` 不再回传 `exception.getMessage()`；每类异常自己组织中文文案，参数类 400 统一带 `fields`，出口处用正则兜底把任何含内部包名的消息降级为通用文案，原文只进服务端日志 | 3.6 的 8 条实测响应体 |
+| 防泄露守门测试 | 新增 `ApiErrorContractTest`（6 项），断言所有 400 响应体不含 `com.example` / `org.springframework` / `Validation failed for argument` / `rejected value` 等特征 | `Tests run: 6, Failures: 0`；全量基线由 154 变为 `160 / 0 / 12` |
+| 契约文档 | `docs/团队协作与接口约定.md` 第 3 节新增「统一错误信封」小节：四个固定键 + `fields`、六个 `code` 的完整对照表、前端处理建议、"不得包含实现细节"这一条硬约束 | 文档 diff |
+| 共享 E2E 选择器 | `frontend/e2e/` 6 个 spec 里 18 处 `查看预设路线` → `查看路线` | Mock 套件 `24 passed (18.3s)`，exit 0 |
+| CI workflow | `.github/workflows/android-build.yml` 的 `Android APK Verification` job 由 `android-actions/setup-android@v3` 对齐到 `@v4`（v3 会安装早已下架的 `tools` 包，必然失败） | 缺陷 7 |
+| 前端基线定性 | 本机首次跑通 `npm test` 与两个 Playwright 套件，把 17 项 vitest 失败逐项对着源码核对，确认**全部是断言过期而非功能回归**，按归属拆给 A（14）/ C（3），并撤回原先"改组件回到旧文案"的建议 | Issue #68 补充留言、3.2.2 |
+| 合并条件核对 | 逐项查了 16 个开放 PR 的 checks 与 `mergeable_state`，确认 `develop`（`d14ecbc`）本身是全绿的，红叉全部来自同步分支 `codex/sync-latest-20261018`；并核实当前 token 无 admin 权限，分支保护只能由仓库维护者读改 | 第 9 节第 4 条 |
