@@ -10,6 +10,8 @@ import com.example.commutemood.domain.ScoredRoute;
 import com.example.commutemood.external.AmapRouteProvider;
 import com.example.commutemood.external.MockRouteProvider;
 import com.example.commutemood.repository.RouteQueryRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -18,6 +20,8 @@ import java.util.List;
 
 @Service
 public class RouteComparisonService {
+    private static final Logger log = LoggerFactory.getLogger(RouteComparisonService.class);
+
     private final AmapRouteProvider amapRouteProvider;
     private final MockRouteProvider mockRouteProvider;
     private final HeatmapService heatmapService;
@@ -109,11 +113,13 @@ public class RouteComparisonService {
 
     private List<RouteCandidate> getCandidates(GeoPoint origin, GeoPoint destination) {
         if (!amapRouteProvider.isConfigured()) {
+            log.debug("AMap key not configured, using MockRouteProvider");
             return mockRouteProvider.findCandidates(origin, destination);
         }
         try {
             return amapRouteProvider.findCandidates(origin, destination);
         } catch (RuntimeException ignored) {
+            log.warn("AMap routing failed, falling back to MockRouteProvider: {}", ignored.getMessage());
             return mockRouteProvider.findCandidates(origin, destination);
         }
     }

@@ -4,6 +4,8 @@ import com.example.commutemood.config.AppProperties;
 import com.example.commutemood.domain.GeoPoint;
 import com.example.commutemood.domain.RouteCandidate;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -13,6 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
 public class AmapRouteProvider implements RouteProvider {
+    private static final Logger log = LoggerFactory.getLogger(AmapRouteProvider.class);
     private final RestClient restClient;
     private final AppProperties properties;
 
@@ -29,6 +32,9 @@ public class AmapRouteProvider implements RouteProvider {
 
     @Override
     public List<RouteCandidate> findCandidates(GeoPoint origin, GeoPoint destination) {
+        log.info("AMap routing: ({},{}) -> ({},{})",
+                origin.longitude(), origin.latitude(),
+                destination.longitude(), destination.latitude());
         JsonNode root = restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/v3/direction/driving")

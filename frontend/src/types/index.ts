@@ -114,6 +114,16 @@ export interface MapPageState {
   error: string | null;
   routeComparison: RouteComparison | null;
   trend: TrendResult | null;
-  selectedOrigin: GeoPoint | null;
-  selectedDestination: GeoPoint | null;
+}
+
+/** 应用三阶段状态 */
+export type AppStage = "welcome" | "route-preview" | "map";
+
+/** 路线预览页状态 */
+export interface RoutePreviewState {
+  loading: boolean;
+  error: string | null;
+  routeComparison: RouteComparison | null;
+  /** 后端不可用时使用 Mock 路线数据（不伪造评分） */
+  isOfflineFallback: boolean;
 }

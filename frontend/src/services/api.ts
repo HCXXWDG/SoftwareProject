@@ -20,17 +20,38 @@ async function request<T>(
     ...((options.headers as Record<string, string>) ?? {}),
   };
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message) {
+      throw err;
+    }
+    throw new Error("无法连接到服务器，请检查网络或后端地址配置");
+  }
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`API ${res.status}: ${body}`);
+    throw new Error(`API ${res.status}: ${body.slice(0, 200)}`);
   }
 
-  return res.json() as Promise<T>;
+  const contentType = res.headers?.get("content-type") ?? "";
+  if (contentType && !contentType.includes("application/json")) {
+    throw new Error(
+      `服务器返回了非 JSON 响应（${contentType}），请确认 VITE_API_BASE_URL 指向正确的后端地址`,
+    );
+  }
+
+  try {
+    return await res.json() as T;
+  } catch {
+    throw new Error(
+      "服务器返回了无法解析的响应，请确认 VITE_API_BASE_URL 指向正确的后端地址",
+    );
+  }
 }
 
 export const api = {

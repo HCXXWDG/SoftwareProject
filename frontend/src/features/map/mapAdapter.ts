@@ -6,9 +6,12 @@ import type {
   AMapPointLike,
 } from "./amapLoader";
 import {
+  clampCenterToBounds,
+  clampZoom,
   DEFAULT_MAP_CENTER,
   DEFAULT_MAP_ZOOM,
   type MapViewport,
+  type MapViewportConstraint,
   type ProjectedPoint,
 } from "./viewport";
 
@@ -18,6 +21,10 @@ export interface MapAdapter {
   project: (point: GeoPoint) => ProjectedPoint;
   unproject: (point: ProjectedPoint) => GeoPoint;
   subscribe: (listener: () => void) => () => void;
+}
+
+export interface CreateAMapAdapterOptions {
+  viewportConstraint?: MapViewportConstraint;
 }
 
 function readCoordinate(
@@ -51,12 +58,33 @@ function readPixel(point: AMapPointLike, axis: "x" | "y"): number {
 export function createAMapAdapter(
   container: HTMLElement,
   namespace: AMapNamespaceLike,
+  options: CreateAMapAdapterOptions = {},
 ): MapAdapter {
+  const { viewportConstraint } = options;
+  const initialCenter = viewportConstraint?.center ?? DEFAULT_MAP_CENTER;
+  const initialZoom = viewportConstraint
+    ? clampZoom(
+        viewportConstraint.defaultZoom ?? DEFAULT_MAP_ZOOM,
+        viewportConstraint.minZoom,
+        viewportConstraint.maxZoom,
+      )
+    : DEFAULT_MAP_ZOOM;
   const map: AMapInstanceLike = new namespace.Map(container, {
-    center: [DEFAULT_MAP_CENTER.longitude, DEFAULT_MAP_CENTER.latitude],
+    center: [initialCenter.longitude, initialCenter.latitude],
     resizeEnable: true,
     viewMode: "2D",
-    zoom: DEFAULT_MAP_ZOOM,
+    zoom: initialZoom,
+    ...(viewportConstraint
+      ? {
+          zooms: [viewportConstraint.minZoom, viewportConstraint.maxZoom],
+          limitBounds: [
+            viewportConstraint.bounds.west,
+            viewportConstraint.bounds.south,
+            viewportConstraint.bounds.east,
+            viewportConstraint.bounds.north,
+          ],
+        }
+      : {}),
   });
   const listeners = new Set<() => void>();
   let destroyed = false;
@@ -64,7 +92,24 @@ export function createAMapAdapter(
   const notify = () => {
     listeners.forEach((listener) => listener());
   };
-  map.on("moveend", notify);
+
+  const handleMoveEnd = () => {
+    const center = map.getCenter();
+    const lng = readCoordinate(center, "getLng", "lng");
+    const lat = readCoordinate(center, "getLat", "lat");
+    if (viewportConstraint) {
+      const clamped = clampCenterToBounds(
+        { longitude: lng, latitude: lat },
+        viewportConstraint.bounds,
+      );
+      if (clamped.longitude !== lng || clamped.latitude !== lat) {
+        map.setCenter([clamped.longitude, clamped.latitude]);
+      }
+    }
+    notify();
+  };
+
+  map.on("moveend", handleMoveEnd);
   map.on("zoomend", notify);
 
   const resizeObserver = typeof ResizeObserver === "undefined"
@@ -82,7 +127,7 @@ export function createAMapAdapter(
       }
       destroyed = true;
       resizeObserver?.disconnect();
-      map.off("moveend", notify);
+      map.off("moveend", handleMoveEnd);
       map.off("zoomend", notify);
       listeners.clear();
       map.destroy();

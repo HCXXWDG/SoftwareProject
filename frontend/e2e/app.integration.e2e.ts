@@ -30,6 +30,7 @@ function isApiResponse(
 }
 
 async function waitForInitialApiResponses(page: Page) {
+  // Set up ALL response listeners BEFORE navigating
   const heatmapPromise = page.waitForResponse((response) =>
     isApiResponse(response, "GET", "/api/v1/heatmap"),
   );
@@ -42,7 +43,25 @@ async function waitForInitialApiResponses(page: Page) {
 
   await page.goto("/");
 
-  return Promise.all([heatmapPromise, routesPromise, trendsPromise]);
+  // Stage 1: Welcome page — click "查看预设路线" (triggers routes/compare on preview page)
+  await page.getByRole("button", { name: "查看预设路线" }).click();
+
+  // Stage 2: Route preview — wait for routes, then click "进入地图"
+  await expect(page.getByRole("button", { name: "进入地图" })).toBeVisible({
+    timeout: 10_000,
+  });
+  await page.getByRole("button", { name: "进入地图" }).click();
+
+  // Stage 3: Map — triggers heatmap and trends API calls
+  await expect(page.locator("[data-map-mode]").first()).toBeVisible();
+
+  const [heatmapRes, routesRes, trendsRes] = await Promise.all([
+    heatmapPromise,
+    routesPromise,
+    trendsPromise,
+  ]);
+
+  return [heatmapRes, routesRes, trendsRes] as const;
 }
 
 test.describe("Full-stack demo flow", () => {
@@ -90,7 +109,7 @@ test.describe("Full-stack demo flow", () => {
     await alternativeButton.click();
     await expect(alternativeButton).toHaveAttribute("aria-pressed", "true");
 
-    const mapSection = page.locator("[aria-label='城市通勤情绪地图']");
+    const mapSection = page.locator("[aria-label='校园通勤情绪地图']");
     const box = await mapSection.boundingBox();
     expect(box).not.toBeNull();
 

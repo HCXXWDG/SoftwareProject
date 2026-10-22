@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
 $base = "http://localhost:8080"
 $device = "integration-demo-device"
+$bbox = "120.26067,31.47278,120.27946,31.49417"
 
 function Test-Endpoint {
     param(
@@ -17,13 +18,13 @@ Test-Endpoint "Health" {
 }
 
 Test-Endpoint "Heatmap" {
-    $cells = Invoke-RestMethod "$base/api/v1/heatmap?bbox=116.39,39.90,116.41,39.92&zoom=16&hours=168"
+    $cells = Invoke-RestMethod "$base/api/v1/heatmap?bbox=$bbox&zoom=16&hours=168"
     Write-Host "cells: $($cells.Count)"
 }
 
 Test-Endpoint "Report" {
     $body = @{
-        location = @{ longitude = 116.401; latitude = 39.915 }
+        location = @{ longitude = 120.273915; latitude = 31.479302 }
         stressLevel = 75
         tag = "CROWD"
     } | ConvertTo-Json -Compress
@@ -44,8 +45,8 @@ Test-Endpoint "Report" {
 
 Test-Endpoint "Route Compare" {
     $body = @{
-        origin = @{ longitude = 116.392; latitude = 39.905 }
-        destination = @{ longitude = 116.405; latitude = 39.912 }
+        origin = @{ longitude = 120.2735103; latitude = 31.4753281 }
+        destination = @{ longitude = 120.2743195; latitude = 31.4832753 }
     } | ConvertTo-Json -Compress
     $route = Invoke-RestMethod -Uri "$base/api/v1/routes/compare" -Method POST `
         -Headers @{ "X-Device-Id" = $device } `
@@ -57,12 +58,12 @@ Test-Endpoint "Route Compare" {
 Test-Endpoint "Commute Complete" {
     $body = @{
         routeId = "route-fast"
-        routeLabel = "Fast route A"
+        routeLabel = "最快路线 A"
         endStressLevel = 25
         durationMinutes = 28
         selectedScore = 52.1
         fastestScore = 48.0
-        alternativeLabel = "Calm route B"
+        alternativeLabel = "少心累路线 B"
         alternativeScore = 41.5
         alternativeDurationRatio = 1.12
         confidence = 0.72
@@ -80,12 +81,14 @@ Test-Endpoint "Trends" {
     Write-Host "total: $($trends.totalCommutes) direction: $($trends.summary.direction)"
 }
 
-Test-Endpoint "CORS preflight" {
-    $headers = curl.exe -s -D - -o NUL -X OPTIONS "$base/api/v1/heatmap?bbox=116.39,39.90,116.41,39.92&zoom=16" `
-        -H "Origin: http://localhost:5173" `
-        -H "Access-Control-Request-Method: GET"
-    $allowOrigin = ($headers | Select-String "Access-Control-Allow-Origin:").Line
-    Write-Host $allowOrigin
+foreach ($origin in @("http://localhost:5173", "http://127.0.0.1:5173", "http://localhost", "https://localhost")) {
+    Test-Endpoint "CORS preflight ($origin)" {
+        $headers = curl.exe -s -D - -o NUL -X OPTIONS "$base/api/v1/heatmap?bbox=$bbox&zoom=16" `
+            -H "Origin: $origin" `
+            -H "Access-Control-Request-Method: GET"
+        $allowOrigin = ($headers | Select-String "Access-Control-Allow-Origin:").Line
+        Write-Host $allowOrigin
+    }
 }
 
 Write-Host "=== Integration smoke passed ==="
