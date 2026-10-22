@@ -160,9 +160,13 @@ public class TrendService {
             return "完成一次通勤后，这里会给出次日路线建议。";
         }
         CommuteRecord latest = records.get(records.size() - 1);
+        // 评分自 V6 起可空：真实路线但沿途还没有反馈时不携带评分，此时不补 0，
+        // 直接判定为"不足以推荐替代路线"，避免用假零分算出"替代路线更从容"。
         boolean recommendAlternative = latest.alternativeLabel() != null
                 && latest.alternativeScore() != null
                 && latest.alternativeDurationRatio() != null
+                && latest.fastestScore() != null
+                && latest.confidence() != null
                 && latest.fastestScore() - latest.alternativeScore() >= 10
                 && latest.alternativeDurationRatio() <= 1.20
                 && latest.confidence() >= 0.35;

@@ -1,10 +1,12 @@
 package com.example.commutemood.application;
 
 import com.example.commutemood.domain.CommuteRecord;
+import com.example.commutemood.domain.FeedbackSource;
 import com.example.commutemood.domain.RouteComparison;
 import com.example.commutemood.domain.RouteQueryHistory;
 import com.example.commutemood.domain.RouteSource;
 import com.example.commutemood.domain.ScoredRoute;
+import com.example.commutemood.domain.ScoringStatus;
 import com.example.commutemood.repository.CommuteRecordRepository;
 import com.example.commutemood.repository.CommuteSaveResult;
 import com.example.commutemood.repository.RouteQueryRepository;
@@ -26,8 +28,12 @@ import java.util.UUID;
  * 与用户感受 {@code endStressLevel}；其余字段一律由快照重建。
  *
  * <p>流程：按 ID+设备读快照（归属校验）→ 过期判断 → 校验 routeId 在快照候选内 →
- * 拒绝演示来源 → 由选中的 {@link ScoredRoute} 取服务端评分/预计秒数 → 按
- * (设备, 操作 ID) 幂等保存 → 区分 CREATED / DUPLICATE / CONFLICT。
+ * 归类快照来源 → 由选中的 {@link ScoredRoute} 取服务端评分/预计秒数（评分不可用时留空，
+ * 不补 0）→ 按 (设备, 操作 ID) 幂等保存 → 区分 CREATED / DUPLICATE / CONFLICT。
+ *
+ * <p><b>演示来源不在这里拒绝</b>：{@code routeSource=DEMO} 的记录照常写入，由
+ * {@link TrendService} 与 {@link CommuteHistoryService} 在读侧排除。理由是写入口一刀切
+ * 会让演示模式下"完成通勤"整个动作走不通（422），而读侧排除既能完整演示又不污染真实统计。
  */
 @Service
 public class CommuteService {
@@ -97,11 +103,8 @@ public class CommuteService {
             throw new SnapshotExpiredException("查询快照已过期，请重新规划路线。");
         }
 
-        // 3) 拒绝演示结果进入真实统计（依赖 B04 快照来源，见 resolveRouteSource）。
+        // 3) 归类快照来源（不再据此拒绝写入，见 resolveRouteSource 的说明）。
         RouteSource source = resolveRouteSource(snapshot);
-        if (source == RouteSource.DEMO) {
-            throw new DemoResultRejectedException("演示路线结果不计入真实通勤统计。");
-        }
 
         // 4) 从快照重建服务端评分与预计时长，前端传入的分数一律不采信。
         RouteComparison comparison = snapshot.result();
@@ -128,6 +131,10 @@ public class CommuteService {
         int estimatedSeconds = selected.durationSeconds();
         int durationMinutes = Math.max(1, (int) Math.ceil(estimatedSeconds / 60.0));
 
+        // 评分不可用时留空，而不是补 0：真实用户的第一次通勤（沿途还没有任何反馈）
+        // 必须能落库，但补造出来的零分会污染趋势均值，也会让前端把"没有评分"显示成"压力 0 分"。
+        boolean scored = hasVerifiableScoring(comparison, selected);
+
         CommuteRecord candidate = new CommuteRecord(
                 UUID.randomUUID(),
                 deviceHash,
@@ -139,12 +146,12 @@ public class CommuteService {
                 endStressLevel,
                 durationMinutes,
                 estimatedSeconds,
-                selected.stressScore(),
-                fastest.stressScore(),
+                scored ? finiteOrNull(selected.stressScore()) : null,
+                scored ? finiteOrNull(fastest.stressScore()) : null,
                 alternative.map(ScoredRoute::label).orElse(null),
-                alternative.map(ScoredRoute::stressScore).map(Double::valueOf).orElse(null),
+                scored ? alternative.map(route -> finiteOrNull(route.stressScore())).orElse(null) : null,
                 alternative.map(route -> route.durationSeconds() / (double) fastest.durationSeconds()).orElse(null),
-                selected.confidence(),
+                scored ? finiteOrNull(selected.confidence()) : null,
                 completedAt == null ? now : completedAt);
 
         // 5) 幂等保存：并发重复只写一条。
@@ -174,25 +181,50 @@ public class CommuteService {
     }
 
     /**
-     * 解析快照的路线来源。
+     * 归类快照的路线来源（B04 交付：来源、评分状态与版本随比较快照保存）。
      *
-     * <p>B04 的来源、评分状态和版本随比较快照保存。只有可验证的真实结果允许创建新通勤；
-     * 旧快照来源未知时必须重新规划。已有历史记录仍由 D05 的读侧兼容规则处理。
+     * <p><b>这里只做归类，不做拒绝。</b>原先的实现在来源为 {@link RouteSource#DEMO} 时抛
+     * {@link DemoResultRejectedException}（422），结果是演示模式下"完成通勤"这个动作根本走不通。
+     * 已确认的口径是<b>「演示结果可以记录，但在读侧排除」</b>：写入时如实记下
+     * {@code routeSource=DEMO}，由 {@link TrendService} 与 {@link CommuteHistoryService}
+     * 在读取时把它排除在真实统计与用户明细之外（两处都已按 {@code != DEMO} 过滤，
+     * 并在趋势的 {@code excludedDemoCommutes} 里计数）。这样演示能完整跑通，
+     * 真实统计又不会被污染，比在写入口一刀切更符合要求。
+     *
+     * <p>{@code null} 来源按 {@link RouteSource#UNKNOWN} 处理，读侧会计入
+     * {@code unknownSourceCommutes}，不会被当成可验证的真实数据。
      */
     private RouteSource resolveRouteSource(RouteQueryHistory snapshot) {
-        RouteComparison comparison = snapshot.result();
-        if (comparison.routeSource() == RouteSource.DEMO) {
-            return RouteSource.DEMO;
-        }
-        if (comparison.routeSource() != RouteSource.REAL
-                || comparison.feedbackSource() != com.example.commutemood.domain.FeedbackSource.REAL
-                || comparison.scoringStatus() != com.example.commutemood.domain.ScoringStatus.VALID
-                || comparison.scoringVersion() == null || comparison.routes().isEmpty()
-                || comparison.routes().stream().anyMatch(route -> route.stressScore() == null
-                || route.stressExposure() == null || !Double.isFinite(route.stressScore())
-                || !Double.isFinite(route.stressExposure()) || route.durationSeconds() <= 0)) {
-            throw new IllegalArgumentException("路线快照没有可验证的真实评分，请重新规划后完成通勤。");
-        }
-        return RouteSource.REAL;
+        RouteSource declared = snapshot.result().routeSource();
+        return declared == null ? RouteSource.UNKNOWN : declared;
+    }
+
+    /**
+     * 判断这次通勤是否带有"可验证的评分"。
+     *
+     * <p>三个条件同时成立才算：快照整体来源可验证（真实路线 + 真实反馈 + 有效评分 + 有评分版本），
+     * 且选中的候选自身状态为 {@link ScoringStatus#VALID}、评分是有限数。
+     *
+     * <p>不成立时<b>不报错、也不补 0</b>，而是让评分字段留空落库——这正是"真实用户第一次通勤
+     * （沿途还没有任何反馈）不应丢失，但不能补造分数"这条口径的落点。
+     */
+    private boolean hasVerifiableScoring(RouteComparison comparison, ScoredRoute selected) {
+        return comparison.routeSource() == RouteSource.REAL
+                && comparison.feedbackSource() == FeedbackSource.REAL
+                && comparison.scoringStatus() == ScoringStatus.VALID
+                && comparison.scoringVersion() != null
+                && selected.scoringStatus() == ScoringStatus.VALID
+                && Double.isFinite(selected.stressScore() == null ? Double.NaN : selected.stressScore())
+                && Double.isFinite(selected.stressExposure() == null ? Double.NaN : selected.stressExposure());
+    }
+
+    /** 把非有限数（NaN / ±Inf）统一成 {@code null}，避免脏值落库后污染均值。 */
+    private Double finiteOrNull(Double value) {
+        return value != null && Double.isFinite(value) ? value : null;
+    }
+
+    /** 便捷重载：primitive 入参（如 {@code ScoredRoute.confidence} 为可空建模前的取值）。 */
+    private Double finiteOrNull(double value) {
+        return Double.isFinite(value) ? value : null;
     }
 }

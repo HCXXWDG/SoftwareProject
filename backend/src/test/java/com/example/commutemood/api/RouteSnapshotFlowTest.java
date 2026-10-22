@@ -75,8 +75,18 @@ class RouteSnapshotFlowTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalCommutes").value(1));
     }
 
+    /**
+     * 演示快照可以完成通勤，但结果不进入真实统计（D07 口径修订）。
+     *
+     * <p>原先这一条断言 422 {@code demo_result_not_allowed}：写入门禁直接拒绝演示结果。
+     * 后果是演示模式下"完成通勤"这个动作根本走不通，答辩现场必踩。已确认的口径改为
+     * <b>「演示结果可以记录，但在读侧排除」</b>：写入时如实记下 {@code routeSource=DEMO}，
+     * 由趋势与历史在读取时排除。所以本用例现在验证的是同一件事的另一半——
+     * 记录写进去了（201），但真实统计里看不到它（{@code totalCommutes=0}、
+     * {@code excludedDemoCommutes=1}），历史明细里也不出现。
+     */
     @Test
-    void demoSnapshotCannotEnterRealCommuteStatistics() throws Exception {
+    void demoSnapshotIsRecordedButExcludedFromRealCommuteStatistics() throws Exception {
         GeoPoint origin = new GeoPoint(120.27, 31.48);
         GeoPoint destination = new GeoPoint(120.27, 31.485);
         String device = "b04-demo-" + UUID.randomUUID();
@@ -87,13 +97,31 @@ class RouteSnapshotFlowTest {
                         .contentType("application/json").content("""
                                 {"snapshotId":"%s","operationId":"%s","routeId":"route-fast","endStressLevel":25}
                                 """.formatted(comparison.path("snapshotId").asText(), UUID.randomUUID())))
-                .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("demo_result_not_allowed"));
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("created"))
+                .andExpect(jsonPath("$.routeSource").value("DEMO"))
+                // 演示快照没有可验证评分，落库时评分留空而不是补 0
+                .andExpect(jsonPath("$.selectedScore").doesNotExist())
+                .andExpect(jsonPath("$.fastestScore").doesNotExist());
+        // 读侧排除：真实统计与历史明细都看不到这条演示通勤
         http.perform(get("/api/v1/commutes/trends").header("X-Device-Id", device))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.totalCommutes").value(0));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCommutes").value(0))
+                .andExpect(jsonPath("$.excludedDemoCommutes").value(1));
+        http.perform(get("/api/v1/commutes/history").header("X-Device-Id", device))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
+    /**
+     * 真实路线但沿途还没有任何反馈：没有评分，但这次通勤不能丢（D07 口径修订）。
+     *
+     * <p>原先这一条断言 400，等于"真实用户的第一次通勤直接失败"。已确认的口径是
+     * <b>不应丢失，但不能补造分数</b>：记录照常写入，评分字段留空（NON_NULL 下整个键不出现），
+     * 趋势的均值不会被假零分拉低。
+     */
     @Test
-    void realRouteWithoutFeedbackHasNoScoresAndCannotComplete() throws Exception {
+    void realRouteWithoutFeedbackHasNoScoresButStillCompletes() throws Exception {
         GeoPoint origin = new GeoPoint(121, 32);
         GeoPoint destination = new GeoPoint(121.001, 32);
         when(provider.isConfigured()).thenReturn(true);
@@ -107,7 +135,23 @@ class RouteSnapshotFlowTest {
                         .contentType("application/json").content("""
                                 {"snapshotId":"%s","operationId":"%s","routeId":"walk","endStressLevel":25}
                                 """.formatted(comparison.path("snapshotId").asText(), UUID.randomUUID())))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("invalid_request"));
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.routeSource").value("REAL"))
+                .andExpect(jsonPath("$.estimatedSeconds").value(80))
+                .andExpect(jsonPath("$.selectedScore").doesNotExist())
+                .andExpect(jsonPath("$.fastestScore").doesNotExist())
+                .andExpect(jsonPath("$.confidence").doesNotExist());
+        // 来源是 REAL，所以照常计入真实统计；缺评分只影响均值样本，不影响次数
+        http.perform(get("/api/v1/commutes/trends").header("X-Device-Id", device))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCommutes").value(1))
+                .andExpect(jsonPath("$.unknownSourceCommutes").value(0))
+                .andExpect(jsonPath("$.excludedDemoCommutes").value(0));
+        http.perform(get("/api/v1/commutes/history").header("X-Device-Id", device))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].selectedScore").doesNotExist())
+                .andExpect(jsonPath("$[0].routeSource").value("REAL"));
     }
 
     private JsonNode compare(String device, GeoPoint origin, GeoPoint destination, boolean demo) throws Exception {

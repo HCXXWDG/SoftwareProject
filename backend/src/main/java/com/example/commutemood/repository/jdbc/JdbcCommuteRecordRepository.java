@@ -135,12 +135,14 @@ public class JdbcCommuteRecordRepository implements CommuteRecordRepository {
             rs.getInt("end_stress_level"),
             rs.getInt("duration_minutes"),
             nullableInt(rs, "estimated_seconds"),
-            rs.getDouble("selected_score"),
-            rs.getDouble("fastest_score"),
+            // 评分与置信度自 V6 起可空：真实路线但沿途无反馈时快照不带评分，
+            // 这里必须按 NULL 读回，不能用 rs.getDouble（它对 NULL 返回 0，会把"没有评分"变成"压力 0 分"）。
+            nullableDouble(rs, "selected_score"),
+            nullableDouble(rs, "fastest_score"),
             rs.getString("alternative_label"),
             nullableDouble(rs, "alternative_score"),
             nullableDouble(rs, "alternative_duration_ratio"),
-            rs.getDouble("confidence"),
+            nullableDouble(rs, "confidence"),
             rs.getTimestamp("completed_at").toInstant());
 
     private static RouteSource parseSource(String value) {
