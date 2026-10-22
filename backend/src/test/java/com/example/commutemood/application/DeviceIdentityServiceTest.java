@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DeviceIdentityServiceTest {
     private final DeviceIdentityService service = new DeviceIdentityService(
-            new AppProperties("test-salt", new AppProperties.Amap(""), List.of()));
+            new AppProperties("test-salt", new AppProperties.Amap(""), ""));
 
     @Test
     void hashesDeviceIdDeterministicallyWithoutKeepingRawValue() {

@@ -4,27 +4,45 @@ import {
   resetAMapLoaderForTests,
   type AMapNamespaceLike,
 } from "./amapLoader";
+import { CAMPUS } from "../../config/campus";
 
 const namespace = {
   Map: class {
     destroy() {}
     getBounds() {
       return {
-        getNorthEast: () => ({ lng: 116.41, lat: 39.92 }),
-        getSouthWest: () => ({ lng: 116.39, lat: 39.9 }),
+        getNorthEast: () => ({ lng: CAMPUS.bounds.east, lat: CAMPUS.bounds.north }),
+        getSouthWest: () => ({ lng: CAMPUS.bounds.west, lat: CAMPUS.bounds.south }),
       };
     }
     getZoom() {
-      return 14;
+      return 16;
     }
+    getCenter() {
+      return { lng: CAMPUS.center.longitude, lat: CAMPUS.center.latitude };
+    }
+    setCenter() {}
+    setZoom() {}
     lngLatToContainer() {
       return { x: 0, y: 0 };
     }
     containerToLngLat() {
-      return { getLng: () => 116.4, getLat: () => 39.91 };
+      return { lng: CAMPUS.center.longitude, lat: CAMPUS.center.latitude };
     }
     off() {}
     on() {}
+  },
+  Bounds: class {
+    constructor(
+      public sw: [number, number],
+      public ne: [number, number],
+    ) {}
+    getSouthWest() {
+      return { lng: this.sw[0], lat: this.sw[1] };
+    }
+    getNorthEast() {
+      return { lng: this.ne[0], lat: this.ne[1] };
+    }
   },
 } satisfies AMapNamespaceLike;
 
