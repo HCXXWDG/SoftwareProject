@@ -1,5 +1,6 @@
 import { api } from "./api";
 import type { HeatmapCell } from "../types";
+import { isHeatmapCells } from "./responseValidators";
 
 /** 获取热力图数据 */
 export async function fetchHeatmap(
@@ -9,5 +10,5 @@ export async function fetchHeatmap(
   signal?: AbortSignal,
 ): Promise<HeatmapCell[]> {
   const params = new URLSearchParams({ bbox, zoom: String(zoom), hours: String(hours) });
-  return api.get<HeatmapCell[]>(`/api/v1/heatmap?${params}`, signal);
+  return api.get<HeatmapCell[]>(`/api/v1/heatmap?${params}`, signal, isHeatmapCells);
 }

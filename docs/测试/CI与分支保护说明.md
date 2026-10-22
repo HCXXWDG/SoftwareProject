@@ -1,5 +1,7 @@
 # CI 与分支保护
 
+仓库：https://github.com/HCXXWDG/SoftwareProject
+
 ## 必需检查
 
 所有合并到 `develop` 的 Pull Request 必须通过：
@@ -29,6 +31,17 @@
 - 禁止强制推送和删除分支。
 
 四个工作流同时监听 `develop` 和 `main`，发布 PR 必须经过同等质量门禁。
+
+## 2026 年 10 月 18 日同步核实
+
+本次同步使用原仓库 `HCXXWDG/SoftwareProject`，保留上述历史配置记录、
+CODEOWNERS 和原有 CI 管理安排。仓库默认分支为 `main`，GitHub 分支列表
+显示 `develop` 与 `main` 均受保护。
+
+当前账号具有 WRITE 权限，保护详情 API 不可读，因而未重新确认上述每项
+规则的当前取值；这些细项仍是 2026-06-14 的历史记录。本次未修改默认
+分支、分支保护或成员权限。继续按 PR、成员复核和核心 CI 检查流程协作，
+合并操作以 GitHub 当前实际规则为准。
 
 ## 本地验证
 

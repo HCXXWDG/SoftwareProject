@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,6 +18,7 @@ import java.util.List;
 
 @Configuration
 public class WebConfiguration implements WebMvcConfigurer {
+    private static final Logger log = LoggerFactory.getLogger(WebConfiguration.class);
     private final AppProperties properties;
 
     public WebConfiguration(AppProperties properties) {
@@ -31,15 +34,21 @@ public class WebConfiguration implements WebMvcConfigurer {
                                             HttpServletResponse response,
                                             FilterChain filterChain) throws ServletException, IOException {
                 String origin = request.getHeader("Origin");
-                if (origin != null && allowedOrigins.contains(origin)) {
-                    response.setHeader("Access-Control-Allow-Origin", origin);
-                    response.setHeader("Vary", "Origin");
-                    response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-                    response.setHeader("Access-Control-Allow-Headers", "*");
-                    response.setHeader("Access-Control-Max-Age", "3600");
-                    if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
-                        response.setStatus(HttpServletResponse.SC_OK);
-                        return;
+                if (origin != null) {
+                    boolean allowed = allowedOrigins.contains(origin)
+                            || origin.startsWith("http://localhost")
+                            || origin.startsWith("capacitor://localhost");
+                    log.debug("CORS origin: {} allowed={}", origin, allowed);
+                    if (allowed) {
+                        response.setHeader("Access-Control-Allow-Origin", origin);
+                        response.setHeader("Vary", "Origin");
+                        response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                        response.setHeader("Access-Control-Allow-Headers", "*");
+                        response.setHeader("Access-Control-Max-Age", "3600");
+                        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+                            response.setStatus(HttpServletResponse.SC_OK);
+                            return;
+                        }
                     }
                 }
                 filterChain.doFilter(request, response);

@@ -10,6 +10,17 @@ on:
       - develop
       - main
   workflow_dispatch:
+    inputs:
+      backend_ref:
+        description: Optional full backend commit SHA for frontend-only stacked PR acceptance
+        type: string
+        required: false
+        default: ""
+      verify_restart:
+        description: Also verify lost-receipt recovery after restarting an isolated in-memory D07 service
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -27,6 +38,24 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+
+      - name: Validate requested backend revision
+        if: inputs.backend_ref != ''
+        env:
+          BACKEND_REF: ${{ inputs.backend_ref }}
+        run: |
+          if [[ ! "$BACKEND_REF" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "backend_ref must be a full commit SHA from this repository."
+            exit 1
+          fi
+
+      - name: Checkout requested backend fixture
+        if: inputs.backend_ref != ''
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.backend_ref }}
+          path: .tmp/fullstack-backend
+          persist-credentials: false
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -51,13 +80,24 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
+      - name: Package backend for isolated restart acceptance
+        if: inputs.verify_restart
+        working-directory: ${{ inputs.backend_ref != '' && '.tmp/fullstack-backend/backend' || 'backend' }}
+        run: bash ./mvnw --batch-mode --no-transfer-progress -DskipTests package
+
       - name: Start demo backend
-        working-directory: backend
+        working-directory: ${{ inputs.backend_ref != '' && '.tmp/fullstack-backend/backend' || 'backend' }}
+        env:
+          SPRING_PROFILES_ACTIVE: demo
+          AMAP_WEB_KEY: ""
+          ROUTE_DEMO_ENABLED: "true"
+          APP_CORS_ORIGINS: http://127.0.0.1:5173,http://localhost:5173
         run: |
+          git rev-parse HEAD
           chmod +x mvnw
           nohup ./mvnw --batch-mode --no-transfer-progress spring-boot:run \
-            > ../backend-demo.log 2>&1 &
-          echo $! > ../backend-demo.pid
+            > "$GITHUB_WORKSPACE/backend-demo.log" 2>&1 &
+          echo $! > "$GITHUB_WORKSPACE/backend-demo.pid"
 
       - name: Wait for backend health
         run: |
@@ -75,6 +115,13 @@ jobs:
         working-directory: frontend
         run: npm run test:e2e:integration
 
+      - name: Verify isolated backend restart recovery
+        if: inputs.verify_restart
+        working-directory: frontend
+        env:
+          MEMBER_A_D07_BACKEND_DIR: ${{ inputs.backend_ref != '' && format('{0}/.tmp/fullstack-backend/backend', github.workspace) || format('{0}/backend', github.workspace) }}
+        run: npm run test:e2e:member-a-restart
+
       - name: Upload full-stack diagnostics
         if: always()
         uses: actions/upload-artifact@v7
@@ -83,6 +130,7 @@ jobs:
           path: |
             frontend/playwright-report/integration/
             frontend/test-results/integration/
+            frontend/test-results/member-a-restart/
             backend-demo.log
           if-no-files-found: warn
           retention-days: 14

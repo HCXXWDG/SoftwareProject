@@ -1,4 +1,17 @@
-# 城市通勤情绪地图
+# 心途校园通勤情绪地图
+团队协作仓库：[HCXXWDG/SoftwareProject](https://github.com/HCXXWDG/SoftwareProject)。日常协作使用 `develop`，稳定版本使用 `main`；GitHub 默认分支为 `main`。
+
+- [贡献与协作指南](CONTRIBUTING.md)
+- [代码与功能优化启动书](docs/project/project-charter.md)
+- [三至四人任务分工](docs/project/task-assignment.md)
+- [成员工作量量化](docs/project/workload.md)
+- [初始检查结果与已知问题](docs/project/initial-baseline.md)
+- [成员 A 开发准备书](docs/project/member-a-preparation.md)
+- [成员 A 实施记录与剩余依赖](docs/project/member-a-worklog.md)
+- [成员 A 真实接口验收与修复](docs/project/member-a-acceptance.md)
+- [成员 A 对 D 新契约的接入与验收](docs/project/member-a-contract-integration.md)
+- [成员 A 对 B/C/D 的接口交接清单](docs/project/member-a-handoff-checklist.md)
+- [开发任务入口](https://github.com/HCXXWDG/SoftwareProject/issues)（结合任务分工书确认任务与认领状态）
 
 一个把“通勤是否心累”加入路线决策的课程软件工程项目。系统聚合用户对噪音、拥挤、暴晒和异味的反馈，生成情绪热力图，并对高德候选路线重新计算“心累指数”。
 
@@ -8,7 +21,7 @@
 - 地图长按 600ms 的 emoji 反馈
 - “最快”与“少心累”双路线对比
 - 七日通勤情绪趋势与次日路线建议
-- 预设 Demo 起终点（北京西直门），无需手动选择
+- 江南大学蠡湖校区五个导航点位，支持选择通勤起终点
 - 无 Key、无数据库时仍可完成课堂演示
 
 ## 技术栈

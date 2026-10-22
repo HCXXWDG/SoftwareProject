@@ -5,7 +5,8 @@ import jakarta.validation.constraints.NotNull;
 
 public record RouteCompareRequest(
         @Valid @NotNull PointRequest origin,
-        @Valid @NotNull PointRequest destination
+        @Valid @NotNull PointRequest destination,
+        boolean demo
 ) {
 }
 

@@ -1,15 +1,50 @@
+import { useState } from "react";
+import { WAYPOINTS, type Waypoint } from "../config/campus";
+import type { GeoPoint } from "../types";
 import "./WelcomePage.css";
 
 interface WelcomePageProps {
-  onNavigateToPreview: () => void;
+  initialOriginId?: string;
+  initialDestinationId?: string;
+  initialOrigin?: Waypoint;
+  initialDestination?: Waypoint;
+  onNavigateToPreview: (
+    origin: GeoPoint,
+    destination: GeoPoint,
+    originName: string,
+    destName: string,
+  ) => void;
 }
 
-/**
- * 欢迎页 — 三阶段流程的第一阶段。
- * 显示项目说明、固定端点信息和"查看预设路线"按钮。
- * 不发任何 API 请求。
- */
-export function WelcomePage({ onNavigateToPreview }: WelcomePageProps) {
+export function WelcomePage({ onNavigateToPreview, initialOriginId = "dorm", initialDestinationId = "teaching", initialOrigin, initialDestination }: WelcomePageProps) {
+  const [originId, setOriginId] = useState(initialOrigin?.id ?? initialOriginId);
+  const [destId, setDestId] = useState(initialDestination?.id ?? initialDestinationId);
+  const options = [...WAYPOINTS];
+  for (const point of [initialOrigin, initialDestination]) {
+    if (point && !options.some((option) => option.id === point.id)) options.push(point);
+  }
+
+  const origin = options.find((w) => w.id === originId);
+  const destination = options.find((w) => w.id === destId);
+  const canGo = origin != null && destination != null && (origin.point.longitude !== destination.point.longitude || origin.point.latitude !== destination.point.latitude);
+
+  const handleGo = () => {
+    if (!origin || !destination || !canGo) return;
+    onNavigateToPreview(origin.point, destination.point, origin.name, destination.name);
+  };
+
+  const renderPoint = (w: Waypoint, selected: boolean, onSelect: (id: string) => void) => (
+    <button
+      key={w.id}
+      className={`welcome-page__point ${selected ? "welcome-page__point--selected" : ""}`}
+      aria-pressed={selected}
+      onClick={() => onSelect(w.id)}
+      type="button"
+    >
+      {w.name}
+    </button>
+  );
+
   return (
     <div className="welcome-page">
       <div className="welcome-page__content">
@@ -18,35 +53,33 @@ export function WelcomePage({ onNavigateToPreview }: WelcomePageProps) {
           江南大学蠡湖校区 · 通勤情绪可视化工具
         </p>
 
-        <div className="welcome-page__info">
-          <div className="welcome-page__endpoint">
-            <span className="welcome-page__endpoint-icon welcome-page__endpoint-icon--origin" />
-            <div>
-              <strong>起点</strong>
-              <p>学生公寓区（留学生公寓）</p>
-            </div>
-          </div>
-          <div className="welcome-page__endpoint">
-            <span className="welcome-page__endpoint-icon welcome-page__endpoint-icon--destination" />
-            <div>
-              <strong>终点</strong>
-              <p>第一教学楼</p>
-            </div>
+        <div className="welcome-page__section">
+          <p className="welcome-page__label">选择起点</p>
+          <div className="welcome-page__grid" role="group" aria-label="选择起点">
+            {options.map((w) => renderPoint(w, w.id === originId, (id) => setOriginId(id)))}
           </div>
         </div>
 
-        <p className="welcome-page__description">
-          本应用为你展示从学生公寓区到第一教学楼的两条推荐路线：
-          <strong>最快路线</strong>和<strong>最少心累路线</strong>。
-          你可以在地图上查看情绪热力图、记录通勤感受，并追踪七日通勤趋势。
-        </p>
+        <div className="welcome-page__section">
+          <p className="welcome-page__label">选择终点</p>
+          <div className="welcome-page__grid" role="group" aria-label="选择终点">
+            {options.map((w) => renderPoint(w, w.id === destId, (id) => setDestId(id)))}
+          </div>
+        </div>
+
+        {origin && destination && (
+          <p className="welcome-page__route-hint">
+            从 <strong>{origin.name}</strong> 到 <strong>{destination.name}</strong>
+          </p>
+        )}
 
         <button
           className="welcome-page__cta"
-          onClick={onNavigateToPreview}
+          disabled={!canGo}
+          onClick={handleGo}
           type="button"
         >
-          查看预设路线
+          查看路线
         </button>
       </div>
     </div>

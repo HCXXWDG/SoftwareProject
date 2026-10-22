@@ -5,9 +5,23 @@
 
 # Environment and secrets
 .env
+.env.*
 .env.local
+.env.android
+.env.production
 !.env.example
 !.env.android.example
+!.env.production.example
+!.env.*.example
+
+# Local agent configuration and signing material
+.opencode/
+opencode.json
+*.jks
+*.keystore
+keystore.properties
+*.pem
+*.key
 
 # Frontend
 frontend/node_modules/

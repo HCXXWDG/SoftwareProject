@@ -15,11 +15,16 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 
 @Component
 @Profile("!postgres")
 public class DemoDataInitializer implements ApplicationRunner {
+    /** 正向原因标签，演示数据里只与低压力记录搭配。 */
+    private static final Set<EmotionTag> POSITIVE_TAGS =
+            Set.of(EmotionTag.QUIET, EmotionTag.SHADE, EmotionTag.OPEN);
+
     private final EmotionReportRepository reportRepository;
     private final CommuteRecordRepository commuteRepository;
     private final DeviceIdentityService identityService;
@@ -44,13 +49,20 @@ public class DemoDataInitializer implements ApplicationRunner {
             double longitude = cluster.longitude() + random.nextGaussian() * cluster.spread();
             double latitude = cluster.latitude() + random.nextGaussian() * cluster.spread();
             int stress = clampToLevel((int) Math.round(cluster.meanStress() + random.nextGaussian() * 15));
-            EmotionTag tag = switch (index % 5) {
+            EmotionTag tag = switch (index % 8) {
                 case 0 -> EmotionTag.NOISE;
                 case 1 -> EmotionTag.CROWD;
                 case 2 -> EmotionTag.SUN;
                 case 3 -> EmotionTag.ODOR;
+                case 4 -> EmotionTag.QUIET;
+                case 5 -> EmotionTag.SHADE;
+                case 6 -> EmotionTag.OPEN;
                 default -> EmotionTag.OTHER;
             };
+            // 正向标签（安静/树荫/开阔）不应出现在高压记录上，否则演示热力图自相矛盾
+            if (POSITIVE_TAGS.contains(tag)) {
+                stress = Math.min(stress, 25);
+            }
             reportRepository.save(new EmotionReport(
                     UUID.randomUUID(),
                     "simulated-device-" + index,
@@ -71,8 +83,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     index % 2 == 0 ? "最快路线 A" : "少心累路线 B",
                     stressHistory[index],
                     18 + index,
-                    index % 2 == 0 ? 62 : 43,
-                    62,
+                    index % 2 == 0 ? 62.0 : 43.0,
+                    62.0,
                     "少心累路线 B",
                     43.0,
                     1.12,

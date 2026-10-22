@@ -42,6 +42,48 @@ jobs:
       - name: Test and package
         run: bash ./mvnw --batch-mode --no-transfer-progress verify
 
+      - name: Require complete database acceptance
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          reports = list(Path("target/surefire-reports").glob("TEST-*.xml"))
+          if not reports:
+              raise SystemExit("No Surefire XML reports found")
+          suites = [ET.parse(path).getroot() for path in reports]
+          by_name = {suite.attrib["name"]: suite for suite in suites}
+          required = {
+              "com.example.commutemood.integration.DatabaseMigrationAcceptanceTest": 4,
+              "com.example.commutemood.integration.CommutePersistenceAcceptanceTest": 4,
+              "com.example.commutemood.integration.PostgisIntegrationTest": 5,
+              "com.example.commutemood.api.PostgisRouteSnapshotFlowTest": 5,
+          }
+          for name, minimum in required.items():
+              suite = by_name.get(name)
+              if suite is None:
+                  raise SystemExit(f"Missing required database suite: {name}")
+              count = int(suite.attrib.get("tests", "0"))
+              if count < minimum:
+                  raise SystemExit(f"Incomplete suite: {name} ran {count}, expected at least {minimum}")
+          for suite in suites:
+              for result in ("skipped", "failures", "errors"):
+                  count = int(suite.attrib.get(result, "0"))
+                  if count:
+                      raise SystemExit(f'{suite.attrib["name"]}: {result}={count}')
+          total = sum(int(suite.attrib["tests"]) for suite in suites)
+          print(f"Verified {total} tests; zero skipped, failures, errors")
+          PY
+
+      - name: Upload Surefire reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-surefire-${{ github.run_id }}
+          path: backend/target/surefire-reports/
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload JaCoCo report
         if: always()
         uses: actions/upload-artifact@v7
