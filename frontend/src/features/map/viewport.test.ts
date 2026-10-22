@@ -43,8 +43,9 @@ describe("map viewport helpers", () => {
   });
 
   it("maps stress and confidence to bounded visual values", () => {
-    expect(scoreToColor(0)).toBe("rgb(35, 104, 255)");
-    expect(scoreToColor(100)).toBe("rgb(239, 68, 68)");
+    // 压力 0=最轻松(绿) → 100=最心累(红) 的现行色阶
+    expect(scoreToColor(0)).toBe("rgb(52, 199, 89)");
+    expect(scoreToColor(100)).toBe("rgb(220, 38, 38)");
     expect(confidenceToOpacity(0)).toBe(0.18);
     expect(confidenceToOpacity(2)).toBe(1);
   });
