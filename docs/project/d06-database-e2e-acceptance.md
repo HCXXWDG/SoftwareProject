@@ -416,3 +416,121 @@ D06 的验收过程里发现了一批不属于"验收"本身、但归 D 或必�
 | CI workflow | `.github/workflows/android-build.yml` 的 `Android APK Verification` job 由 `android-actions/setup-android@v3` 对齐到 `@v4`（v3 会安装早已下架的 `tools` 包，必然失败） | 缺陷 7 |
 | 前端基线定性 | 本机首次跑通 `npm test` 与两个 Playwright 套件，把 17 项 vitest 失败逐项对着源码核对，确认**全部是断言过期而非功能回归**，按归属拆给 A（14）/ C（3），并撤回原先"改组件回到旧文案"的建议 | Issue #68 补充留言、3.2.2 |
 | 合并条件核对 | 逐项查了 16 个开放 PR 的 checks 与 `mergeable_state`，确认 `develop`（`d14ecbc`）本身是全绿的，红叉全部来自同步分支 `codex/sync-latest-20261018`；并核实当前 token 无 admin 权限，分支保护只能由仓库维护者读改 | 第 9 节第 4 条 |
+
+## 11. 合并阻塞清单（2026-10-22 全仓盘点，17 个开放 PR）
+
+D06 验收时只核对了 checks 与 `mergeable_state`。这一节把"到底还差什么才能合并"逐项拆开，并且给出每个红叉的**已定位根因**。数据来源是 GitHub API 的 `pulls` / `commits/{sha}/check-runs` / `actions/runs` / `actions/jobs/{id}/logs`，以及各分支的实际文件内容。
+
+### 11.1 结论先说
+
+- **没有一个 PR 存在 git 冲突**：17 个开放 PR 的 `mergeable` 全是 `true`。之前担心的 `ApiExceptionHandler.java` / `docs/团队协作与接口约定.md` 在 #67 与 #69 之间会撞，GitHub 目前判定不冲突（两个 PR 的 base 都是 develop，改动行不重叠）；真正会撞的是 #54 与 #55 的 `WelcomePage.tsx`，见 11.4。
+- **卡住合并的只有两类东西**：必需检查红叉（`Frontend CI` / `E2E CI` / `Full-stack E2E`），以及**一个批准都没有**。
+- **`Android APK Verification` 与 `Android Build` 不是必需检查**（`.github/workflows/README.md:17-18` 列的必需项只有 `Frontend CI`、`Backend CI`、`E2E CI`、`Full-stack E2E`），它们的红叉不阻塞合并，只是噪音。
+- 三个必需检查的红叉根因全部定位完毕，**没有一个需要改后端代码**：一个是文案与选择器不匹配（11.2），一个是 vitest 断言过期（#68），一个是前端还在提交旧请求体（#70）。
+
+### 11.2 根因一：`E2E CI` 的 `cancelled` 是 20 分钟超时被杀，不是并发取消
+
+`E2E CI` 在 #55 / #62 / #63 / #64 / #65 / #67 上全部是 `cancelled`，此前没人说清为什么。以 #67 的 run `39712309025` 为证：
+
+```
+created 2026-10-22T02:36:24Z   updated 2026-10-22T02:56:44Z   →  20 分 20 秒
+step Set up job / Checkout / Set up Node.js / Install dependencies / Install Chromium   success
+step Run end-to-end tests      cancelled      ← 只有这一步
+step Upload Playwright report  success
+```
+
+`.github/workflows/e2e.yml:25` 是 `timeout-minutes: 20`；GitHub 对超时被杀的 job 报的结论就是 `cancelled`。10-21 那次（run `39616196409`）同样卡满 20 分 22 秒。
+
+**根因**：#55 的同步把欢迎页按钮文案从 `查看预设路线` 改成了 `查看路线`（`frontend/src/pages/WelcomePage.tsx:73`；develop 上还是第 49 行的 `查看预设路线`），但共享的 `frontend/e2e/` 里 18 处选择器没有跟着改（`app.e2e.ts` 3、`app.integration.e2e.ts` 2、`campus-boundary.e2e.ts` 1、`mobile.e2e.ts` 6、`pwa-sw.e2e.ts` 1、`welcome-flow.e2e.ts` 5）。
+
+**时间刚好算得平**：`frontend/playwright.config.ts` 是 `timeout: 30_000`、CI 下 `retries: 2`、`workers: 1`；`testIgnore` 排除 `*.integration.e2e.ts` 和 `pwa-sw.e2e.ts`，所以 Mock 套件实际撞上的是 15 处。每个用例点不到按钮等满 30 秒再重试两次 ≈ 90 秒，串行 15+ 个用例 ≈ 22 分钟 > 20 分钟上限，job 必被杀。
+
+**反证**：#69 与 #55/#67 同源（都含 `0d3da53`），唯一相关差异就是 D 在 commit `9a9a4c0` 里把这 18 处改成了 `查看路线`。#69 的 `E2E CI` 两次运行分别 51 秒和 66 秒 **success**（run `39725039871` / `39724369348`），本机 Mock 套件 `24 passed (18.3s)`。**20 分钟超时 → 50 秒通过。**
+
+**修法**：`git cherry-pick 9a9a4c0` 到 #55 的分支（只动 `frontend/e2e/` 6 个文件）。⚠️ 不要单独提到 develop——develop 的欢迎页还渲染 `查看预设路线`，单独改 e2e 会把 develop 自己的 E2E CI 弄挂。已在 #55 留言。A 在 #56 上已独立改掉 16 处，只剩 `app.integration.e2e.ts` 第 46、47 行两处，已在 #56 留言标出。
+
+### 11.3 根因二：`Android APK Verification` 的 20 秒失败是环境烂了，与代码无关
+
+#67 的 job `119606240250` 日志（`actions/jobs/{id}/logs`，注意要先取 302 的 `Location` 再不带 Authorization 请求，直接跟随重定向会 401）：
+
+```
+Warning: Failed to find package 'tools'
+Error: The process '/usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager' failed with exit code 1
+```
+
+`.github/workflows/android-build.yml` 的 `android-apk-verify` job 用 `android-actions/setup-android@v3`（develop 第 171 行、#54 分支第 175 行），v3 会执行 `sdkmanager tools`，而 `tools` 包已从 Android SDK 仓库下架；同文件第 45 行的 `Android Build` job 用 `@v4`，同一次运行里是 success。这就是缺陷 7 的修法依据，`95001cf` 已把第 171 行对齐到 `@v4`。
+
+**注意这个修复目前被关在 #69 里**，其他分支要等 #69 合并才拿得到。因为它不是必需检查，所以不阻塞合并；但今天重跑任何 PR 都会看到这根红叉。
+
+**顺带一个容易误判的点**：#52 / #53 / #54 三个 PR 的 6~8 个 check 全绿，包括 `Android APK Verification`——但它们最后一次运行是 **2026-07-01**，早于 `tools` 下架。**那三个绿勾是四个月前留下的，不代表今天重跑还会绿。**
+
+### 11.4 三个 PR 改同两个文件：#52 ⊂ #53，#54 覆盖两者但引入一处回归
+
+#52 / #53 / #54 都改 `.github/workflows/android-build.yml` 和 `frontend/src/services/api.ts`，是同一个问题（APK 连不上后端）的三层版本：
+
+| | workflow 未配置变量时写什么 | `api.ts` |
+| --- | --- | --- |
+| #52 | `VITE_API_BASE_URL=`（空串） | 8 秒 `AbortController` 超时 + `AbortError` 友好提示 |
+| #53 | `VITE_API_BASE_URL=__OFFLINE__` | #52 全部 + `NO_BACKEND` 哨兵，进 `request()` 立刻抛错 |
+| #54 | `VITE_API_BASE_URL=`（**空串，回到 #52**） | #53 全部（判断挪到运行时 `getApiBase()`）+ `localStorage` 可配置地址 + 欢迎页设置 UI |
+
+**#54 的问题**：它保留了 `NO_BACKEND === "__OFFLINE__"` 的判断，却把 workflow 改回写空串，于是 `getApiBase()` 返回 `""`，那段抛错在 CI 打出的 APK 里一次都走不到，"没配后端"退化成相对路径 `fetch("/api/v1/...")`，在 Capacitor WebView 里拿回 index.html —— 正是 #53 要修的 `非 JSON 响应 (text/html)`。一行修法是把判断改成 `if (!base || base === NO_BACKEND)`（顺带覆盖"用户点了清除"这条路径）。
+
+**建议**：以 #54 为准收口、改掉那行判断，#52 / #53 用 `close`（不是 `merge`）关掉。三个 PR 依次合并会让 `api.ts` 开头几行常量和 workflow 两个 `.env.production` 步骤被改三遍，后两次必然冲突。已在三个 PR 上各留一条评审。
+
+**另外**：#54 对 `WelcomePage.tsx` 是 `+74 −6`，#55 对同一文件是 `+50 −26`，两边都动了组件顶部注释和 `welcome-page__cta` 附近 → **后合的那个必须手工解冲突**。#54 没有改按钮文案，rebase 到 #55 之后要留意别把 `查看路线` 带回 `查看预设路线`。
+
+### 11.5 C 的五个 PR base 设成了 `main`，而 `main` 落后 develop 48 个提交
+
+| PR | 分支含 develop 头？ | 相对 develop | GitHub 显示的 diff | `mergeable_state` |
+| --- | --- | --- | --- | --- |
+| #57 | 是 | 领先 1 | **49 commits / 154 files / +12953 −2543** | `behind` |
+| #58 | 是 | 领先 1 | **49 commits / 153 files / +12971 −2524** | `behind` |
+| #59 | 是 | 领先 1 | **49 commits / 152 files / +12896 −2523** | `behind` |
+| #60 | 否 | 落后 48、领先 3 | 1 commit / 4 files / +232 −3 | `blocked` |
+| #61 | 否 | 落后 48、领先 3 | 1 commit / 3 files / +250 −0 | `blocked` |
+
+#57~#59 的分支本身已经是"develop + 1 个提交"，只是 base 填成了 `main`，于是 GitHub 拿四个月前的 main 做基准，把 develop 上所有人这四个多月的工作（含 D 的 V1~V6 迁移）全算成"这个 PR 的改动"。**把 base 改成 `develop` 即可，不用动代码**，diff 会立刻缩成 1 个提交。#60 / #61 的分支不含 develop，需要先 `git rebase origin/develop` 再改 base。
+
+改 base 会影响 CI 结果与评审上下文，属于作者该拍的事，D 没有代改，只在 #57 留了一条覆盖五个 PR 的说明（含 API 命令）。
+
+### 11.6 评审批准：17 个 PR 里只有 4 个拿到过批准
+
+| PR | 作者 | 评审数 | 已批准 | `mergeable_state` |
+| --- | --- | --- | --- | --- |
+| #52 #53 #54 | HCXXWDG | 0 | — | `blocked`（CI 全绿，只差批准） |
+| #55 | xlm-xlm | 0 | — | `blocked` |
+| #56 | xlm-xlm | 1 | — | `clean`（base 不是 develop，只有 1 个 check） |
+| #57~#61 | xie-cheng-ai | 0 | — | `behind` ×3 / `blocked` ×2 |
+| #62 #63 #64 #65 | ahao9968 | 1 | **xie-cheng-ai** | `blocked`（CI 红） |
+| #67 | HCXXWDG | 1 | — | `blocked` |
+| #69 | ahao9968 | 3 | — | `blocked` |
+| #71 | ahao9968 | 0 | — | `clean`（base 不是 develop，**check 数为 0**） |
+
+分支保护要求"至少一名非作者批准 + 最后一次推送由其他成员批准 + 解决全部评审对话"。目前**只有 C 批准过 D 的 #62~#65**，其余方向一条批准都没有。也就是说：即使所有红叉修好，没有互评也一个都合不进去。
+
+**可以立刻推进的**：#52 / #53 / #54 的 CI 全绿（虽然是四个月前的绿），`mergeable_state` 是 `blocked` 而非 `dirty`，只差批准；但按 11.4 的结论这三个应当收口成 #54，所以 D 没有直接批准，而是留了评审说明。#61 也是全绿只差批准，但它 base 是 `main`（11.5），批准并合并等于绕过 develop 把 C05 推进发布分支，同样先留说明没有批。
+
+### 11.7 base 不是 develop/main 的 PR 拿不到任何 CI
+
+四个必需 workflow 的触发条件都是 `pull_request: branches: [develop, main]`（`android-build.yml:3-11` 同）。所以：
+
+- **#56**（base = `codex/sync-latest-20261018`）只有 1 个 check，A 今天那两个 commit（`1ae7f2e` / `69e67ae`）的 vitest 结果没有任何 CI 验证过；
+- **#71**（base = `codex/member-b-route-correctness`）**check 数为 0**，D07 的验证只有本机的 `208 通过 / 0 失败 / 9 跳过` 和真实 PostgreSQL 链路实测。
+
+两个 PR 都需要在上游合并后把 base 改到 develop 才能看到 CI。已在 #56 与 #71 各留一条说明。
+
+### 11.8 建议的合并顺序（修订版）
+
+B 原定 `#55 → #62 → #63 → #64 → #65 → #67`。按本轮盘点补充：
+
+1. **先修 #55 的 18 处选择器**（`cherry-pick 9a9a4c0`）——不修的话 #55 及其下游每一个 PR 的必需检查 `E2E CI` 都会卡满 20 分钟。
+2. `#55` → develop。
+3. `#54`（改掉 11.4 那行判断、解决与 #55 的 `WelcomePage.tsx` 冲突）→ develop；`#52` `#53` 关闭为"被 #54 覆盖"。
+4. `#62 → #63 → #64 → #65`（D 的四个，C 已批准，等 CI 转绿）。
+5. `#67`（B）→ develop。
+6. `#69`（D 的 D06 验收）→ develop，随后 #71 rebase 到 develop 并改 base，等四个必需检查跑绿再合。
+7. `#57~#59` 改 base 为 develop（不用动代码）、`#60~#61` rebase 到 develop 后改 base，逐个合入。
+8. 最后 `develop` → `main` 做一次发布合并（`main` 现在落后 48 个提交）。
+
+每一步都还缺"非作者批准 + 最后推送由他人批准"，这部分只能靠四个人互相 review，工具解决不了。
