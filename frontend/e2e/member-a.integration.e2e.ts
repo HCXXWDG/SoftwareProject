@@ -31,7 +31,7 @@ async function enterMap(page: Page) {
 }
 
 async function openFeedback(page: Page, xRatio = 0.45, yRatio = 0.75) {
-  const surface = page.getByLabel("校园通勤情绪地图", { exact: true });
+  const surface = page.getByLabel("心途——通勤情绪地图", { exact: true });
   await surface.scrollIntoViewIfNeeded();
   const box = await surface.boundingBox();
   if (!box) throw new Error("Map surface is not visible");
@@ -65,14 +65,14 @@ test("真实接口 初始查询 选路 返回与刷新恢复", async ({ page }, 
   const choice = page.getByRole("button", { name: `选择 ${last.label}`, exact: true });
   await choice.click(); await expect(choice).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "修改起终点" }).click();
-  await page.getByRole("group", { name: "选择终点" }).getByRole("button", { name: "图书馆" }).click();
+  await page.getByRole("group", { name: "选择终点" }).getByRole("button", { name: "无锡站" }).click();
   const fresh = api(page, "routes/compare", "POST");
   await page.getByRole("button", { name: "查看路线", exact: true }).click();
   expect((await fresh).status()).toBe(200);
   await page.getByRole("button", { name: "进入地图", exact: true }).click();
   await page.reload();
   await expect(page.getByRole("heading", { name: "路线预览" })).toBeVisible();
-  await expect(page.getByText("学生公寓区 → 图书馆", { exact: true })).toBeVisible();
+  await expect(page.getByText("南禅寺 → 无锡站", { exact: true })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole("heading", { name: "路线预览" })).toBeVisible();
   await page.goBack();

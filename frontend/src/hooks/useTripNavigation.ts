@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DEFAULT_DESTINATION, DEFAULT_ORIGIN } from "../config/campus";
+import { DEFAULT_DESTINATION, DEFAULT_ORIGIN, isPointInServiceArea } from "../config/serviceArea";
 import type { AppStage, GeoPoint } from "../types";
 
 export interface TripSelection { origin: GeoPoint; destination: GeoPoint; originName: string; destName: string; }
@@ -27,6 +27,7 @@ function read(value: unknown): Navigation | null {
   const saved = value as { version?: unknown; stage?: unknown; selection?: TripSelection };
   const trip = saved.selection;
   if (saved.version !== 1 || !trip || !validPoint(trip.origin) || !validPoint(trip.destination)
+    || !isPointInServiceArea(trip.origin) || !isPointInServiceArea(trip.destination)
     || typeof trip.originName !== "string" || typeof trip.destName !== "string"
     || !trip.originName.trim() || !trip.destName.trim() || trip.originName.length > 80 || trip.destName.length > 80
     || !["welcome", "route-preview", "map"].includes(String(saved.stage))) return null;
@@ -46,7 +47,8 @@ export function useTripNavigation() {
   useEffect(() => {
     window.history.replaceState({ ...window.history.state, commuteTrip: { version: 1, ...navigation } }, "", `#${navigation.stage}`);
     const pop = (event: PopStateEvent) => {
-      const next = read(event.state?.commuteTrip) ?? { ...current.current, stage: "welcome" as const };
+      const saved = event.state?.commuteTrip;
+      const next = read(saved) ?? (saved ? defaults : { ...current.current, stage: "welcome" as const });
       current.current = next; save(next); setNavigation(next);
       window.history.replaceState({ ...window.history.state, commuteTrip: { version: 1, ...next } }, "", `#${next.stage}`);
     };
@@ -56,9 +58,11 @@ export function useTripNavigation() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const navigate = useCallback((stage: AppStage, selection?: TripSelection) => {
-    const next = { stage, selection: lightweight(selection ?? current.current.selection) };
+    const selected = selection ?? current.current.selection;
+    const next = isPointInServiceArea(selected.origin) && isPointInServiceArea(selected.destination)
+      ? { stage, selection: lightweight(selected) } : defaults;
     current.current = next; save(next);
-    window.history.pushState({ ...window.history.state, commuteTrip: { version: 1, ...next } }, "", `#${stage}`);
+    window.history.pushState({ ...window.history.state, commuteTrip: { version: 1, ...next } }, "", `#${next.stage}`);
     setNavigation(next);
   }, []);
   return { ...navigation, navigate };

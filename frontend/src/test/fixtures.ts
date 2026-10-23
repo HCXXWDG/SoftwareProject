@@ -1,4 +1,4 @@
-import { DEFAULT_DESTINATION, DEFAULT_ORIGIN } from "../config/campus";
+import { DEFAULT_DESTINATION, DEFAULT_ORIGIN } from "../config/serviceArea";
 import type { RouteComparison, TrendResult } from "../types";
 
 export const routeComparison: RouteComparison = {

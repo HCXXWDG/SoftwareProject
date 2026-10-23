@@ -181,8 +181,7 @@ class CommutePersistenceAcceptanceTest {
         UUID snapshotId = routeQueryRepository.save(
                 identityService.hash(deviceId), ORIGIN, DESTINATION, comparison());
 
-        // 快照上限是 30 分钟（CommuteService.SNAPSHOT_MAX_AGE），直接把 created_at 改老，
-        // 不必真的等半小时。
+        // 把短途快照改到其动态窗口之外；不必真的等待到达宽限结束。
         jdbcTemplate.update("UPDATE route_query SET created_at = now() - interval '2 hours' WHERE id = ?",
                 snapshotId);
 
@@ -207,6 +206,11 @@ class CommutePersistenceAcceptanceTest {
                 .andExpect(jsonPath("$.status").value("created"))
                 .andReturn();
         String commuteId = readString(created, "$.commuteId");
+
+        // A lost response can be confirmed after expiry. This also verifies that a
+        // changed payload still produces 409 instead of being hidden by 410.
+        jdbcTemplate.update("UPDATE route_query SET created_at = now() - interval '2 hours' WHERE id = ?",
+                snapshotId);
 
         // 完全相同的重放：200 duplicate，并返回同一条通勤 ID。
         mockMvc.perform(complete(deviceId, snapshotId, operationId, "route-fast", 50))

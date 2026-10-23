@@ -16,7 +16,7 @@ import { test, expect, type Page } from "@playwright/test";
 const MOCK_HEATMAP = [
   {
     cellId: "16:133638:34976",
-    center: { longitude: 120.274, latitude: 31.479 },
+    center: { longitude: 120.296676, latitude: 31.571576 },
     score: 68.2,
     confidence: 0.72,
     count: 18,
@@ -37,9 +37,9 @@ const MOCK_ROUTES = {
       fastest: true,
       leastStressful: false,
       polyline: [
-        { longitude: 120.273510, latitude: 31.475328 },
-        { longitude: 120.2738, latitude: 31.478 },
-        { longitude: 120.274319, latitude: 31.483275 },
+        { longitude: 120.296186, latitude: 31.567904 },
+        { longitude: 120.296476, latitude: 31.570576 },
+        { longitude: 120.296995, latitude: 31.575851 },
       ],
     },
     {
@@ -53,9 +53,9 @@ const MOCK_ROUTES = {
       fastest: false,
       leastStressful: true,
       polyline: [
-        { longitude: 120.273510, latitude: 31.475328 },
-        { longitude: 120.274, latitude: 31.48 },
-        { longitude: 120.274319, latitude: 31.483275 },
+        { longitude: 120.296186, latitude: 31.567904 },
+        { longitude: 120.296676, latitude: 31.572576 },
+        { longitude: 120.296995, latitude: 31.575851 },
       ],
     },
   ],
@@ -111,7 +111,7 @@ async function navigateToMap(page: Page) {
  * of the map section maps to campus coordinates → inside bounds.
  */
 async function longPressAtCenter(page: Page) {
-  const mapSection = page.locator("[aria-label='校园通勤情绪地图']");
+  const mapSection = page.locator("[aria-label='心途——通勤情绪地图']");
   const box = await mapSection.boundingBox();
   expect(box).not.toBeNull();
 
@@ -120,7 +120,7 @@ async function longPressAtCenter(page: Page) {
     clientX: box!.x + box!.width / 2,
     clientY: box!.y + box!.height / 2,
     pointerId: 1,
-    pointerType: "mouse",
+    pointerType: "mouse", isPrimary: true,
   };
 
   await mapSection.dispatchEvent("pointerdown", pointer);

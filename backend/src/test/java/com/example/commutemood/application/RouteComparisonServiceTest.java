@@ -32,10 +32,10 @@ class RouteComparisonServiceTest {
         service = service(false);
         when(provider.isConfigured()).thenReturn(true);
         when(provider.findCandidates(ORIGIN, DESTINATION)).thenReturn(List.of(candidate("fast", 600), candidate("calm", 660)));
-        when(heatmap.getHeatmap(any(), eq(16), eq(168), eq(ReportScope.REAL_ONLY)))
+        when(heatmap.getRouteScoringCells(any(), eq(16), eq(168), eq(ReportScope.REAL_ONLY)))
                 .thenReturn(List.of(new HeatmapCell("real", ORIGIN, 30, 1, 20,
                         EmotionTag.QUIET, FeedbackSource.REAL, java.time.Instant.now(), 168)));
-        when(heatmap.getHeatmap(any(), eq(16), eq(168), eq(ReportScope.SIMULATED_ONLY))).thenReturn(List.of());
+        when(heatmap.getRouteScoringCells(any(), eq(16), eq(168), eq(ReportScope.SIMULATED_ONLY))).thenReturn(List.of());
         when(scoring.score(any(), anyInt(), anyList(), anyBoolean())).thenAnswer(invocation -> {
             RouteCandidate route = invocation.getArgument(0);
             double value = route.id().equals("fast") ? 65 : 35;
@@ -59,7 +59,7 @@ class RouteComparisonServiceTest {
         assertThat(comparison.recommendationDetails().extraDurationSeconds()).isEqualTo(60);
         verify(snapshots).save(eq(identity.hash("device")), eq(ORIGIN), eq(DESTINATION),
                 eq(comparison.withSnapshotId(null)));
-        verify(heatmap).getHeatmap(any(), eq(16), eq(168), eq(ReportScope.REAL_ONLY));
+        verify(heatmap).getRouteScoringCells(any(), eq(16), eq(168), eq(ReportScope.REAL_ONLY));
     }
 
     @Test
@@ -130,7 +130,7 @@ class RouteComparisonServiceTest {
 
     @Test
     void simulatedOrMissingFeedbackCannotBecomeValidRealRecommendation() {
-        when(heatmap.getHeatmap(any(), eq(16), eq(168), eq(ReportScope.REAL_ONLY)))
+        when(heatmap.getRouteScoringCells(any(), eq(16), eq(168), eq(ReportScope.REAL_ONLY)))
                 .thenReturn(List.of(new HeatmapCell("simulated", ORIGIN, 0, 1, 20,
                         EmotionTag.QUIET, FeedbackSource.DEMO, java.time.Instant.now(), 168)));
         var result = service.compare(ORIGIN, DESTINATION);
@@ -138,7 +138,7 @@ class RouteComparisonServiceTest {
         assertThat(result.recommendationReason()).isEqualTo(RecommendationReason.INSUFFICIENT_DATA);
         assertThat(result.recommendAlternative()).isFalse();
         assertThat(result.routes()).allSatisfy(route -> assertThat(route.stressScore()).isNull());
-        when(heatmap.getHeatmap(any(), anyInt(), anyInt(), any())).thenReturn(List.of());
+        when(heatmap.getRouteScoringCells(any(), anyInt(), anyInt(), any())).thenReturn(List.of());
         assertThat(service.compare(ORIGIN, DESTINATION).feedbackSource()).isEqualTo(FeedbackSource.NONE);
     }
 

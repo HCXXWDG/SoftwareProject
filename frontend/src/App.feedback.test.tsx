@@ -38,6 +38,20 @@ async function enterDefaultMap() {
   await waitFor(() => expect(screen.getByRole("button", { name: "提交测试反馈" })).not.toBeDisabled());
 }
 
+it("returns from simulated heatmap to real feedback after saving a new report", async () => {
+  vi.mocked(submitReport).mockResolvedValue({ status: "created", message: "情绪反馈已加入热力图。" });
+  render(<App />);
+  await enterDefaultMap();
+  fireEvent.click(screen.getByRole("button", { name: "演示热力图" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "演示热力图" })).toHaveAttribute("aria-pressed", "true"));
+  expect(vi.mocked(fetchHeatmap).mock.lastCall?.[4]).toBe("SIMULATED_ONLY");
+  fireEvent.click(screen.getByRole("button", { name: "提交测试反馈" }));
+  await screen.findByText("反馈已提交，当前视口热力图已更新。");
+  expect(screen.getByRole("button", { name: "真实反馈" })).toHaveAttribute("aria-pressed", "true");
+  expect(vi.mocked(fetchHeatmap).mock.lastCall?.[4]).toBe("REAL_ONLY");
+  expect(submitReport).toHaveBeenCalledTimes(1);
+});
+
 it("ignores an old report response after leaving and returning to the same endpoints", async () => {
   const oldReport = deferred<ReportResponse>();
   vi.mocked(submitReport).mockReturnValueOnce(oldReport.promise);

@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CAMPUS_DEFAULT_BBOX } from "../config/campus";
+import { SERVICE_DEFAULT_BBOX, SERVICE_AREA } from "../config/serviceArea";
 import { ApiError, type ApiErrorKind } from "../services/api";
 import { fetchHeatmap } from "../services/heatmap";
 import type { BackendStatus, HeatmapCell } from "../types";
@@ -54,6 +54,92 @@ afterEach(() => {
 });
 
 describe("useHeatmapQuery", () => {
+  it("refreshes the same real scope explicitly after a newly saved report", async () => {
+    query.mockResolvedValueOnce([]).mockResolvedValueOnce(refreshedCells);
+    const { result } = renderHook(() => useHeatmapQuery(true, vi.fn()));
+    await settle();
+    await act(async () => { expect(await result.current.setScope("REAL_ONLY", true)).toBe("success"); });
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(query.mock.lastCall?.[4]).toBe("REAL_ONLY");
+    expect(result.current.cells).toEqual(refreshedCells);
+  });
+  it("keeps an empty real result empty until the user explicitly selects demo", async () => {
+    query.mockResolvedValueOnce([]).mockResolvedValueOnce(originalCells).mockResolvedValueOnce([]);
+    const { result } = renderHook(() => useHeatmapQuery(true, vi.fn()));
+    await settle();
+    expect(result.current).toMatchObject({ scope: "REAL_ONLY", cells: [], loading: false, error: null });
+    expect(query).toHaveBeenCalledOnce();
+
+    act(() => { void result.current.setScope("SIMULATED_ONLY"); });
+    expect(result.current).toMatchObject({ scope: "SIMULATED_ONLY", cells: [], loading: true });
+    await settle();
+    expect(query).toHaveBeenLastCalledWith(SERVICE_DEFAULT_BBOX, SERVICE_AREA.defaultZoom, 168, expect.any(AbortSignal), "SIMULATED_ONLY");
+    expect(result.current.cells).toEqual(originalCells);
+
+    act(() => { void result.current.setScope("REAL_ONLY"); });
+    expect(result.current).toMatchObject({ scope: "REAL_ONLY", cells: [], loading: true });
+    await settle();
+    expect(result.current.cells).toEqual([]);
+    expect(query).toHaveBeenCalledTimes(3);
+  });
+
+  it("refreshes the latest viewport with the new scope and removes its pending debounce", async () => {
+    query.mockResolvedValue(originalCells);
+    const { result } = renderHook(() => useHeatmapQuery(true, vi.fn()));
+    await settle();
+    act(() => result.current.updateViewport(latestViewport, 18));
+    act(() => { void result.current.setScope("SIMULATED_ONLY"); });
+    await settle();
+    expect(query).toHaveBeenLastCalledWith(latestViewport, 18, 168, expect.any(AbortSignal), "SIMULATED_ONLY");
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    expect(query).toHaveBeenCalledTimes(2);
+    await act(async () => { expect(await result.current.refresh()).toBe("success"); });
+    expect(query).toHaveBeenLastCalledWith(latestViewport, 18, 168, expect.any(AbortSignal), "SIMULATED_ONLY");
+  });
+
+  it("ignores late real and demo requests across rapid real-demo-real switches", async () => {
+    const oldReal = deferred<HeatmapCell[]>();
+    const oldDemo = deferred<HeatmapCell[]>();
+    query.mockReturnValueOnce(oldReal.promise).mockReturnValueOnce(oldDemo.promise).mockResolvedValueOnce(refreshedCells);
+    const onBackend = vi.fn();
+    const { result } = renderHook(() => useHeatmapQuery(true, onBackend));
+    act(() => { void result.current.setScope("SIMULATED_ONLY"); });
+    const demoSignal = query.mock.calls[1][3]!;
+    act(() => { void result.current.setScope("REAL_ONLY"); });
+    expect(demoSignal.aborted).toBe(true);
+    await settle();
+    await settle(() => oldDemo.resolve(originalCells));
+    await settle(() => oldReal.reject(new ApiError("network", "已过期请求失败")));
+    expect(result.current).toMatchObject({ scope: "REAL_ONLY", cells: refreshedCells, loading: false, error: null });
+    expect(onBackend.mock.calls).toEqual([["available"]]);
+  });
+
+  it("does not show old demo cells as real feedback when the real request fails", async () => {
+    query.mockResolvedValueOnce([]).mockResolvedValueOnce(originalCells).mockRejectedValueOnce(new ApiError("network", "真实反馈查询失败"));
+    const { result } = renderHook(() => useHeatmapQuery(true, vi.fn()));
+    await settle();
+    act(() => { void result.current.setScope("SIMULATED_ONLY"); });
+    await settle();
+    expect(result.current.cells).toEqual(originalCells);
+    act(() => { void result.current.setScope("REAL_ONLY"); });
+    await settle();
+    expect(result.current).toMatchObject({ scope: "REAL_ONLY", cells: [], loading: false, error: "真实反馈查询失败" });
+  });
+
+  it("remembers scope while disabled without requesting and avoids refetching an unchanged scope", async () => {
+    query.mockResolvedValue(originalCells);
+    const { result, rerender } = renderHook(({ enabled }) => useHeatmapQuery(enabled, vi.fn()), { initialProps: { enabled: false } });
+    act(() => { void result.current.setScope("SIMULATED_ONLY"); });
+    expect(result.current.scope).toBe("SIMULATED_ONLY");
+    expect(query).not.toHaveBeenCalled();
+    rerender({ enabled: true });
+    await settle();
+    expect(query).toHaveBeenLastCalledWith(SERVICE_DEFAULT_BBOX, SERVICE_AREA.defaultZoom, 168, expect.any(AbortSignal), "SIMULATED_ONLY");
+    act(() => { void result.current.setScope("SIMULATED_ONLY"); });
+    await settle();
+    expect(query).toHaveBeenCalledOnce();
+  });
+
   it("does not query or schedule a query while disabled", async () => {
     const onBackend = vi.fn<(status: BackendStatus) => void>();
     const { result } = renderHook(() => useHeatmapQuery(false, onBackend));
@@ -75,7 +161,7 @@ describe("useHeatmapQuery", () => {
     const onBackend = vi.fn();
     const { result } = renderHook(() => useHeatmapQuery(true, onBackend));
 
-    expect(query).toHaveBeenCalledWith(CAMPUS_DEFAULT_BBOX, 16, 168, expect.any(AbortSignal));
+    expect(query).toHaveBeenCalledWith(SERVICE_DEFAULT_BBOX, SERVICE_AREA.defaultZoom, 168, expect.any(AbortSignal), "REAL_ONLY");
     expect(result.current.loading).toBe(true);
     await settle(() => response.resolve(originalCells));
 
@@ -95,7 +181,7 @@ describe("useHeatmapQuery", () => {
       expect(await result.current.refresh()).toBe("success");
     });
 
-    expect(query).toHaveBeenLastCalledWith(latestViewport, 18, 168, expect.any(AbortSignal));
+    expect(query).toHaveBeenLastCalledWith(latestViewport, 18, 168, expect.any(AbortSignal), "REAL_ONLY");
     expect(result.current.cells).toEqual(refreshedCells);
     expect(result.current.error).toBeNull();
     await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
@@ -115,7 +201,7 @@ describe("useHeatmapQuery", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
 
     expect(query).toHaveBeenCalledTimes(2);
-    expect(query).toHaveBeenLastCalledWith(latestViewport, 17, 168, expect.any(AbortSignal));
+    expect(query).toHaveBeenLastCalledWith(latestViewport, 17, 168, expect.any(AbortSignal), "REAL_ONLY");
   });
 
   it("ignores an old success during the new viewport debounce window", async () => {
@@ -135,7 +221,7 @@ describe("useHeatmapQuery", () => {
     expect(query).toHaveBeenCalledTimes(1);
     await act(async () => { await vi.advanceTimersByTimeAsync(200); });
     expect(result.current).toMatchObject({ cells: refreshedCells, loading: false, error: null });
-    expect(query).toHaveBeenLastCalledWith(latestViewport, 17, 168, expect.any(AbortSignal));
+    expect(query).toHaveBeenLastCalledWith(latestViewport, 17, 168, expect.any(AbortSignal), "REAL_ONLY");
   });
 
   it("ignores an old failure during the new viewport debounce window", async () => {
@@ -255,7 +341,7 @@ describe("useHeatmapQuery", () => {
     expect(await reportRefresh).toBe("cancelled");
     expect(result.current).toMatchObject({ cells: originalCells, loading: true, error: null });
     expect(onBackend).not.toHaveBeenCalled();
-    expect(query).toHaveBeenLastCalledWith(latestViewport, 18, 168, expect.any(AbortSignal));
+    expect(query).toHaveBeenLastCalledWith(latestViewport, 18, 168, expect.any(AbortSignal), "REAL_ONLY");
 
     await settle(() => afterViewport.resolve(refreshedCells));
     expect(result.current).toMatchObject({ cells: refreshedCells, loading: false, error: null });

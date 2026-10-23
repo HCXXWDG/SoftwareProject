@@ -23,8 +23,7 @@ export function tripCapabilities(comparison: RouteComparison | null, backend: Ba
     baseMap, canRefresh: backend !== "unavailable", canReport: backend === "available", showScores,
     canComplete: recordingEnabled && backend === "available" && recordable,
     completeReason: !recordingEnabled
-      ? comparison?.routeSource === "DEMO" ? "演示通勤记录尚待接口联调，不会计入真实趋势。"
-        : "当前路线暂不支持记录通勤，可继续查看路线和历史趋势。"
+      ? "此版本尚未开放通勤记录，可继续查看路线和历史趋势。"
       : backend !== "available" ? "数据服务暂不可用，请恢复连接后再记录通勤。"
         : !recordable ? "当前路线暂时无法记录，请重新规划。"
           : comparison?.routeSource === "DEMO" ? "演示通勤可以保存，但不会计入真实趋势或通勤历史。"

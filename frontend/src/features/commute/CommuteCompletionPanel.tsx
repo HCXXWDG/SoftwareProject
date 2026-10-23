@@ -31,8 +31,9 @@ export function CommuteCompletionPanel(props: Props) {
 
   if (!props.active && !operation.operation && operation.phase !== "blocked") return null;
 
-  return <section className="commute-completion app-status" aria-label="通勤记录">
+  return <section className="commute-completion app-status" aria-label="通勤记录" data-pending={!!pending}>
     <h2>记录本次通勤</h2>
+    {enabled && import.meta.env.VITE_EPHEMERAL_RECORDS === "true" && <p role="note">当前为体验环境，通勤记录仅在本次服务器运行期间保留。</p>}
     {operation.receipt ? <>
       <p role="status">{operation.receipt.status === "duplicate" ? "这次通勤已记录，无需重复提交。" : "通勤已记录。"}</p>
       <p>{operation.receipt.routeLabel} · 到达感受：{labels[operation.receipt.endStressLevel]}</p>
@@ -56,6 +57,7 @@ export function CommuteCompletionPanel(props: Props) {
         <legend>本次通勤结束后的压力感受</legend>
         <div className="commute-completion__levels">{levels.map(level => <button type="button" key={level}
           aria-pressed={stress === level} onClick={() => setStress(level)}>{level} · {labels[level]}</button>)}</div>
+        <p className="commute-completion__selection" role="status">{stress === null ? "请选择到达时的压力感受。" : `已选择：${labels[stress]}（${stress}）`}</p>
       </fieldset>}
       <button type="button" aria-describedby="commute-disabled-reason" disabled={!props.active || !capabilities.canComplete || !route || stress === null || submitting}
         onClick={() => {

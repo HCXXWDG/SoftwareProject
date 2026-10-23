@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { routeComparison, emptyTrend } from "../src/test/fixtures";
-import { DEFAULT_ORIGIN, WAYPOINTS } from "../src/config/campus";
+import { DEFAULT_ORIGIN, WAYPOINTS } from "../src/config/serviceArea";
 
 async function backend(page: Page, compareFailure = false) {
   await page.route("**/api/v1/**", async (route) => {
@@ -18,6 +18,28 @@ async function enterMap(page: Page) {
   await expect(page.getByTestId("offline-map")).toBeVisible();
 }
 
+test("A campus cache opens the district planner without automatic API calls or losing the pending commute", async ({ page }) => {
+  const pending = JSON.stringify({ version: 1, scope: "previous-session:previous-service", request: {
+    snapshotId: "00000000-0000-4000-8000-000000000001", operationId: "preserved-before-city-upgrade",
+    routeId: "previous-route", endStressLevel: 25, completedAt: "2026-10-22T12:00:00Z",
+  } });
+  await page.addInitScript(({ pending }) => {
+    sessionStorage.setItem("commute-pending-v1", pending);
+    localStorage.setItem("commute-trip-v1", JSON.stringify({ version: 1, stage: "map", selection: {
+      origin: { longitude: 120.27351, latitude: 31.475328 },
+      destination: { longitude: 120.274319, latitude: 31.483275 },
+      originName: "学生公寓区", destName: "第一教学楼",
+    } }));
+  }, { pending });
+  const calls: string[] = [];
+  page.on("request", request => { if (new URL(request.url()).pathname.startsWith("/api/v1/")) calls.push(request.url()); });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "心途——通勤情绪地图", exact: true })).toBeVisible();
+  await expect(page.getByRole("group", { name: "选择起点", exact: true }).getByRole("button", { name: DEFAULT_ORIGIN.name, exact: true })).toHaveAttribute("aria-pressed", "true");
+  expect(calls).toEqual([]);
+  expect(await page.evaluate(() => sessionStorage.getItem("commute-pending-v1"))).toBe(pending);
+});
+
 test("A navigation selects routes, returns and reloads endpoints without stale route state", async ({ page }) => {
   await backend(page); await page.goto("/"); await enterMap(page);
   await page.getByRole("button", { name: /选择 路线 B/ }).click();
@@ -25,7 +47,7 @@ test("A navigation selects routes, returns and reloads endpoints without stale r
   await expect(page.getByRole("button", { name: "完成本次通勤" })).toBeDisabled();
   await expect(page.getByText("当前无有效评分，不展示舒适标签。")).toBeVisible();
   await page.getByRole("button", { name: "修改起终点" }).click();
-  await page.getByRole("group", { name: "选择终点" }).getByRole("button", { name: "图书馆" }).click();
+  await page.getByRole("group", { name: "选择终点" }).getByRole("button", { name: "无锡站" }).click();
   const pending = page.waitForRequest("**/api/v1/routes/compare");
   await page.getByRole("button", { name: "查看路线", exact: true }).click();
   expect((await pending).postDataJSON().destination).toEqual(WAYPOINTS[2].point);
@@ -33,7 +55,7 @@ test("A navigation selects routes, returns and reloads endpoints without stale r
   await expect(page.getByRole("button", { name: /选择 路线 A/ })).toHaveAttribute("aria-pressed", "true");
   await page.reload();
   await expect(page.getByRole("heading", { name: "路线预览" })).toBeVisible();
-  await expect(page.getByText("学生公寓区 → 图书馆", { exact: true })).toBeVisible();
+  await expect(page.getByText("南禅寺 → 无锡站", { exact: true })).toBeVisible();
 });
 
 test("A errors stay actionable and matching demo is an explicit choice", async ({ page }) => {
@@ -51,12 +73,12 @@ test("A errors stay actionable and matching demo is an explicit choice", async (
 
 test("A non-default endpoints never inherit the default demonstration", async ({ page }) => {
   await backend(page, true); await page.goto("/");
-  await page.getByRole("group", { name: "选择终点" }).getByRole("button", { name: "图书馆" }).click();
+  await page.getByRole("group", { name: "选择终点" }).getByRole("button", { name: "无锡站" }).click();
   await page.getByRole("button", { name: "查看路线", exact: true }).click();
   await expect(page.getByText("这组起终点没有配置演示路线。")).toBeVisible();
   await expect(page.getByRole("button", { name: "查看匹配的演示路线" })).toHaveCount(0);
   await page.getByRole("button", { name: "修改起终点" }).click();
-  await expect(page.getByRole("group", { name: "选择终点" }).getByRole("button", { name: "图书馆" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("group", { name: "选择终点" }).getByRole("button", { name: "无锡站" })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("A history only restores endpoints and requeries current routes", async ({ page }) => {
@@ -74,8 +96,8 @@ test("A history only restores endpoints and requeries current routes", async ({ 
 });
 
 test("A non-preset history endpoints survive editing and a second comparison unchanged", async ({ page }) => {
-  const origin = { longitude: 120.2735105, latitude: 31.4753285 };
-  const destination = { longitude: 120.2744, latitude: 31.4832 };
+  const origin = { longitude: 120.296187, latitude: 31.567905 };
+  const destination = { longitude: 120.297076, latitude: 31.575776 };
   await backend(page);
   await page.route("**/api/v1/routes/history*", (route) => route.fulfill({ json: [{
     id: "history-custom-endpoints", origin, destination, createdAt: "2026-10-18T00:00:00Z",

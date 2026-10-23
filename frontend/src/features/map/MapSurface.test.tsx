@@ -1,7 +1,7 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HeatmapCell, MapFeedbackDraft, ScoredRoute } from "../../types";
-import { CAMPUS, DEFAULT_ORIGIN, DEFAULT_DESTINATION } from "../../config/campus";
+import { SERVICE_AREA, DEFAULT_ORIGIN, DEFAULT_DESTINATION } from "../../config/serviceArea";
 import {
   resetAMapLoaderForTests,
   type AMapNamespaceLike,
@@ -11,8 +11,8 @@ import { MapSurface, type MapSurfaceProps } from "./MapSurface";
 const heatmapCell: HeatmapCell = {
   cellId: "cell-1",
   center: {
-    longitude: CAMPUS.center.longitude,
-    latitude: CAMPUS.center.latitude,
+    longitude: SERVICE_AREA.center.longitude,
+    latitude: SERVICE_AREA.center.latitude,
   },
   score: 100,
   confidence: 0.05,
@@ -21,20 +21,21 @@ const heatmapCell: HeatmapCell = {
 };
 
 const campusViewportConstraint = {
-  center: { longitude: 120.273915, latitude: 31.479302 },
+  // A deliberately small test constraint exercises boundary enforcement independently of the district overview.
+  center: SERVICE_AREA.center,
   bounds: {
-    west: 120.26067,
-    south: 31.47278,
-    east: 120.27946,
-    north: 31.49417,
+    west: SERVICE_AREA.center.longitude - 0.013245,
+    south: SERVICE_AREA.center.latitude - 0.006522,
+    east: SERVICE_AREA.center.longitude + 0.005545,
+    north: SERVICE_AREA.center.latitude + 0.014868,
   },
   minZoom: 15,
   maxZoom: 18,
   defaultZoom: 16,
 };
 
-const campusOrigin = DEFAULT_ORIGIN.point;
-const campusDestination = DEFAULT_DESTINATION.point;
+const campusOrigin = { longitude: SERVICE_AREA.center.longitude - 0.001, latitude: SERVICE_AREA.center.latitude - 0.002 };
+const campusDestination = { longitude: SERVICE_AREA.center.longitude + 0.001, latitude: SERVICE_AREA.center.latitude + 0.002 };
 
 const defaultProps: Omit<MapSurfaceProps, "heatmapCells" | "loading"> = {
   routes: [],
@@ -73,7 +74,7 @@ describe("MapSurface", () => {
     const [west, south, east, north] = String(bbox).split(",").map(Number);
     expect(west).toBeLessThan(east);
     expect(south).toBeLessThan(north);
-    expect(zoom).toBe(16);
+    expect(zoom).toBe(SERVICE_AREA.defaultZoom);
   });
 
   it("renders heatmap visuals and opens cell details", async () => {
@@ -92,8 +93,9 @@ describe("MapSurface", () => {
     });
     expect(point).toHaveAttribute("data-testid", "heatmap-point");
     // 热点用径向渐变呈现压力色（score 100 → rgb(220, 38, 38)），透明度由置信度决定
-    expect(point).toHaveStyle({ opacity: "0.18" });
-    expect(point.style.background).toContain("rgb(220, 38, 38)");
+    const halo = within(point).getByTestId("heatmap-point-halo");
+    expect(halo).toHaveStyle({ opacity: "0.18" });
+    expect(halo.style.background).toContain("rgb(220, 38, 38)");
 
     fireEvent.click(point);
 
@@ -123,13 +125,60 @@ describe("MapSurface", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "放大地图" }));
     await waitFor(() =>
-      expect(lastCall(onViewportChange)[1]).toBe(17),
+      expect(lastCall(onViewportChange)[1]).toBe(SERVICE_AREA.defaultZoom + 1),
     );
 
     fireEvent.keyDown(offlineMap, { key: "ArrowRight" });
     await waitFor(() =>
       expect(lastCall(onViewportChange)[0]).not.toBe(initialBbox),
     );
+  });
+
+  it("pans from a heatmap target without opening details or feedback", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+    const onViewportChange = vi.fn();
+    render(<MapSurface {...defaultProps} heatmapCells={[heatmapCell]} loading={false}
+      viewportConstraint={campusViewportConstraint} onViewportChange={onViewportChange} />);
+    await screen.findByTestId("offline-map");
+    await waitFor(() => expect(onViewportChange).toHaveBeenCalled());
+    const before = lastCall(onViewportChange)[0];
+    const point = screen.getByTestId("heatmap-point");
+    const surface = screen.getByLabelText("心途——通勤情绪地图");
+    fireEvent(point, new MouseEvent("pointerdown", { bubbles: true, clientX: 480, clientY: 300 }));
+    fireEvent(surface, new MouseEvent("pointermove", { bubbles: true, clientX: 560, clientY: 320 }));
+    fireEvent(surface, new MouseEvent("pointerup", { bubbles: true, clientX: 560, clientY: 320 }));
+    fireEvent.click(point, { detail: 1 });
+    await waitFor(() => expect(lastCall(onViewportChange)[0]).not.toBe(before));
+    expect(screen.queryByTestId("heatmap-cell-details")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("feedback-panel")).not.toBeInTheDocument();
+  });
+
+  it("ignores right-button drags and keeps the primary heat gesture when another touch ends", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+    const onViewportChange = vi.fn();
+    render(<MapSurface {...defaultProps} heatmapCells={[heatmapCell]} loading={false}
+      viewportConstraint={campusViewportConstraint} onViewportChange={onViewportChange} />);
+    await screen.findByTestId("offline-map");
+    await waitFor(() => expect(onViewportChange).toHaveBeenCalled());
+    const before = lastCall(onViewportChange)[0];
+    const point = screen.getByTestId("heatmap-point");
+    const surface = screen.getByLabelText("心途——通勤情绪地图");
+    const pointer = (type: string, target: HTMLElement, id: number, x: number, button = 0, primary = true) => {
+      const event = new MouseEvent(type, { bubbles: true, clientX: x, clientY: 300, button });
+      Object.defineProperties(event, { pointerId: { value: id }, isPrimary: { value: primary } });
+      fireEvent(target, event);
+    };
+    pointer("pointerdown", point, 1, 480, 2);
+    pointer("pointermove", surface, 1, 540, 2);
+    pointer("pointerup", surface, 1, 540, 2);
+    expect(lastCall(onViewportChange)[0]).toBe(before);
+    pointer("pointerdown", point, 1, 480);
+    pointer("pointerdown", point, 2, 500, 0, false);
+    pointer("pointerup", surface, 2, 500, 0, false);
+    pointer("pointermove", surface, 1, 540);
+    pointer("pointerup", surface, 1, 540);
+    await waitFor(() => expect(lastCall(onViewportChange)[0]).not.toBe(before));
+    expect(screen.queryByTestId("feedback-panel")).not.toBeInTheDocument();
   });
 
   it("falls back offline when the AMap script reports an error", async () => {
@@ -164,15 +213,15 @@ describe("MapSurface", () => {
         destroy = destroySpy;
         getBounds() {
           return {
-            getNorthEast: () => ({ lng: CAMPUS.bounds.east, lat: CAMPUS.bounds.north }),
-            getSouthWest: () => ({ lng: CAMPUS.bounds.west, lat: CAMPUS.bounds.south }),
+            getNorthEast: () => ({ lng: SERVICE_AREA.bounds.east, lat: SERVICE_AREA.bounds.north }),
+            getSouthWest: () => ({ lng: SERVICE_AREA.bounds.west, lat: SERVICE_AREA.bounds.south }),
           };
         }
         getZoom() {
           return 16;
         }
         getCenter() {
-          return { lng: CAMPUS.center.longitude, lat: CAMPUS.center.latitude };
+          return { lng: SERVICE_AREA.center.longitude, lat: SERVICE_AREA.center.latitude };
         }
         setCenter() {}
         setZoom() {}
@@ -180,7 +229,7 @@ describe("MapSurface", () => {
           return { x: 480, y: 300 };
         }
         containerToLngLat() {
-          return { getLng: () => CAMPUS.center.longitude, getLat: () => CAMPUS.center.latitude };
+          return { getLng: () => SERVICE_AREA.center.longitude, getLat: () => SERVICE_AREA.center.latitude };
         }
         off(eventName: string) {
           listeners.delete(eventName);
@@ -257,18 +306,18 @@ describe("MapSurface", () => {
         destroy() {}
         getBounds() {
           return {
-            getNorthEast: () => ({ lng: CAMPUS.bounds.east, lat: CAMPUS.bounds.north }),
-            getSouthWest: () => ({ lng: CAMPUS.bounds.west, lat: CAMPUS.bounds.south }),
+            getNorthEast: () => ({ lng: SERVICE_AREA.bounds.east, lat: SERVICE_AREA.bounds.north }),
+            getSouthWest: () => ({ lng: SERVICE_AREA.bounds.west, lat: SERVICE_AREA.bounds.south }),
           };
         }
         getZoom() { return 16; }
-        getCenter() { return { lng: CAMPUS.center.longitude, lat: CAMPUS.center.latitude }; }
+        getCenter() { return { lng: SERVICE_AREA.center.longitude, lat: SERVICE_AREA.center.latitude }; }
         setCenter() {}
         setZoom() {}
         lngLatToContainer() { return { x: 380, y: 250 }; }
         containerToLngLat() {
           // Return a point inside campus bounds
-          return { getLng: () => CAMPUS.center.longitude, getLat: () => CAMPUS.center.latitude };
+          return { getLng: () => SERVICE_AREA.center.longitude, getLat: () => SERVICE_AREA.center.latitude };
         }
         off(eventName: string) { listeners.delete(eventName); }
         on(eventName: string, listener: () => void) { listeners.set(eventName, listener); }
@@ -296,7 +345,7 @@ describe("MapSurface", () => {
     // Now switch to fake timers for long press simulation
     vi.useFakeTimers();
 
-    const section = screen.getByLabelText("校园通勤情绪地图");
+    const section = screen.getByLabelText("心途——通勤情绪地图");
     const mapCanvas = screen.getByTestId("map-canvas");
     vi.spyOn(mapCanvas, "getBoundingClientRect").mockReturnValue({
       bottom: 650,
@@ -443,7 +492,7 @@ describe("MapSurface campus bounds", () => {
 
     // Long-press near the top-left corner (outside the campus bounds) should
     // not open the feedback panel because the projected GeoPoint is far away.
-    const section = screen.getByLabelText("校园通勤情绪地图");
+    const section = screen.getByLabelText("心途——通勤情绪地图");
     const mapCanvas = screen.getByTestId("map-canvas");
     vi.spyOn(mapCanvas, "getBoundingClientRect").mockReturnValue({
       bottom: 650,
@@ -495,6 +544,24 @@ describe("MapSurface campus bounds", () => {
 });
 
 describe("MapSurface explicit feedback and recovery", () => {
+  it("selects the current map center as an endpoint without opening feedback", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+    const onSelect = vi.fn();
+    render(<MapSurface {...defaultProps} heatmapCells={[]} loading={false} feedbackEnabled={false}
+      viewportConstraint={campusViewportConstraint} pointSelection={{ label: "使用此位置作为起点", onSelect }} />);
+    const map = await screen.findByTestId("offline-map");
+    const button = screen.getByRole("button", { name: "使用此位置作为起点" });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.keyDown(map, { key: "ArrowLeft" });
+    fireEvent.click(button);
+    expect(onSelect).toHaveBeenCalledOnce();
+    const point = onSelect.mock.calls[0][0];
+    expect(point.longitude).toBeLessThan(campusViewportConstraint.center.longitude);
+    expect(point.latitude).toBeCloseTo(campusViewportConstraint.center.latitude, 5);
+    expect(screen.queryByRole("button", { name: "记录此处感受" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("feedback-panel")).not.toBeInTheDocument();
+  });
+
   it("uses the currently panned map center and preserves the failed draft for retry", async () => {
     vi.stubEnv("VITE_AMAP_JS_KEY", "");
     const onViewportChange = vi.fn();
@@ -569,7 +636,7 @@ describe("MapSurface explicit feedback and recovery", () => {
         expect(Number.parseFloat(panel.style.left)).toBeGreaterThanOrEqual(8);
         expect(Number.parseFloat(panel.style.left) + 300).toBeLessThanOrEqual(size.width - 8);
         expect(Number.parseFloat(panel.style.top)).toBeGreaterThanOrEqual(8);
-        expect(Number.parseFloat(panel.style.top) + 350).toBeLessThanOrEqual(size.height - 8);
+        expect(Number.parseFloat(panel.style.top) + 350).toBeLessThanOrEqual(size.height - 34);
       };
       expectInside();
       size.width = 320; size.height = 420;

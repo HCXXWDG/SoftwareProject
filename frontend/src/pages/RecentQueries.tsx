@@ -1,7 +1,7 @@
 import type { AsyncQueryState } from "../hooks/useTrendsHistory";
 import type { RouteQueryHistory } from "../services/history";
 import type { GeoPoint } from "../types";
-import { WAYPOINTS } from "../config/campus";
+import { WAYPOINTS, isPointInServiceArea } from "../config/serviceArea";
 import "./RecentQueries.css";
 
 interface RecentQueriesProps {
@@ -56,8 +56,9 @@ export function RecentQueries({ state, onRetry, onReplan }: RecentQueriesProps) 
                 <div>
                   <span>{pointLabel(entry.origin)} → {pointLabel(entry.destination)}</span>
                   <time dateTime={entry.createdAt}>{queryTime(entry.createdAt)}</time>
+                  {(!isPointInServiceArea(entry.origin) || !isPointInServiceArea(entry.destination)) && <small>此历史行程不在当前梁溪区地图范围，已保留记录。</small>}
                 </div>
-                <button type="button" onClick={() => onReplan({ ...entry.origin }, { ...entry.destination })}>重新规划</button>
+                <button type="button" disabled={!isPointInServiceArea(entry.origin) || !isPointInServiceArea(entry.destination)} onClick={() => onReplan({ ...entry.origin }, { ...entry.destination })}>重新规划</button>
               </li>
             ))}
           </ul>

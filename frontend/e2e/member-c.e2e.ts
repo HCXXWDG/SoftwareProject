@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { CAMPUS } from "../src/config/campus";
+import { SERVICE_AREA } from "../src/config/serviceArea";
 import { emptyTrend, routeComparison } from "../src/test/fixtures";
 import type { HeatmapCell } from "../src/types";
 
@@ -52,6 +52,16 @@ async function enterMap(page: Page) {
   await page.getByRole("button", { name: "进入地图", exact: true }).click();
   await expect(page.getByTestId("offline-map")).toBeVisible();
   await expect(page.getByRole("button", { name: "记录此处感受", exact: true })).toBeEnabled();
+  await expect(page.getByText("正在更新情绪热力图", { exact: true })).toHaveCount(0);
+  // Inspect a neighbourhood before testing corner gestures; the city overview also shows areas beyond its service bounds.
+  const neighbourhood = page.waitForRequest(request => {
+    const url = new URL(request.url());
+    return url.pathname === "/api/v1/heatmap" && url.searchParams.get("zoom") === "14";
+  });
+  for (let zoom = SERVICE_AREA.defaultZoom; zoom < 14; zoom += 1) {
+    await page.getByRole("button", { name: "放大地图", exact: true }).click();
+  }
+  await neighbourhood;
   await expect(page.getByText("正在更新情绪热力图", { exact: true })).toHaveCount(0);
 }
 
@@ -127,7 +137,7 @@ for (const width of [390, 320]) {
     await page.keyboard.press("ArrowLeft");
     const expected = centerOfViewport((await movedViewport).url());
     // A fixed campus center would pass an unpanned example; this must use the new viewport.
-    expect(Math.abs(expected.longitude - CAMPUS.center.longitude)).toBeGreaterThan(0.0001);
+    expect(Math.abs(expected.longitude - SERVICE_AREA.center.longitude)).toBeGreaterThan(0.0001);
     await expect(page.getByText("正在更新情绪热力图", { exact: true })).toHaveCount(0);
 
     const entry = page.getByRole("button", { name: "记录此处感受", exact: true });
@@ -152,15 +162,15 @@ for (const width of [390, 320]) {
     await expect(quiet).toHaveAttribute("aria-pressed", "true");
     await expectInsideMap(page, panel);
     const failedDraftScreenshot = testInfo.outputPath(`feedback-error-${width}.png`);
-    await page.getByRole("region", { name: "校园通勤情绪地图", exact: true }).screenshot({ path: failedDraftScreenshot });
+    await page.getByRole("region", { name: "心途——通勤情绪地图", exact: true }).screenshot({ path: failedDraftScreenshot });
     await testInfo.attach(`feedback-error-${width}`, { path: failedDraftScreenshot, contentType: "image/png" });
     await expect(page.getByTestId("emoji-fountain")).toHaveCount(0);
     expect(reports).toHaveLength(1);
     expect(reports[0]).toMatchObject({ stressLevel: 25, tag: "QUIET" });
     expect(reports[0].location.longitude).toBeCloseTo(expected.longitude, 5);
     expect(reports[0].location.latitude).toBeCloseTo(expected.latitude, 5);
-    expect(reports[0].location.longitude).toBeGreaterThanOrEqual(CAMPUS.bounds.west);
-    expect(reports[0].location.latitude).toBeGreaterThanOrEqual(CAMPUS.bounds.south);
+    expect(reports[0].location.longitude).toBeGreaterThanOrEqual(SERVICE_AREA.bounds.west);
+    expect(reports[0].location.latitude).toBeGreaterThanOrEqual(SERVICE_AREA.bounds.south);
 
     const saved = page.waitForResponse(response => new URL(response.url()).pathname === "/api/v1/reports");
     await panel.getByRole("button", { name: "提交反馈", exact: true }).click();
@@ -225,7 +235,7 @@ for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 });
     const { reports } = await mockBackend(page);
     await enterMap(page);
-    const map = page.getByRole("region", { name: "校园通勤情绪地图", exact: true });
+    const map = page.getByRole("region", { name: "心途——通勤情绪地图", exact: true });
     const canvas = page.getByTestId("map-canvas");
     await canvas.scrollIntoViewIfNeeded();
     const panel = page.getByRole("dialog", { name: "情绪反馈面板", exact: true });
@@ -233,7 +243,7 @@ for (const width of [390, 320]) {
       const box = await canvas.boundingBox();
       expect(box).not.toBeNull();
       const pointer = {
-        button: 0, pointerType: "mouse", pointerId: 42,
+        button: 0, pointerType: "mouse", isPrimary: true, pointerId: 42,
         clientX: box!.x + (horizontal ? box!.width - 8 : 8),
         clientY: box!.y + (vertical ? box!.height - 8 : 8),
       };
@@ -255,12 +265,12 @@ for (const width of [390, 320]) {
     await enterMap(page);
     await expect.poll(() => heatmapUrls.length).toBeGreaterThan(0);
     for (const cell of metadataCellsForViewport(heatmapUrls[heatmapUrls.length - 1])) {
-      expect(cell.center.longitude).toBeGreaterThanOrEqual(CAMPUS.bounds.west);
-      expect(cell.center.longitude).toBeLessThanOrEqual(CAMPUS.bounds.east);
-      expect(cell.center.latitude).toBeGreaterThanOrEqual(CAMPUS.bounds.south);
-      expect(cell.center.latitude).toBeLessThanOrEqual(CAMPUS.bounds.north);
+      expect(cell.center.longitude).toBeGreaterThanOrEqual(SERVICE_AREA.bounds.west);
+      expect(cell.center.longitude).toBeLessThanOrEqual(SERVICE_AREA.bounds.east);
+      expect(cell.center.latitude).toBeGreaterThanOrEqual(SERVICE_AREA.bounds.south);
+      expect(cell.center.latitude).toBeLessThanOrEqual(SERVICE_AREA.bounds.north);
     }
-    const map = page.getByRole("region", { name: "校园通勤情绪地图", exact: true });
+    const map = page.getByRole("region", { name: "心途——通勤情绪地图", exact: true });
     await expect(page.getByTestId("heatmap-point")).toHaveCount(4);
     const details = page.getByRole("dialog", { name: "热力点详情", exact: true });
     const labels = ["噪音", "安静", "树荫", "开阔"];

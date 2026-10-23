@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../App";
 import { MapPage } from "../pages/MapPage";
-import { DEFAULT_ORIGIN, DEFAULT_DESTINATION, WAYPOINTS } from "../config/campus";
+import { DEFAULT_ORIGIN, DEFAULT_DESTINATION, WAYPOINTS } from "../config/serviceArea";
 import type { MapSurfaceProps } from "../features/map/MapSurface";
 import { deferred, emptyTrend, jsonResponse, routeComparison } from "./fixtures";
 import type { MapPageState } from "../types";
@@ -49,16 +49,34 @@ async function map() {
   await waitFor(() => expect(screen.getByRole("button", { name: "提交反馈" })).toBeEnabled());
 }
 const calls = (part: string) => fetchMock.mock.calls.filter(([url]) => String(url).includes(part));
-beforeEach(() => { localStorage.clear(); window.history.replaceState(null, "", "/"); installBackend(); });
+beforeEach(() => { localStorage.clear(); sessionStorage.clear(); window.history.replaceState(null, "", "/"); installBackend(); });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("成员 A 页面编排", () => {
+  it.each(["map", "route-preview"])("returns an old campus %s cache to the Liangxi planner without requests or discarding a pending commute", (stage) => {
+    const pending = JSON.stringify({ version: 1, scope: "old-device:old-service", request: {
+      snapshotId: "00000000-0000-4000-8000-000000000001", operationId: "pending-before-district-upgrade",
+      routeId: "old-route", endStressLevel: 25, completedAt: "2026-10-22T12:00:00Z",
+    } });
+    sessionStorage.setItem("commute-pending-v1", pending);
+    localStorage.setItem("commute-trip-v1", JSON.stringify({ version: 1, stage, selection: {
+      origin: { longitude: 120.27351, latitude: 31.475328 },
+      destination: { longitude: 120.274319, latitude: 31.483275 },
+      originName: "学生公寓区", destName: "第一教学楼",
+    } }));
+    render(<App />);
+    expect(screen.getByRole("heading", { name: "心途——通勤情绪地图" })).toBeInTheDocument();
+    expect(within(screen.getByRole("group", { name: "选择起点" })).getByRole("button", { name: DEFAULT_ORIGIN.name })).toHaveAttribute("aria-pressed", "true");
+    expect(within(screen.getByRole("group", { name: "选择终点" })).getByRole("button", { name: DEFAULT_DESTINATION.name })).toHaveAttribute("aria-pressed", "true");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem("commute-pending-v1")).toBe(pending);
+  });
   it("starts at selection without requesting routes, heatmap or trends", () => {
     render(<App />); expect(screen.getByRole("button", { name: "查看路线" })).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled(); expect(screen.queryByTestId("map-contract")).not.toBeInTheDocument();
   });
   it("submits selected non-default endpoints", async () => {
-    render(<App />); fireEvent.click(within(screen.getByRole("group", { name: "选择终点" })).getByRole("button", { name: "图书馆" }));
+    render(<App />); fireEvent.click(within(screen.getByRole("group", { name: "选择终点" })).getByRole("button", { name: "无锡站" }));
     fireEvent.click(screen.getByRole("button", { name: "查看路线" }));
     await screen.findByRole("button", { name: "进入地图" });
     expect(JSON.parse(calls("/routes/compare")[0][1].body)).toEqual({ origin: DEFAULT_ORIGIN.point, destination: WAYPOINTS[2].point });
@@ -105,7 +123,7 @@ describe("成员 A 页面编排", () => {
   it("returns with selected endpoints and can plan a new trip", async () => {
     render(<App />); await map(); fireEvent.click(screen.getByRole("button", { name: "修改起终点" }));
     expect(within(screen.getByRole("group", { name: "选择终点" })).getByRole("button", { name: DEFAULT_DESTINATION.name })).toHaveAttribute("aria-pressed", "true");
-    fireEvent.click(within(screen.getByRole("group", { name: "选择终点" })).getByRole("button", { name: "图书馆" }));
+    fireEvent.click(within(screen.getByRole("group", { name: "选择终点" })).getByRole("button", { name: "无锡站" }));
     fireEvent.click(screen.getByRole("button", { name: "查看路线" }));
     await screen.findByRole("button", { name: "进入地图" });
     expect(JSON.parse(calls("/routes/compare").at(-1)![1].body).destination).toEqual(WAYPOINTS[2].point);
@@ -163,7 +181,7 @@ describe("成员 A 页面编排", () => {
   });
   it("restores only endpoints on refresh and queries routes again", async () => {
     localStorage.setItem("commute-trip-v1", JSON.stringify({ version: 1, stage: "map", selection: {
-      origin: DEFAULT_ORIGIN.point, destination: WAYPOINTS[2].point, originName: "学生公寓区", destName: "图书馆" }, result: { selectedScore: 100 } }));
+      origin: DEFAULT_ORIGIN.point, destination: WAYPOINTS[2].point, originName: "南禅寺", destName: "无锡站" }, result: { selectedScore: 100 } }));
     render(<App />); await screen.findByRole("button", { name: "进入地图" });
     expect(calls("/routes/compare")).toHaveLength(1); expect(calls("/heatmap")).toHaveLength(0);
   });

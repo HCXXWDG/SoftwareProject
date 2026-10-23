@@ -13,11 +13,11 @@ export default defineConfig({
         enabled: false,
       },
       manifest: {
-        name: "校园通勤情绪地图",
-        short_name: "通勤地图",
-        description: "江南大学蠡湖校区通勤情绪可视化",
-        theme_color: "#2368ff",
-        background_color: "#ffffff",
+        name: "心途——通勤情绪地图",
+        short_name: "心途",
+        description: "从无锡梁溪区出发，规划日常步行路线，记录沿途感受。",
+        theme_color: "#18694f",
+        background_color: "#f3f6f3",
         display: "standalone",
         icons: [
           {

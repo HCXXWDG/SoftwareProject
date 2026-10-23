@@ -1,15 +1,15 @@
 import { StrictMode, type PropsWithChildren } from "react";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_DESTINATION, DEFAULT_ORIGIN } from "../config/campus";
+import { DEFAULT_DESTINATION, DEFAULT_ORIGIN, SERVICE_AREA } from "../config/serviceArea";
 import { useTripNavigation, type TripSelection } from "./useTripNavigation";
 
 const KEY = "commute-trip-v1";
 const selection: TripSelection = {
-  origin: { longitude: 120.273019, latitude: 31.482245 },
-  destination: { longitude: 120.275344, latitude: 31.487085 },
-  originName: "图书馆",
-  destName: "体育中心",
+  origin: { longitude: 120.3065, latitude: 31.5882 },
+  destination: { longitude: 120.3187, latitude: 31.5575 },
+  originName: "无锡站附近",
+  destName: "清名桥附近",
 };
 
 beforeEach(() => {
@@ -18,6 +18,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  sessionStorage.clear();
   vi.restoreAllMocks();
 });
 
@@ -79,6 +80,46 @@ describe("useTripNavigation", () => {
     expect(window.location.hash).toBe("#route-preview");
   });
 
+  it.each(["map", "route-preview", "welcome"])("ignores a saved campus trip at %s without clearing identity or a pending commute", (stage) => {
+    const pending = JSON.stringify({ version: 1, scope: "existing-device:existing-service", request: { operationId: "existing-operation" } });
+    localStorage.setItem("commute-device-id", "existing-device");
+    sessionStorage.setItem("commute-pending-v1", pending);
+    localStorage.setItem(KEY, JSON.stringify({ version: 1, stage, selection: {
+      origin: { longitude: 120.27351, latitude: 31.475328 },
+      destination: { longitude: 120.274319, latitude: 31.483275 },
+      originName: "学生公寓区", destName: "第一教学楼",
+    } }));
+    const { result } = renderHook(() => useTripNavigation());
+    expect(result.current.stage).toBe("welcome");
+    expect(result.current.selection.origin).toEqual(DEFAULT_ORIGIN.point);
+    expect(result.current.selection.destination).toEqual(DEFAULT_DESTINATION.point);
+    expect(localStorage.getItem("commute-device-id")).toBe("existing-device");
+    expect(sessionStorage.getItem("commute-pending-v1")).toBe(pending);
+    expect(window.location.hash).toBe("#welcome");
+    sessionStorage.removeItem("commute-pending-v1");
+  });
+
+  it.each(["origin", "destination"] as const)("rejects a saved trip when only %s is outside the current service area", (endpoint) => {
+    localStorage.setItem(KEY, JSON.stringify({ version: 1, stage: "map", selection: {
+      ...selection, [endpoint]: { longitude: SERVICE_AREA.bounds.west - 0.001, latitude: SERVICE_AREA.center.latitude },
+    } }));
+    const { result } = renderHook(() => useTripNavigation());
+    expect(result.current.stage).toBe("welcome");
+    expect(result.current.selection.origin).toEqual(DEFAULT_ORIGIN.point);
+    expect(result.current.selection.destination).toEqual(DEFAULT_DESTINATION.point);
+  });
+
+  it("does not restore campus endpoints from browser history", () => {
+    const { result } = renderHook(() => useTripNavigation());
+    act(() => result.current.navigate("map", selection));
+    act(() => window.dispatchEvent(new PopStateEvent("popstate", { state: { commuteTrip: {
+      version: 1, stage: "map", selection: { ...selection, origin: { longitude: 120.27351, latitude: 31.475328 } },
+    } } })));
+    expect(result.current.stage).toBe("welcome");
+    expect(result.current.selection.origin).toEqual(DEFAULT_ORIGIN.point);
+    expect(result.current.selection.destination).toEqual(DEFAULT_DESTINATION.point);
+  });
+
   it("strips obsolete comparison data from restored endpoint preferences", () => {
     localStorage.setItem(KEY, JSON.stringify({
       version: 1,
@@ -110,7 +151,19 @@ describe("useTripNavigation", () => {
       state: { commuteTrip: { version: 9, stage: "map", selection } },
     })));
     expect(result.current.stage).toBe("welcome");
-    expect(result.current.selection).toEqual(selection);
+    expect(result.current.selection.origin).toEqual(DEFAULT_ORIGIN.point);
+    expect(result.current.selection.destination).toEqual(DEFAULT_DESTINATION.point);
+  });
+
+  it("rejects direct navigation to a route outside the service area", () => {
+    const { result } = renderHook(() => useTripNavigation());
+    act(() => result.current.navigate("route-preview", { ...selection,
+      destination: { longitude: 120.274319, latitude: 31.483275 },
+    }));
+    expect(result.current.stage).toBe("welcome");
+    expect(result.current.selection.origin).toEqual(DEFAULT_ORIGIN.point);
+    expect(result.current.selection.destination).toEqual(DEFAULT_DESTINATION.point);
+    expect(window.location.hash).toBe("#welcome");
   });
 
   it("pushes one browser history entry for one user navigation in StrictMode", () => {

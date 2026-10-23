@@ -1,4 +1,4 @@
-import { DEFAULT_ORIGIN, DEFAULT_DESTINATION } from "./campus";
+import { DEFAULT_ORIGIN, DEFAULT_DESTINATION } from "./serviceArea";
 import type { GeoPoint, RouteComparison } from "../types";
 
 /**
@@ -13,9 +13,9 @@ export const MOCK_ROUTE_COMPARISON: RouteComparison = {
   routes: [
     {
       id: "mock-via-east",
-      label: "路线 A（东侧步道）",
-      distanceMeters: 850,
-      durationSeconds: 600,
+      label: "演示路线 A（街区步道）",
+      distanceMeters: 1680,
+      durationSeconds: 1260,
       stressExposure: null,
       stressScore: null,
       confidence: 0,
@@ -23,16 +23,16 @@ export const MOCK_ROUTE_COMPARISON: RouteComparison = {
       leastStressful: false,
       polyline: [
         DEFAULT_ORIGIN.point,
-        { longitude: 120.2738, latitude: 31.478 },
-        { longitude: 120.2741, latitude: 31.481 },
+        { longitude: 120.3076, latitude: 31.5704 },
+        { longitude: 120.3037, latitude: 31.5758 },
         DEFAULT_DESTINATION.point,
       ],
     },
     {
       id: "mock-via-lake",
-      label: "路线 B（蠡湖环路）",
-      distanceMeters: 1100,
-      durationSeconds: 780,
+      label: "演示路线 B（沿河步道）",
+      distanceMeters: 1920,
+      durationSeconds: 1440,
       stressExposure: null,
       stressScore: null,
       confidence: 0,
@@ -40,8 +40,8 @@ export const MOCK_ROUTE_COMPARISON: RouteComparison = {
       leastStressful: false,
       polyline: [
         DEFAULT_ORIGIN.point,
-        { longitude: 120.2732, latitude: 31.477 },
-        { longitude: 120.2745, latitude: 31.481 },
+        { longitude: 120.3112, latitude: 31.5698 },
+        { longitude: 120.3051, latitude: 31.5769 },
         DEFAULT_DESTINATION.point,
       ],
     },

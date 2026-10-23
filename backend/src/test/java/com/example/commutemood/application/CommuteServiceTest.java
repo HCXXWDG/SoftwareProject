@@ -11,6 +11,8 @@ import com.example.commutemood.repository.RouteQueryRepository;
 import com.example.commutemood.repository.memory.MemoryCommuteRecordRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Instant;
 import java.util.List;
@@ -22,6 +24,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 class CommuteServiceTest {
 
@@ -50,6 +55,7 @@ class CommuteServiceTest {
     @BeforeEach
     void setUp() {
         deviceHash = identityService.hash("device-x");
+        doCallRealMethod().when(routeQueryRepository).isExpired(any(), any(), any());
     }
 
     private UUID stubSnapshot(RouteComparison comparison, Instant createdAt) {
@@ -114,7 +120,6 @@ class CommuteServiceTest {
     @Test
     void expiredSnapshotIsRejected() {
         UUID snapshotId = stubSnapshot(COMPARISON, Instant.now().minusSeconds(3600));
-        when(routeQueryRepository.isExpired(any(), any(), any())).thenReturn(true);
 
         assertThatThrownBy(() -> service.complete("device-x", snapshotId, "op-1", "route-fast", 25, null))
                 .isInstanceOf(SnapshotExpiredException.class);
@@ -172,5 +177,96 @@ class CommuteServiceTest {
         assertThat(first.outcome()).isEqualTo(CommuteCompletion.Outcome.CREATED);
         assertThat(second.outcome()).isEqualTo(CommuteCompletion.Outcome.CREATED);
         assertThat(commuteRepository.findByDeviceSince(deviceHash, Instant.EPOCH)).hasSize(2);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void savedOperationReplaysOriginalReceiptEvenWhenSnapshotExpiredOrMissing(boolean missing) {
+        UUID snapshotId = stubSnapshot(COMPARISON, Instant.now());
+        CommuteCompletion first = service.complete("device-x", snapshotId, "lost-response", "route-fast", 25, null);
+        when(routeQueryRepository.findSnapshotById(snapshotId, deviceHash)).thenReturn(missing ? Optional.empty()
+                : Optional.of(new RouteQueryHistory(snapshotId, ORIGIN, DESTINATION, COMPARISON,
+                        Instant.now().minusSeconds(7200))));
+        clearInvocations(routeQueryRepository);
+
+        CommuteCompletion replay = service.complete("device-x", snapshotId, "lost-response", "route-fast", 25, null);
+
+        assertThat(replay.outcome()).isEqualTo(CommuteCompletion.Outcome.DUPLICATE);
+        assertThat(replay.record()).isEqualTo(first.record());
+        assertThat(commuteRepository.findByDeviceSince(deviceHash, Instant.EPOCH)).hasSize(1);
+        verifyNoInteractions(routeQueryRepository);
+    }
+
+    @Test
+    void savedOperationWithChangedBusinessInputStillConflictsWithoutSnapshot() {
+        UUID snapshotId = stubSnapshot(COMPARISON, Instant.now());
+        CommuteCompletion first = service.complete("device-x", snapshotId, "existing-op", "route-fast", 25, null);
+        when(routeQueryRepository.findSnapshotById(snapshotId, deviceHash)).thenReturn(Optional.empty());
+        clearInvocations(routeQueryRepository);
+
+        assertThat(service.complete("device-x", snapshotId, "existing-op", "route-calm", 25, null).outcome())
+                .isEqualTo(CommuteCompletion.Outcome.CONFLICT);
+        assertThat(service.complete("device-x", snapshotId, "existing-op", "route-fast", 75, null).outcome())
+                .isEqualTo(CommuteCompletion.Outcome.CONFLICT);
+        var changedSnapshot = service.complete("device-x", UUID.randomUUID(), "existing-op", "route-fast", 25, null);
+        assertThat(changedSnapshot.outcome()).isEqualTo(CommuteCompletion.Outcome.CONFLICT);
+        assertThat(changedSnapshot.record()).isEqualTo(first.record());
+        assertThat(commuteRepository.findByDeviceSince(deviceHash, Instant.EPOCH)).hasSize(1);
+        verifyNoInteractions(routeQueryRepository);
+    }
+
+    @Test
+    void matchingOperationIdOnAnotherDeviceCannotReplayAnOwnersReceipt() {
+        UUID snapshotId = stubSnapshot(COMPARISON, Instant.now());
+        service.complete("device-x", snapshotId, "shared-op", "route-fast", 25, null);
+
+        assertThatThrownBy(() -> service.complete("other-device", snapshotId, "shared-op", "route-fast", 25, null))
+                .isInstanceOf(SnapshotMissingException.class);
+        assertThat(commuteRepository.findByDeviceSince(identityService.hash("other-device"), Instant.EPOCH)).isEmpty();
+        assertThat(commuteRepository.findByDeviceSince(deviceHash, Instant.EPOCH)).hasSize(1);
+    }
+
+    @Test
+    void cityWalkingTripCanBeCompletedAtExpectedArrivalAfterThirtyMinutes() {
+        UUID snapshotId = stubSnapshot(cityComparison(), Instant.now().minusSeconds(60 * 60));
+
+        var result = service.complete("device-x", snapshotId, "city-trip", "route-long", 50, null);
+
+        assertThat(result.outcome()).isEqualTo(CommuteCompletion.Outcome.CREATED);
+        assertThat(result.record().estimatedSeconds()).isEqualTo(60 * 60);
+        assertThat(result.record().durationMinutes()).isEqualTo(60);
+    }
+
+    @Test
+    void cityWalkingTripExpiresAfterItsDurationPlusArrivalGrace() {
+        UUID snapshotId = stubSnapshot(cityComparison(), Instant.now().minusSeconds(76 * 60));
+
+        assertThatThrownBy(() -> service.complete("device-x", snapshotId, "city-trip", "route-long", 50, null))
+                .isInstanceOf(SnapshotExpiredException.class);
+        assertThat(commuteRepository.findByDeviceSince(deviceHash, Instant.EPOCH)).isEmpty();
+    }
+
+    @Test
+    void unselectedLongRouteCannotExtendTheShortRouteThirtyMinuteWindow() {
+        UUID freshId = stubSnapshot(cityComparison(), Instant.now().minusSeconds(29 * 60));
+        assertThat(service.complete("device-x", freshId, "short-valid", "route-short", 25, null).outcome())
+                .isEqualTo(CommuteCompletion.Outcome.CREATED);
+
+        UUID oldId = stubSnapshot(cityComparison(), Instant.now().minusSeconds(31 * 60));
+        assertThatThrownBy(() -> service.complete("device-x", oldId, "short-expired", "route-short", 25, null))
+                .isInstanceOf(SnapshotExpiredException.class);
+        assertThat(commuteRepository.findByDeviceSince(deviceHash, Instant.EPOCH)).hasSize(1);
+    }
+
+    private RouteComparison cityComparison() {
+        var shortRoute = new ScoredRoute("route-short", "短途", 800, 600,
+                40.0, 30.0, 0.72, true, false, List.of());
+        var longRoute = new ScoredRoute("route-long", "跨街区步行", 4800, 3600,
+                20.0, 40.0, 0.72, false, true, List.of());
+        return new RouteComparison(List.of(shortRoute, longRoute), "route-short", "route-long", "ok", false,
+                RouteSource.REAL, com.example.commutemood.domain.FeedbackSource.REAL,
+                com.example.commutemood.domain.ScoringStatus.VALID,
+                com.example.commutemood.domain.RecommendationReason.DETOUR_TOO_LONG,
+                WeightedStressRouteScoringStrategy.VERSION, "WALKING", null, null);
     }
 }

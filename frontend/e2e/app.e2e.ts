@@ -1,10 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
 
-/** Mock heatmap cells matching the backend demo data format (campus coords) */
+/** District fixtures have separate hit targets at the city overview zoom. */
 const MOCK_HEATMAP = [
   {
     cellId: "16:133638:34976",
-    center: { longitude: 120.274, latitude: 31.479 },
+    center: { longitude: 120.286591, latitude: 31.576878 },
     score: 68.2,
     confidence: 0.72,
     count: 18,
@@ -12,7 +12,7 @@ const MOCK_HEATMAP = [
   },
   {
     cellId: "16:133639:34977",
-    center: { longitude: 120.275, latitude: 31.481 },
+    center: { longitude: 120.306591, latitude: 31.566878 },
     score: 35.0,
     confidence: 0.5,
     count: 5,
@@ -34,9 +34,9 @@ const MOCK_ROUTES = {
       fastest: true,
       leastStressful: false,
       polyline: [
-        { longitude: 120.273510, latitude: 31.475328 },
-        { longitude: 120.2738, latitude: 31.478 },
-        { longitude: 120.274319, latitude: 31.483275 },
+        { longitude: 120.296186, latitude: 31.567904 },
+        { longitude: 120.296476, latitude: 31.570576 },
+        { longitude: 120.296995, latitude: 31.575851 },
       ],
     },
     {
@@ -50,9 +50,9 @@ const MOCK_ROUTES = {
       fastest: false,
       leastStressful: true,
       polyline: [
-        { longitude: 120.273510, latitude: 31.475328 },
-        { longitude: 120.2740, latitude: 31.480 },
-        { longitude: 120.274319, latitude: 31.483275 },
+        { longitude: 120.296186, latitude: 31.567904 },
+        { longitude: 120.296676, latitude: 31.572576 },
+        { longitude: 120.296995, latitude: 31.575851 },
       ],
     },
   ],
@@ -206,25 +206,19 @@ test.describe("Core user flow", () => {
     // Navigate through 3-stage flow to map
     await navigateToMap(page);
 
-    // Long-press on the map area (dispatchEvent for reliable React pointer capture)
-    const mapSection = page.locator("[aria-label='校园通勤情绪地图']");
+    // A real browser mouse press exercises the DOM capture path and native primary-pointer flags.
+    const mapSection = page.locator("[aria-label='心途——通勤情绪地图']");
+    await mapSection.scrollIntoViewIfNeeded();
     const box = await mapSection.boundingBox();
     expect(box).not.toBeNull();
 
-    const pointer = {
-      button: 0,
-      clientX: box!.x + box!.width / 2,
-      clientY: box!.y + box!.height / 2,
-      pointerId: 1,
-      pointerType: "mouse",
-    };
-
     // Hold until the application confirms the long press, then release.
-    await mapSection.dispatchEvent("pointerdown", pointer);
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await page.mouse.down();
     await expect(page.getByTestId("feedback-panel")).toBeVisible({
       timeout: 5000,
     });
-    await mapSection.dispatchEvent("pointerup", pointer);
+    await page.mouse.up();
 
     // Select stress level and tag
     await page.getByRole("button", { name: /压力 50/ }).click();
@@ -248,10 +242,10 @@ test.describe("Core user flow", () => {
     });
     await page.goto("/");
     await navigateToMap(page);
-    const map = page.getByLabel("校园通勤情绪地图", { exact: true });
+    const map = page.getByLabel("心途——通勤情绪地图", { exact: true });
     const box = await map.boundingBox();
     expect(box).not.toBeNull();
-    const pointer = { clientX: box!.x + box!.width / 2, clientY: box!.y + box!.height / 2, pointerId: 1, pointerType: "mouse", button: 0 };
+    const pointer = { clientX: box!.x + box!.width / 2, clientY: box!.y + box!.height / 2, pointerId: 1, pointerType: "mouse", isPrimary: true, button: 0 };
     await map.dispatchEvent("pointerdown", pointer);
     const panel = page.getByTestId("feedback-panel");
     await expect(panel).toBeVisible();
@@ -288,7 +282,7 @@ test.describe("Core user flow", () => {
     const submit = page.getByRole("button", { name: "完成本次通勤", exact: true });
     await expect(submit).toBeDisabled();
     await expect(submit).toHaveAttribute("aria-describedby", "commute-disabled-reason");
-    await expect(page.locator("#commute-disabled-reason")).toHaveText("当前路线暂不支持记录通勤，可继续查看路线和历史趋势。");
+    await expect(page.locator("#commute-disabled-reason")).toHaveText("此版本尚未开放通勤记录，可继续查看路线和历史趋势。");
     expect(writes).toEqual([]);
   });
 });

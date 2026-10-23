@@ -101,9 +101,11 @@
 }
 
 .map-surface__heatmap {
-  z-index: 3;
+  z-index: 4;
   pointer-events: none;
 }
+
+.map-surface__heatmap-label { position: absolute; z-index: 5; top: 56px; left: 12px; max-width: calc(100% - 24px); padding: 6px 10px; border-radius: 8px; background: #fff5dbeF; color: #674500; font-size: 12px; pointer-events: none; }
 
 .map-surface__heatmap--details-open {
   z-index: 6;
@@ -262,7 +264,7 @@
   font-size: 11px;
 }
 
-/* 校园起终点标记 */
+/* 起终点标记 */
 .map-surface__campus-marker {
   position: absolute;
   z-index: 4;
@@ -609,3 +611,13 @@
   font-weight: 700;
   color: #183848;
 }
+
+/* Map controls share the campus app's material palette. Data colors stay semantic. */
+.map-surface { color: var(--ink); background: #e5ece6; }
+.map-surface__mode-badge { color: var(--ink); border: 1px solid #ffffffb3; background: #fffffff2; box-shadow: 0 3px 14px #17352e12; font-weight: 650; }
+.map-surface__heatmap-label { font-size: 10px; border-radius: 100px; background: #fff9e6f2; color: #6b551d; }
+.map-surface__record-here { border-radius: 16px; background: var(--primary); color: #fff; border: 1px solid #ffffff55; box-shadow: 0 5px 18px #17352e29; font-weight: 650; }
+.map-surface__record-here:hover:not(:disabled) { background: #10503c; color: #fff; }
+.map-surface__route-legend { border-radius: 14px; box-shadow: 0 3px 14px #17352e12; border-color: #ffffffbb; }
+.map-surface__zoom-controls { border-radius: 14px; box-shadow: 0 3px 14px #17352e18; overflow: hidden; }
+.map-surface__zoom-controls button { border: none; border-radius: 0; color: var(--ink); }

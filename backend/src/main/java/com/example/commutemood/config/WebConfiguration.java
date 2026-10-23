@@ -14,6 +14,7 @@ import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.List;
 
 @Configuration
@@ -36,8 +37,7 @@ public class WebConfiguration implements WebMvcConfigurer {
                 String origin = request.getHeader("Origin");
                 if (origin != null) {
                     boolean allowed = allowedOrigins.contains(origin)
-                            || origin.startsWith("http://localhost")
-                            || origin.startsWith("capacitor://localhost");
+                            || isLocalAppOrigin(origin);
                     log.debug("CORS origin: {} allowed={}", origin, allowed);
                     if (allowed) {
                         response.setHeader("Access-Control-Allow-Origin", origin);
@@ -57,6 +57,19 @@ public class WebConfiguration implements WebMvcConfigurer {
         FilterRegistrationBean<OncePerRequestFilter> bean = new FilterRegistrationBean<>(filter);
         bean.setOrder(0);
         return bean;
+    }
+
+    private static boolean isLocalAppOrigin(String origin) {
+        try {
+            URI uri = URI.create(origin);
+            return "localhost".equalsIgnoreCase(uri.getHost())
+                    && ("http".equalsIgnoreCase(uri.getScheme()) || "capacitor".equalsIgnoreCase(uri.getScheme()))
+                    && uri.getRawUserInfo() == null && uri.getRawQuery() == null && uri.getRawFragment() == null
+                    && (uri.getRawPath() == null || uri.getRawPath().isEmpty())
+                    && uri.getPort() >= -1 && uri.getPort() <= 65535;
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
     }
 
     @Override
