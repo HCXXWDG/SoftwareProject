@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { EmotionTag } from "../../types";
+import { scoreToColor } from "./viewport";
 import "./FeedbackPanel.css";
 
 const STRESS_LEVELS = [
@@ -152,12 +153,14 @@ export function FeedbackPanel({
               aria-pressed={stressLevel === value}
               className="map-surface__feedback-btn"
               data-stress={value}
+              style={{ "--stress-color": scoreToColor(value) } as CSSProperties}
               key={value}
               onClick={() => setStressLevel(value)}
               type="button"
             >
               <span className="map-surface__feedback-emoji">{emoji}</span>
               <span className="map-surface__feedback-label">{label}</span>
+              <span className="map-surface__stress-swatch" aria-hidden="true" />
             </button>
           ))}
         </div>

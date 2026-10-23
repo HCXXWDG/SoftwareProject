@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CampusPointPicker } from "../features/map/CampusPointPicker";
 import { isPointInBounds } from "../features/map/viewport";
-import { CAMPUS, WAYPOINTS, type Waypoint } from "../config/campus";
+import { SERVICE_AREA, DEFAULT_ORIGIN, DEFAULT_DESTINATION, WAYPOINTS, type Waypoint } from "../config/serviceArea";
 import type { GeoPoint } from "../types";
 import "./WelcomePage.css";
 
@@ -18,7 +18,7 @@ interface WelcomePageProps {
   ) => void;
 }
 
-export function WelcomePage({ onNavigateToPreview, initialOriginId = "dorm", initialDestinationId = "teaching", initialOrigin, initialDestination }: WelcomePageProps) {
+export function WelcomePage({ onNavigateToPreview, initialOriginId = DEFAULT_ORIGIN.id, initialDestinationId = DEFAULT_DESTINATION.id, initialOrigin, initialDestination }: WelcomePageProps) {
   const [originId, setOriginId] = useState(initialOrigin?.id ?? initialOriginId);
   const [destId, setDestId] = useState(initialDestination?.id ?? initialDestinationId);
   const [customPoints, setCustomPoints] = useState<Waypoint[]>([]);
@@ -45,13 +45,13 @@ export function WelcomePage({ onNavigateToPreview, initialOriginId = "dorm", ini
   const origin = options.find((w) => w.id === originId);
   const destination = options.find((w) => w.id === destId);
   const canGo = origin != null && destination != null
-    && isPointInBounds(origin.point, CAMPUS.bounds) && isPointInBounds(destination.point, CAMPUS.bounds)
+    && isPointInBounds(origin.point, SERVICE_AREA.bounds) && isPointInBounds(destination.point, SERVICE_AREA.bounds)
     && (origin.point.longitude !== destination.point.longitude || origin.point.latitude !== destination.point.latitude);
   const closePicker = () => {
     setPicking(null);
   };
   const selectPoint = (point: GeoPoint) => {
-    if (!picking || !isPointInBounds(point, CAMPUS.bounds)) return;
+    if (!picking || !isPointInBounds(point, SERVICE_AREA.bounds)) return;
     const id = `custom-${picking}-${point.longitude}-${point.latitude}`;
     const chosen = { id, name: `地图${picking}（${point.longitude.toFixed(5)}, ${point.latitude.toFixed(5)}）`, point };
     setCustomPoints(current => [...current.filter(option => option.id !== id), chosen]);
@@ -77,43 +77,45 @@ export function WelcomePage({ onNavigateToPreview, initialOriginId = "dorm", ini
   );
 
   if (picking) return <CampusPointPicker target={picking}
-    initialPoint={(picking === "起点" ? origin : destination)?.point ?? CAMPUS.center}
+    initialPoint={(picking === "起点" ? origin : destination)?.point ?? SERVICE_AREA.center}
     onSelect={selectPoint} onCancel={closePicker} />;
 
   return (
     <div className="welcome-page">
       <header className="welcome-page__masthead">
         <span className="welcome-page__brand"><svg aria-hidden="true" viewBox="0 0 32 32"><path d="M7 23C7 12 13 7 25 7c0 12-5 18-16 18" /><path d="m9 23 12-12M13 19v-6m4 2h6" /></svg>心途<span>走一段，轻松一点</span></span>
-        <span className="welcome-page__campus">江南大学 · 蠡湖校区</span>
+        <span className="welcome-page__region">无锡 · 梁溪区</span>
       </header>
       <main className="welcome-page__content">
       <section className="welcome-page__intro">
-        <p className="welcome-page__eyebrow">从校园的任何一处出发</p>
-        <h1 className="welcome-page__title">校园通勤情绪地图</h1>
+        <p className="welcome-page__eyebrow">从熟悉的街区，走向日常</p>
+        <h1 className="welcome-page__title">心途——通勤情绪地图</h1>
         <p className="welcome-page__subtitle">
-          选一段步行路线，看看沿途的情绪风景。<br />让每一次校园通勤，都多一点从容。
+          选一段步行路线，看看沿途的情绪风景。<br />让每一次日常通勤，都多一点从容。
         </p>
         <svg className="welcome-page__illustration" viewBox="0 0 440 280" aria-hidden="true">
           <rect x="8" y="12" width="424" height="252" rx="32" fill="#e8eee6" />
-          <path d="M8 186c73-30 113 15 175-7s110-44 249-20v105H8Z" fill="#d8e6cf" />
-          <path d="m55 247 84-79 82 23 65-98 105-49" fill="none" stroke="#fafcf8" strokeWidth="34" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="m55 247 84-79 82 23 65-98 105-49" fill="none" stroke="#18694f" strokeWidth="4" strokeDasharray="2 11" strokeLinecap="round" />
-          <rect x="46" y="66" width="104" height="66" rx="8" fill="#fbfcf7" stroke="#bacfba" strokeWidth="2" />
-          <path d="M38 70 98 40l60 30" fill="#d9ef6d" stroke="#bacfba" strokeWidth="2" strokeLinejoin="round" />
-          <path d="M66 87h13m19 0h13m19 0h7M66 108h13m19 0h13m19 0h7" stroke="#a6c3ad" strokeWidth="8" />
-          <rect x="303" y="169" width="77" height="57" rx="8" fill="#fbfcf7" stroke="#bacfba" strokeWidth="2" />
-          <path d="M315 189h12m17 0h12m-41 18h12m17 0h12" stroke="#a6c3ad" strokeWidth="7" />
-          <path d="M206 102v39m-22-47c0-32 44-32 44 0 0 30-44 30-44 0Z" fill="#b6cdb6" stroke="#92b49b" strokeWidth="2" />
-          <path d="M264 221v26m-15-41c0-23 30-23 30 0 0 21-30 21-30 0Z" fill="#b6cdb6" stroke="#92b49b" strokeWidth="2" />
-          <circle cx="55" cy="247" r="9" fill="#fff" stroke="#18694f" strokeWidth="4" />
-          <circle cx="391" cy="44" r="13" fill="#d9ef6d" stroke="#18694f" strokeWidth="3" />
-          <circle cx="391" cy="44" r="4" fill="#18694f" />
+          <path d="M8 197c70-31 128 18 195-6s137-32 229-2v75H8Z" fill="#d8e6cf" />
+          <path d="M18 148h404M172 24v228m99-228v228" fill="none" stroke="#fafcf8" strokeWidth="22" />
+          <rect x="40" y="48" width="49" height="78" rx="5" fill="#fbfcf7" stroke="#bacfba" strokeWidth="2" />
+          <rect x="97" y="70" width="48" height="56" rx="5" fill="#cedfce" stroke="#bacfba" strokeWidth="2" />
+          <path d="M52 64h8m9 0h8M52 82h8m9 0h8M52 100h8m9 0h8M108 85h8m9 0h8m-25 19h8m9 0h8" stroke="#93b29c" strokeWidth="5" />
+          <rect x="294" y="44" width="39" height="82" rx="5" fill="#d9ef6d" stroke="#bacfba" strokeWidth="2" />
+          <rect x="341" y="68" width="60" height="58" rx="5" fill="#fbfcf7" stroke="#bacfba" strokeWidth="2" />
+          <path d="M305 61h16m-16 18h16m-16 18h16m31-13h10m13 0h10m-33 19h10m13 0h10" stroke="#93b29c" strokeWidth="5" />
+          <rect x="297" y="177" width="107" height="61" rx="17" fill="#c1d7b7" />
+          <path d="m316 223 61-31" stroke="#f5f8ed" strokeWidth="9" strokeLinecap="round" />
+          <path d="M61 205v29m-17-42c0-25 34-25 34 0 0 24-34 24-34 0ZM118 194v24m-15-37c0-23 30-23 30 0 0 21-30 21-30 0ZM353 179v21m-13-33c0-20 26-20 26 0 0 20-26 20-26 0Z" fill="#a9c4a9" stroke="#86aa90" strokeWidth="2" />
+          <path d="M52 247h120v-99h49l50-42h119" fill="none" stroke="#18694f" strokeWidth="4" strokeDasharray="2 10" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="52" cy="247" r="9" fill="#fff" stroke="#18694f" strokeWidth="4" />
+          <circle cx="390" cy="106" r="13" fill="#d9ef6d" stroke="#18694f" strokeWidth="3" />
+          <circle cx="390" cy="106" r="4" fill="#18694f" />
         </svg>
         <p className="welcome-page__caption"><span /> 自由选点 · 步行规划 · 情绪反馈</p>
       </section>
-      <section className="welcome-page__planner" aria-label="规划校园步行路线">
+      <section className="welcome-page__planner" aria-label="规划步行路线">
         <div className="welcome-page__planner-heading"><span className="welcome-page__step">01</span><h2>今天，想走到哪里？</h2></div>
-        <p className="welcome-page__instructions">在地图上自由选择校区内位置，或使用下方常用地点。</p>
+        <p className="welcome-page__instructions">在地图上自由选择梁溪区地图范围内的位置，或使用下方常用地点。</p>
 
         <div className="welcome-page__section">
           <p className="welcome-page__label"><span className="welcome-page__location-dot" />选择起点<span className="welcome-page__label-note">从哪里出发</span></p>
@@ -147,7 +149,7 @@ export function WelcomePage({ onNavigateToPreview, initialOriginId = "dorm", ini
         >
           查看路线
         </button>
-        <p className="welcome-page__footnote">每一条反馈，都是了解校园的一小步。</p>
+        <p className="welcome-page__footnote">每一条反馈，都是了解这座城市的一小步。</p>
       </section>
       </main>
     </div>

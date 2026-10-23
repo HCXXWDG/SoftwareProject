@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import type { MapPageState } from "../types";
 import type { HeatmapScope } from "../services/heatmap";
+import { STRESS_COLOR_GRADIENT } from "../features/map/viewport";
 import "./MapPage.css";
 
 export interface MapPageProps {
@@ -32,8 +33,12 @@ export function MapPage({ state, mapSlot, heatmapScope = "REAL_ONLY", onHeatmapS
         </div>}
         <p>{demo ? "当前显示：演示热力图（模拟反馈）。不影响路线规划、评分或真实统计。"
           : "当前显示：真实反馈热力图，统计当前地图范围内近 7 天的情绪反馈。"}</p>
+        <div className="map-page__pressure-scale" role="img" aria-label="压力颜色图例：0低压力蓝色，25青色，50黄色，75橙色，100高压力红色">
+          <div className="map-page__pressure-bar" style={{ background: STRESS_COLOR_GRADIENT }} />
+          <div className="map-page__pressure-ticks"><span>0 · 低压力</span><span>25</span><span>50</span><span>75</span><span>100 · 高压力</span></div>
+        </div>
         {!loading && !error && !hasData && <p className="map-page__empty">
-          {demo ? "当前地图范围近 7 天暂无模拟反馈，可移动地图查看其他校园区域，或切回真实反馈。"
+          {demo ? "当前地图范围近 7 天暂无模拟反馈，可移动地图查看其他街区，或切回真实反馈。"
             : "当前地图范围近 7 天暂无真实反馈，因此暂时没有热力点。可在地图上点“记录此处感受”提交反馈，或切换演示热力图查看效果。"}
         </p>}
       </section>

@@ -1,6 +1,6 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CAMPUS } from "../../config/campus";
+import { SERVICE_AREA } from "../../config/serviceArea";
 import type { MapFeedbackDraft } from "../../types";
 import { resetAMapLoaderForTests, type AMapNamespaceLike } from "./amapLoader";
 import { MapSurface, type MapSurfaceProps } from "./MapSurface";
@@ -12,17 +12,17 @@ function installAMap() {
       destroy() {}
       getBounds() {
         return {
-          getNorthEast: () => ({ lng: CAMPUS.bounds.east, lat: CAMPUS.bounds.north }),
-          getSouthWest: () => ({ lng: CAMPUS.bounds.west, lat: CAMPUS.bounds.south }),
+          getNorthEast: () => ({ lng: SERVICE_AREA.bounds.east, lat: SERVICE_AREA.bounds.north }),
+          getSouthWest: () => ({ lng: SERVICE_AREA.bounds.west, lat: SERVICE_AREA.bounds.south }),
         };
       }
       getZoom() { return 16; }
-      getCenter() { return { lng: CAMPUS.center.longitude, lat: CAMPUS.center.latitude }; }
+      getCenter() { return { lng: SERVICE_AREA.center.longitude, lat: SERVICE_AREA.center.latitude }; }
       setCenter() {}
       setZoom() {}
       lngLatToContainer() { return { x: 380, y: 250 }; }
       containerToLngLat() {
-        return { getLng: () => CAMPUS.center.longitude, getLat: () => CAMPUS.center.latitude };
+        return { getLng: () => SERVICE_AREA.center.longitude, getLat: () => SERVICE_AREA.center.latitude };
       }
       off(eventName: string) { listeners.delete(eventName); }
       on(eventName: string, listener: () => void) { listeners.set(eventName, listener); }
@@ -51,6 +51,8 @@ function makeProps(overrides: Partial<MapSurfaceProps> = {}): MapSurfaceProps {
 async function readyMap(props: MapSurfaceProps) {
   const result = render(<MapSurface {...props} />);
   await screen.findByText("高德地图");
+  // The badge commits before the effect reports the mode. Wait for the observed callback before using fake gesture timers.
+  if (props.onModeChange) await waitFor(() => expect(props.onModeChange).toHaveBeenLastCalledWith("amap"));
   vi.spyOn(screen.getByTestId("map-canvas"), "getBoundingClientRect").mockReturnValue({
     bottom: 650, height: 600, left: 100, right: 1060,
     top: 50, width: 960, x: 100, y: 50, toJSON: () => ({}),
@@ -62,7 +64,7 @@ async function readyMap(props: MapSurfaceProps) {
 async function longPress(clientX = 480, clientY = 300) {
   const event = new MouseEvent("pointerdown", { bubbles: true, clientX, clientY });
   Object.defineProperty(event, "pointerId", { value: 1 });
-  fireEvent(screen.getByLabelText("校园通勤情绪地图"), event);
+  fireEvent(screen.getByLabelText("心途——通勤情绪地图"), event);
   await act(async () => { await vi.advanceTimersByTimeAsync(650); });
 }
 
@@ -131,7 +133,7 @@ describe("MapSurface feedback submission boundary", () => {
     expect(onFeedbackSubmit).toHaveBeenCalledTimes(2);
     expect(onFeedbackSubmit.mock.calls[1][0]).toEqual(onFeedbackSubmit.mock.calls[0][0]);
     expect(onFeedbackSubmit.mock.calls[1][0]).toEqual({
-      location: CAMPUS.center, stressLevel: 75, tag: "CROWD",
+      location: SERVICE_AREA.center, stressLevel: 75, tag: "CROWD",
     });
     expect(screen.queryByTestId("feedback-panel")).not.toBeInTheDocument();
     expect(screen.getByTestId("emoji-fountain")).toHaveStyle({ left: "380px", top: "250px" });
@@ -195,7 +197,7 @@ describe("MapSurface feedback submission boundary", () => {
     rerender(<MapSurface {...props} feedbackEnabled />);
     expect(screen.getByRole("button", { name: "提交反馈" })).toBeEnabled();
     await submit();
-    expect(onFeedbackSubmit).toHaveBeenCalledWith({ location: CAMPUS.center, stressLevel: 75, tag: "CROWD" });
+    expect(onFeedbackSubmit).toHaveBeenCalledWith({ location: SERVICE_AREA.center, stressLevel: 75, tag: "CROWD" });
   });
 
   it("reports loading and AMap modes through its callback", async () => {
@@ -211,6 +213,6 @@ describe("MapSurface feedback submission boundary", () => {
     render(<MapSurface {...makeProps({ onModeChange, feedbackEnabled: false })} />);
     await screen.findByText("离线演示地图");
 
-    expect(onModeChange.mock.calls.map(([mode]) => mode)).toEqual(["loading", "offline"]);
+    await waitFor(() => expect(onModeChange.mock.calls.map(([mode]) => mode)).toEqual(["loading", "offline"]));
   });
 });

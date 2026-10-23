@@ -141,3 +141,7 @@
   .map-page__source-options button { transition: none; }
   .map-page__spinner { animation-duration: 1.5s; }
 }
+
+.map-page__pressure-scale { max-width: 380px; margin-top: 12px; }
+.map-page__pressure-bar { height: 9px; border-radius: 9px; border: 1px solid #17352e15; }
+.map-page__pressure-ticks { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-top: 5px; color: var(--muted, #61736a); font-size: 10px; white-space: nowrap; }

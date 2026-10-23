@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RoutePreviewPage } from "./RoutePreviewPage";
-import { DEFAULT_DESTINATION, DEFAULT_ORIGIN, WAYPOINTS } from "../config/campus";
+import { DEFAULT_DESTINATION, DEFAULT_ORIGIN, WAYPOINTS } from "../config/serviceArea";
 import { compareRoutes } from "../services/route";
 import { ApiError } from "../services/api";
 import { deferred, routeComparison } from "../test/fixtures";
@@ -51,10 +51,10 @@ describe("RoutePreviewPage", () => {
     const oldSignal = request.mock.calls[0][1];
     rerender(<RoutePreviewPage {...baseProps} destination={WAYPOINTS[2].point} onEnterMap={vi.fn()} />);
     expect(oldSignal?.aborted).toBe(true);
-    const next = { ...routeComparison, routes: [{ ...routeComparison.routes[0], label: "图书馆新路线" }] };
+    const next = { ...routeComparison, routes: [{ ...routeComparison.routes[0], label: "无锡站新路线" }] };
     await act(async () => recent.resolve(next));
     await act(async () => old.resolve(routeComparison));
-    expect(screen.getByText("图书馆新路线")).toBeInTheDocument();
+    expect(screen.getByText("无锡站新路线")).toBeInTheDocument();
     expect(screen.queryByText(routeComparison.routes[1].label)).not.toBeInTheDocument();
   });
   it("does not display cancellation as failure", async () => {

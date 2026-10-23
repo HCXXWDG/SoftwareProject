@@ -12,7 +12,7 @@ import { getDeviceIdentityState } from "./services/api";
 import { useHeatmapQuery } from "./hooks/useHeatmapQuery";
 import { useTripNavigation } from "./hooks/useTripNavigation";
 import { useTrendsHistory } from "./hooks/useTrendsHistory";
-import { CAMPUS_VIEWPORT_CONSTRAINT, DEFAULT_DESTINATION, DEFAULT_ORIGIN, WAYPOINTS } from "./config/campus";
+import { SERVICE_VIEWPORT_CONSTRAINT, DEFAULT_DESTINATION, DEFAULT_ORIGIN, WAYPOINTS } from "./config/serviceArea";
 import { formatDuration, routePanelPresentation, routeSourceLabel, tripCapabilities } from "./config/capabilities";
 import type { BackendStatus, BaseMapMode, GeoPoint, MapFeedbackDraft, RouteComparison } from "./types";
 import "./App.css";
@@ -116,9 +116,9 @@ export default function App() {
     <header className="app-header">
       <button className="app-brand" type="button" aria-label="心途首页" onClick={() => navigate("welcome")}>
         <svg aria-hidden="true" viewBox="0 0 40 40" fill="none"><rect width="40" height="40" rx="13" fill="currentColor"/><path d="M11 27c0-8 18 2 18-9 0-7-8-8-8-1 0 4 5 3 5-1" stroke="#d9ef6d" strokeWidth="3" strokeLinecap="round"/><circle cx="12" cy="12" r="3" fill="#fff"/></svg>
-        <span><strong>心途</strong><small>XINTU CAMPUS</small></span>
+        <span><strong>心途</strong><small>XINTU COMMUTE</small></span>
       </button>
-      <span className="app-campus">江南大学 · 蠡湖校区</span>
+      <span className="app-campus">无锡 · 梁溪区</span>
     </header>
     <nav className="app-toolbar" aria-label="通勤导航">
       <button type="button" onClick={() => navigate("welcome")}>修改起终点</button>
@@ -142,7 +142,7 @@ export default function App() {
           onFeedbackOpen={() => { setFeedbackNotice(null); setFeedbackSaved(false); }}
         onRouteSelect={(id) => { if (comparison.routes.some((r) => r.id === id)) setSelectedRouteId(id); }}
         onViewportChange={heatmap.updateViewport} onModeChange={setBaseMap}
-        origin={selection.origin} destination={selection.destination} viewportConstraint={CAMPUS_VIEWPORT_CONSTRAINT} />} />
+        origin={selection.origin} destination={selection.destination} viewportConstraint={SERVICE_VIEWPORT_CONSTRAINT} />} />
     {capabilities.showScores ? <RoutePanel {...routePanelPresentation(comparison)} routes={comparison.routes} selectedRouteId={selectedRouteId} onSelectRoute={setSelectedRouteId} />
       : <nav className="app-route-choices" aria-label="路线对比">
         {comparison.routes.map((route) => <button key={route.id} type="button" aria-label={`选择 ${route.label}`}

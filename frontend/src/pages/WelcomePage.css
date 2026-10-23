@@ -3,12 +3,12 @@
 .welcome-page__brand { display: flex; align-items: center; gap: 9px; font-size: 23px; font-weight: 750; letter-spacing: 1px; }
 .welcome-page__brand svg { width: 34px; height: 34px; fill: none; stroke: var(--primary, #18694f); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .welcome-page__brand > span { margin-left: 10px; color: var(--muted, #667b73); font-size: 12px; font-weight: 400; letter-spacing: 1px; }
-.welcome-page__campus { color: var(--muted, #667b73); border: 1px solid var(--line, #dbe5df); padding: 8px 13px; border-radius: 30px; font-size: 12px; }
+.welcome-page__region { color: var(--muted, #667b73); border: 1px solid var(--line, #dbe5df); padding: 8px 13px; border-radius: 30px; font-size: 12px; white-space: nowrap; }
 .welcome-page__content { display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); gap: clamp(32px, 6vw, 88px); max-width: 1080px; margin: auto; align-items: start; }
 .welcome-page__intro { padding-top: 40px; min-width: 0; }
 .welcome-page__eyebrow { display: flex; align-items: center; gap: 9px; margin: 0 0 18px; color: var(--primary, #18694f); font-size: 13px; letter-spacing: 2px; }
 .welcome-page__eyebrow::before { content: ''; width: 22px; height: 2px; background: currentColor; }
-.welcome-page__title { margin: 0 0 18px; font-size: clamp(27px, 3vw, 38px); font-weight: 750; letter-spacing: -.8px; line-height: 1.5; }
+.welcome-page__title { margin: 0 0 18px; font-size: clamp(25px, 2.7vw, 36px); font-weight: 750; letter-spacing: -.8px; line-height: 1.5; overflow-wrap: anywhere; text-wrap: balance; }
 .welcome-page__subtitle { margin: 0; color: var(--muted, #667b73); font-size: 15px; line-height: 1.9; }
 .welcome-page__illustration { display: block; width: 100%; max-width: 440px; height: auto; margin: 34px 0 12px; }
 .welcome-page__caption { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--muted, #667b73); font-size: 12px; letter-spacing: 1px; }
@@ -44,11 +44,11 @@
   .welcome-page__masthead { margin-bottom: 28px; }
   .welcome-page__brand { font-size: 21px; }
   .welcome-page__brand > span { display: none; }
-  .welcome-page__campus { padding: 6px 10px; font-size: 10px; }
+  .welcome-page__region { padding: 6px 10px; font-size: 10px; }
   .welcome-page__content { display: block; max-width: 500px; }
   .welcome-page__intro { padding: 0 4px; position: relative; }
   .welcome-page__eyebrow { margin-bottom: 10px; font-size: 11px; }
-  .welcome-page__title { font-size: 28px; margin-bottom: 9px; }
+  .welcome-page__title { font-size: clamp(21px, 5.4vw, 28px); margin-bottom: 9px; }
   .welcome-page__subtitle { font-size: 13px; line-height: 1.8; }
   .welcome-page__illustration { height: 130px; width: auto; margin: 10px auto 6px; }
   .welcome-page__caption { justify-content: center; font-size: 10px; margin-bottom: 22px; }
@@ -59,7 +59,7 @@
 @media (max-width: 359px) {
   .welcome-page { padding-left: 12px; padding-right: 12px; }
   .welcome-page__planner { padding: 18px; }
-  .welcome-page__title { font-size: 26px; letter-spacing: -1px; }
+  .welcome-page__title { font-size: 21px; letter-spacing: -.8px; }
   .welcome-page__illustration { height: 115px; }
   .welcome-page__point { font-size: 11px; padding: 7px 8px; }
 }

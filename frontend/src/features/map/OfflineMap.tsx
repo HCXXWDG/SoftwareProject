@@ -9,6 +9,7 @@ import {
   type WheelEvent,
 } from "react";
 import type { GeoPoint } from "../../types";
+import { SERVICE_AREA } from "../../config/serviceArea";
 import {
   calculateViewport,
   clampCenterToBounds,
@@ -24,8 +25,8 @@ import {
   type ProjectedPoint,
 } from "./viewport";
 
-const MIN_ZOOM = 11;
-const MAX_ZOOM = 18;
+const MIN_ZOOM = SERVICE_AREA.minZoom;
+const MAX_ZOOM = SERVICE_AREA.maxZoom;
 const KEYBOARD_PAN_PIXELS = 80;
 
 interface OfflineMapProps {
@@ -220,10 +221,10 @@ export function OfflineMap({
       <div className="map-surface__offline-road map-surface__offline-road--two" />
       <div className="map-surface__offline-road map-surface__offline-road--three" />
       <span className="map-surface__offline-place map-surface__offline-place--one">
-        学生公寓区
+        城市步道
       </span>
       <span className="map-surface__offline-place map-surface__offline-place--two">
-        第一教学楼
+        街区绿地
       </span>
 
       <div aria-label="地图缩放" className="map-surface__zoom-controls">

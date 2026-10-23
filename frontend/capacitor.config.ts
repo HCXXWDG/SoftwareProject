@@ -2,7 +2,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
   appId: "com.jiangnan.course.commutemoodmap",
-  appName: "校园通勤情绪地图",
+  appName: "心途——通勤情绪地图",
   webDir: "dist",
   server: {
     androidScheme: "http",
@@ -18,11 +18,11 @@ const config: CapacitorConfig = {
       launchAutoHide: true,
       androidScaleType: "CENTER_CROP",
       showSpinner: true,
-      spinnerColor: "#2368ff",
+      spinnerColor: "#18694f",
     },
     StatusBar: {
       style: "DARK",
-      backgroundColor: "#2368ff",
+      backgroundColor: "#f3f6f3",
     },
   },
 };

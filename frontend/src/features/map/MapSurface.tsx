@@ -345,7 +345,7 @@ export function MapSurface({
 
   return (
     <section
-      aria-label="校园通勤情绪地图"
+      aria-label="心途——通勤情绪地图"
       className="map-surface"
       data-map-mode={mode}
       onPointerCancel={finishHeatDrag}

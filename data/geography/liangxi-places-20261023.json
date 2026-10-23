@@ -1,0 +1,52 @@
+[
+  {
+    "name": "南禅寺",
+    "providerName": "南禅寺",
+    "district": "梁溪区",
+    "adcode": "320213",
+    "location": "120.308640,31.566744",
+    "address": "向阳路32号(南禅寺地铁站8号口步行190米)",
+    "longitude": 120.30864,
+    "latitude": 31.566744
+  },
+  {
+    "name": "崇安寺",
+    "providerName": "崇安寺",
+    "district": "梁溪区",
+    "adcode": "320213",
+    "location": "120.301784,31.578312",
+    "address": "中山路308号",
+    "longitude": 120.301784,
+    "latitude": 31.578312
+  },
+  {
+    "name": "无锡站",
+    "providerName": "无锡站",
+    "district": "梁溪区",
+    "adcode": "320213",
+    "location": "120.306343,31.588016",
+    "address": "车站路1号",
+    "longitude": 120.306343,
+    "latitude": 31.588016
+  },
+  {
+    "name": "东林书院",
+    "providerName": "东林书院",
+    "district": "梁溪区",
+    "adcode": "320213",
+    "location": "120.308567,31.576862",
+    "address": "解放东路867号(东林广场地铁站出入口旁)",
+    "longitude": 120.308567,
+    "latitude": 31.576862
+  },
+  {
+    "name": "清名桥",
+    "providerName": "清名桥古运河景区",
+    "district": "梁溪区",
+    "adcode": "320213",
+    "location": "120.318564,31.557328",
+    "address": "永乐路与南长街交汇处",
+    "longitude": 120.318564,
+    "latitude": 31.557328
+  }
+]

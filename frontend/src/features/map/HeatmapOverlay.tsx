@@ -61,6 +61,19 @@ export function HeatmapOverlay({
     [cells, project, viewportRevision],
   );
   const selected = projectedCells.find(({ cell }) => cell.cellId === selectedCellId);
+  // Keep the full heat field, but prevent 44px buttons from covering each other
+  // in the district overview. A selected cell keeps its own identity on zoom.
+  const interactiveCellIds = useMemo(() => {
+    const accepted: typeof projectedCells = [];
+    const ordered = [...projectedCells].sort((a, b) =>
+      Number(b.cell.cellId === selectedCellId) - Number(a.cell.cellId === selectedCellId)
+      || a.cell.cellId.localeCompare(b.cell.cellId));
+    for (const candidate of ordered) {
+      if (!accepted.some(({ point }) => Math.abs(point.x - candidate.point.x) < 48
+        && Math.abs(point.y - candidate.point.y) < 48)) accepted.push(candidate);
+    }
+    return new Set(accepted.map(({ cell }) => cell.cellId));
+  }, [projectedCells, selectedCellId]);
   const detailsVisible = !!selected && interactionEnabled && detailsPosition !== null;
 
   const closeDetails = useCallback(() => {
@@ -141,6 +154,13 @@ export function HeatmapOverlay({
         const { inner, outer } = scoreToGradient(cell.score);
         const opacity = confidenceToOpacity(cell.confidence);
         const glow = scoreToColor(cell.score).replace("rgb(", "rgba(").replace(")", ", 0.45)");
+        const haloStyle = {
+          width: `${size * 1.3}px`, height: `${size * 1.3}px`, opacity,
+          background: `radial-gradient(circle at 50% 50%, ${inner}, ${glow} 35%, ${outer} 65%, transparent 100%)`,
+        };
+        if (!interactiveCellIds.has(cell.cellId)) return <span key={cell.cellId} aria-hidden="true"
+          className="heatmap-point__halo heatmap-point__halo--passive" data-testid="heatmap-point-halo"
+          data-cell-id={cell.cellId} style={{ ...haloStyle, left: `${point.x}px`, top: `${point.y}px` }} />;
         return (
           <button
             aria-label={`热力点 压力${Math.round(cell.score)} ${cell.dominantTag}`}
@@ -182,15 +202,14 @@ export function HeatmapOverlay({
             } as CSSProperties}
             type="button"
           >
-            <span aria-hidden="true" className="heatmap-point__halo" data-testid="heatmap-point-halo" style={{
-              width: `${size * 1.3}px`, height: `${size * 1.3}px`, opacity,
-              background: `radial-gradient(circle at 50% 50%, ${inner}, ${glow} 35%, ${outer} 65%, transparent 100%)`,
-            }} />
+            <span aria-hidden="true" className="heatmap-point__halo" data-testid="heatmap-point-halo" style={haloStyle} />
             <span aria-hidden="true" className="heatmap-point__center" />
             <span aria-hidden="true" className="heatmap-point__selection" />
           </button>
         );
       })}
+
+      {interactiveCellIds.size < projectedCells.length && <p className="heatmap-density-hint">放大地图可查看更细的热力点</p>}
 
       {selected && interactionEnabled && (
         <div
@@ -214,6 +233,7 @@ export function HeatmapOverlay({
           />
           <div className="map-surface__cell-details-body">
             <span className="heatmap-details__selected">已选热力点</span>
+            <span className="heatmap-details__scope">以下为此单元格数据</span>
             <strong>{tagLabel(selected.cell.dominantTag)}</strong>
             <span>压力 {Math.round(selected.cell.score)}</span>
             <span>置信度 {Math.round(selected.cell.confidence * 100)}%</span>

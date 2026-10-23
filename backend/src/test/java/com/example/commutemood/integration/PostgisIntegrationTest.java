@@ -29,6 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Testcontainers(disabledWithoutDocker = true)
 class PostgisIntegrationTest {
     private static final String DEVICE_HASH_SALT = "local-demo-salt-change-before-deploy";
+    // V3/V5 remain immutable historical migrations; they seeded the former campus demo area.
+    private static final String HISTORICAL_CAMPUS_BBOX = "120.26067,31.47278,120.27946,31.49417";
 
     @Container
     @SuppressWarnings("resource")
@@ -50,14 +52,25 @@ class PostgisIntegrationTest {
     private MockMvc mockMvc;
 
     @Test
-    void servesHeatmapFromFlywaySeed() throws Exception {
+    void preservesHistoricalFlywaySeedsWithoutClaimingLiangxiDemoCoverage() throws Exception {
         mockMvc.perform(get("/api/v1/heatmap")
-                        .param("bbox", DemoGeography.HEATMAP_BBOX)
+                        .param("bbox", HISTORICAL_CAMPUS_BBOX)
                         .param("zoom", "16")
                         .param("scope", "SIMULATED_ONLY")
                         .param("hours", "168"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].cellId").exists());
+                .andExpect(jsonPath("$[0].cellId").exists())
+                .andExpect(jsonPath("$[0].feedbackSource").value("DEMO"));
+
+        // Only the in-memory demo moved to Liangxi in this release. A dedicated future
+        // migration is needed before PostgreSQL can provide Liangxi simulated heatmaps.
+        mockMvc.perform(get("/api/v1/heatmap")
+                        .param("bbox", DemoGeography.HEATMAP_BBOX)
+                        .param("zoom", "12")
+                        .param("scope", "SIMULATED_ONLY")
+                        .param("hours", "168"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test

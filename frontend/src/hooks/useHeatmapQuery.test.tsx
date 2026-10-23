@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CAMPUS_DEFAULT_BBOX } from "../config/campus";
+import { SERVICE_DEFAULT_BBOX, SERVICE_AREA } from "../config/serviceArea";
 import { ApiError, type ApiErrorKind } from "../services/api";
 import { fetchHeatmap } from "../services/heatmap";
 import type { BackendStatus, HeatmapCell } from "../types";
@@ -73,7 +73,7 @@ describe("useHeatmapQuery", () => {
     act(() => { void result.current.setScope("SIMULATED_ONLY"); });
     expect(result.current).toMatchObject({ scope: "SIMULATED_ONLY", cells: [], loading: true });
     await settle();
-    expect(query).toHaveBeenLastCalledWith(CAMPUS_DEFAULT_BBOX, 16, 168, expect.any(AbortSignal), "SIMULATED_ONLY");
+    expect(query).toHaveBeenLastCalledWith(SERVICE_DEFAULT_BBOX, SERVICE_AREA.defaultZoom, 168, expect.any(AbortSignal), "SIMULATED_ONLY");
     expect(result.current.cells).toEqual(originalCells);
 
     act(() => { void result.current.setScope("REAL_ONLY"); });
@@ -134,7 +134,7 @@ describe("useHeatmapQuery", () => {
     expect(query).not.toHaveBeenCalled();
     rerender({ enabled: true });
     await settle();
-    expect(query).toHaveBeenLastCalledWith(CAMPUS_DEFAULT_BBOX, 16, 168, expect.any(AbortSignal), "SIMULATED_ONLY");
+    expect(query).toHaveBeenLastCalledWith(SERVICE_DEFAULT_BBOX, SERVICE_AREA.defaultZoom, 168, expect.any(AbortSignal), "SIMULATED_ONLY");
     act(() => { void result.current.setScope("SIMULATED_ONLY"); });
     await settle();
     expect(query).toHaveBeenCalledOnce();
@@ -161,7 +161,7 @@ describe("useHeatmapQuery", () => {
     const onBackend = vi.fn();
     const { result } = renderHook(() => useHeatmapQuery(true, onBackend));
 
-    expect(query).toHaveBeenCalledWith(CAMPUS_DEFAULT_BBOX, 16, 168, expect.any(AbortSignal), "REAL_ONLY");
+    expect(query).toHaveBeenCalledWith(SERVICE_DEFAULT_BBOX, SERVICE_AREA.defaultZoom, 168, expect.any(AbortSignal), "REAL_ONLY");
     expect(result.current.loading).toBe(true);
     await settle(() => response.resolve(originalCells));
 

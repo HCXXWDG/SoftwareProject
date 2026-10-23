@@ -147,7 +147,7 @@ test.describe("Full-stack demo flow", () => {
     await alternativeButton.click();
     await expect(alternativeButton).toHaveAttribute("aria-pressed", "true");
 
-    const mapSection = page.locator("[aria-label='校园通勤情绪地图']");
+    const mapSection = page.locator("[aria-label='心途——通勤情绪地图']");
     const box = await mapSection.boundingBox();
     expect(box).not.toBeNull();
 

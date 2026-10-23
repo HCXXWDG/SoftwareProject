@@ -59,11 +59,7 @@
   border-color: var(--primary, #18694f);
   box-shadow: inset 0 0 0 1px var(--primary, #18694f);
 }
-.map-surface__feedback-panel .map-surface__feedback-btn[data-stress="0"] { --stress-color: #277650; }
-.map-surface__feedback-panel .map-surface__feedback-btn[data-stress="25"] { --stress-color: #65833a; }
-.map-surface__feedback-panel .map-surface__feedback-btn[data-stress="50"] { --stress-color: #a17b21; }
-.map-surface__feedback-panel .map-surface__feedback-btn[data-stress="75"] { --stress-color: #b35f34; }
-.map-surface__feedback-panel .map-surface__feedback-btn[data-stress="100"] { --stress-color: #a5413f; }
+.map-surface__stress-swatch { width: 20px; height: 4px; border-radius: 4px; background: var(--stress-color); }
 .map-surface__feedback-panel .map-surface__feedback-btn[data-stress][aria-pressed="true"] {
   border-color: var(--stress-color);
   box-shadow: inset 0 0 0 1px var(--stress-color);

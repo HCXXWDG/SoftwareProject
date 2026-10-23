@@ -264,7 +264,7 @@
   font-size: 11px;
 }
 
-/* 校园起终点标记 */
+/* 起终点标记 */
 .map-surface__campus-marker {
   position: absolute;
   z-index: 4;

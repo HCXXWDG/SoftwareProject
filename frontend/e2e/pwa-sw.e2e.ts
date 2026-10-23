@@ -8,7 +8,7 @@ async function mockAPI(page: Page) {
     const path = new URL(route.request().url()).pathname;
     network.requests.push(route.request().url());
     if (path === "/api/v1/heatmap") return route.fulfill({ json: [{
-      cellId: "16:133638:34976", center: { longitude: 120.274, latitude: 31.479 },
+      cellId: "16:133638:34976", center: { longitude: 120.296676, latitude: 31.571576 },
       score: network.heatScore, confidence: 0.72, count: 18, dominantTag: "NOISE",
     }] });
     if (path === "/api/v1/routes/compare") return route.fulfill({ json: {
@@ -17,8 +17,8 @@ async function mockAPI(page: Page) {
         stressExposure: 67.2, stressScore: 50.4, confidence: 0.68,
         fastest: true, leastStressful: false,
         polyline: [
-          { longitude: 120.273510, latitude: 31.475328 },
-          { longitude: 120.274319, latitude: 31.483275 },
+          { longitude: 120.296186, latitude: 31.567904 },
+          { longitude: 120.296995, latitude: 31.575851 },
         ],
       }],
       fastestRouteId: "route-fast", leastStressfulRouteId: "route-fast",
@@ -101,7 +101,7 @@ test.describe("PWA Service Worker NetworkOnly", () => {
     expect(response.status()).toBe(200);
     const manifest = await response.json();
     expect(manifest.display).toBe("standalone");
-    expect(manifest.name).toContain("校园通勤情绪地图");
+    expect(manifest.name).toContain("心途——通勤情绪地图");
   });
 
   test("includes 192/512 pixel and maskable icons backed by accessible assets", async ({ page }) => {
@@ -126,7 +126,7 @@ test.describe("PWA Service Worker NetworkOnly", () => {
     expect(keys.some(url => new URL(url).pathname.startsWith("/api/"))).toBe(false);
     await page.context().setOffline(true);
     await page.reload();
-    await expect(page.getByRole("heading", { name: "校园通勤情绪地图", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "心途——通勤情绪地图", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "查看路线", exact: true })).toBeEnabled();
     await page.context().setOffline(false);
   });

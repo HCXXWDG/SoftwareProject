@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CAMPUS, DEFAULT_DESTINATION, DEFAULT_ORIGIN, WAYPOINTS } from "../src/config/campus";
+import { SERVICE_AREA, DEFAULT_DESTINATION, DEFAULT_ORIGIN, WAYPOINTS } from "../src/config/serviceArea";
 import { emptyTrend, routeComparison } from "../src/test/fixtures";
 import type { GeoPoint, HeatmapCell } from "../src/types";
 
@@ -20,10 +20,10 @@ async function mockBackend(page: Page, cellsForViewport?: (url: URL) => HeatmapC
 }
 
 function expectCampusPoint(point: GeoPoint) {
-  expect(point.longitude).toBeGreaterThanOrEqual(CAMPUS.bounds.west);
-  expect(point.longitude).toBeLessThanOrEqual(CAMPUS.bounds.east);
-  expect(point.latitude).toBeGreaterThanOrEqual(CAMPUS.bounds.south);
-  expect(point.latitude).toBeLessThanOrEqual(CAMPUS.bounds.north);
+  expect(point.longitude).toBeGreaterThanOrEqual(SERVICE_AREA.bounds.west);
+  expect(point.longitude).toBeLessThanOrEqual(SERVICE_AREA.bounds.east);
+  expect(point.latitude).toBeGreaterThanOrEqual(SERVICE_AREA.bounds.south);
+  expect(point.latitude).toBeLessThanOrEqual(SERVICE_AREA.bounds.north);
   expect(WAYPOINTS.some(waypoint => waypoint.point.longitude === point.longitude
     && waypoint.point.latitude === point.latitude)).toBe(false);
 }
@@ -33,7 +33,7 @@ for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 });
     await mockBackend(page);
     await page.goto("/");
-    await page.getByRole("group", { name: "选择终点", exact: true }).getByRole("button", { name: "图书馆", exact: true }).click();
+    await page.getByRole("group", { name: "选择终点", exact: true }).getByRole("button", { name: "无锡站", exact: true }).click();
 
     await page.getByRole("button", { name: "地图选择起点", exact: true }).click();
     const picker = page.getByRole("dialog", { name: "地图选择起点", exact: true });
@@ -49,7 +49,7 @@ for (const width of [390, 320]) {
     await expect(selectedOrigin).toHaveAttribute("aria-pressed", "true");
     const originLabel = await selectedOrigin.innerText();
     await expect(page.getByRole("group", { name: "选择终点", exact: true })
-      .getByRole("button", { name: "图书馆", exact: true })).toHaveAttribute("aria-pressed", "true");
+      .getByRole("button", { name: "无锡站", exact: true })).toHaveAttribute("aria-pressed", "true");
 
     // Moving a draft destination must not change the selected destination after cancellation.
     await page.getByRole("button", { name: "地图选择终点", exact: true }).click();
@@ -60,7 +60,7 @@ for (const width of [390, 320]) {
     await expect(destinationPicker).toHaveCount(0);
     await expect(selectedOrigin).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("group", { name: "选择终点", exact: true })
-      .getByRole("button", { name: "图书馆", exact: true })).toHaveAttribute("aria-pressed", "true");
+      .getByRole("button", { name: "无锡站", exact: true })).toHaveAttribute("aria-pressed", "true");
 
     const request = page.waitForRequest("**/api/v1/routes/compare");
     await page.getByRole("button", { name: "查看路线", exact: true }).click();
@@ -75,7 +75,7 @@ for (const width of [390, 320]) {
     await page.reload();
     expect((await restoredRequest).postDataJSON()).toMatchObject(endpoints);
     await expect(page.getByRole("heading", { name: "路线预览", exact: true })).toBeVisible();
-    await expect(page.getByText(`${originLabel} → 图书馆`, { exact: true })).toBeVisible();
+    await expect(page.getByText(`${originLabel} → 无锡站`, { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "修改起终点", exact: true }).click();
     await expect(page.getByRole("group", { name: "选择起点", exact: true })
       .getByRole("button", { name: originLabel, exact: true })).toHaveAttribute("aria-pressed", "true");

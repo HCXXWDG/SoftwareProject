@@ -6,7 +6,7 @@ const api = (page: Page, path: string, method = "GET") => page.waitForResponse((
 test("D03 正向标签可经真实服务提交并通过前端热力校验", async ({ page }) => {
   await page.goto("/");
   for (const [index, tag] of ["QUIET", "SHADE", "OPEN"].entries()) {
-    const location = { longitude: 120.2615 + index * 0.0008, latitude: 31.4736 };
+    const location = { longitude: 120.284176 + index * 0.0008, latitude: 31.566176 };
     const bbox = `${location.longitude - 0.00001},${location.latitude - 0.00001},${location.longitude + 0.00001},${location.latitude + 0.00001}`;
     const result = await page.evaluate(async (input) => {
       const reportModule = "/src/services/report.ts";

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CAMPUS_DEFAULT_BBOX } from "../config/campus";
+import { SERVICE_AREA, SERVICE_DEFAULT_BBOX } from "../config/serviceArea";
 import { ApiError, isRequestCancelled } from "../services/api";
 import { fetchHeatmap, type HeatmapScope } from "../services/heatmap";
 import type { BackendStatus, HeatmapCell } from "../types";
@@ -13,7 +13,7 @@ export function useHeatmapQuery(enabled: boolean, onBackend: (status: BackendSta
   const [error, setError] = useState<string | null>(null);
   const [scope, setScopeState] = useState<HeatmapScope>("REAL_ONLY");
   const currentScope = useRef<HeatmapScope>("REAL_ONLY");
-  const viewport = useRef({ bbox: CAMPUS_DEFAULT_BBOX, zoom: 16 });
+  const viewport = useRef({ bbox: SERVICE_DEFAULT_BBOX, zoom: SERVICE_AREA.defaultZoom as number });
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const controller = useRef<AbortController | undefined>(undefined);
   const active = useRef(enabled); active.current = enabled;

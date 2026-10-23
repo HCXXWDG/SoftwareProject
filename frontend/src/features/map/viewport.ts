@@ -1,10 +1,8 @@
 import type { GeoPoint } from "../../types";
+import { SERVICE_AREA } from "../../config/serviceArea";
 
-export const DEFAULT_MAP_CENTER: GeoPoint = {
-  longitude: 120.273915,
-  latitude: 31.479302,
-};
-export const DEFAULT_MAP_ZOOM = 16;
+export const DEFAULT_MAP_CENTER: GeoPoint = SERVICE_AREA.center;
+export const DEFAULT_MAP_ZOOM: number = SERVICE_AREA.defaultZoom;
 
 const TILE_SIZE = 256;
 const MAX_LATITUDE = 85.05112878;
@@ -151,35 +149,26 @@ export function calculateViewport(
   };
 }
 
+/** One scale for real feedback, simulated cells, detail dots and the legend. */
+export const STRESS_COLOR_STOPS = [
+  { score: 0, rgb: [37, 99, 235] },
+  { score: 25, rgb: [6, 182, 212] },
+  { score: 50, rgb: [250, 204, 21] },
+  { score: 75, rgb: [249, 115, 22] },
+  { score: 100, rgb: [220, 38, 38] },
+] as const;
+
 export function scoreToColor(score: number): string {
-  const ratio = Math.max(0, Math.min(100, score)) / 100;
-  if (ratio < 0.25) {
-    const t = ratio / 0.25;
-    const r = Math.round(52 + (255 - 52) * t);
-    const g = Math.round(199 + (193 - 199) * t);
-    const b = Math.round(89 + (7 - 89) * t);
-    return `rgb(${r}, ${g}, ${b})`;
-  }
-  if (ratio < 0.5) {
-    const t = (ratio - 0.25) / 0.25;
-    const r = Math.round(255 + (245 - 255) * t);
-    const g = Math.round(193 + (158 - 193) * t);
-    const b = Math.round(7 + (11 - 7) * t);
-    return `rgb(${r}, ${g}, ${b})`;
-  }
-  if (ratio < 0.75) {
-    const t = (ratio - 0.5) / 0.25;
-    const r = Math.round(245 + (239 - 245) * t);
-    const g = Math.round(158 + (68 - 158) * t);
-    const b = Math.round(11 + (68 - 11) * t);
-    return `rgb(${r}, ${g}, ${b})`;
-  }
-  const t = (ratio - 0.75) / 0.25;
-  const r = Math.round(239 + (220 - 239) * t);
-  const g = Math.round(68 + (38 - 68) * t);
-  const b = Math.round(68 + (38 - 68) * t);
-  return `rgb(${r}, ${g}, ${b})`;
+  const bounded = Math.max(0, Math.min(100, score));
+  const index = Math.min(Math.floor(bounded / 25), STRESS_COLOR_STOPS.length - 2);
+  const from = STRESS_COLOR_STOPS[index];
+  const to = STRESS_COLOR_STOPS[index + 1];
+  const ratio = (bounded - from.score) / (to.score - from.score);
+  const rgb = from.rgb.map((value, channel) => Math.round(value + (to.rgb[channel] - value) * ratio));
+  return `rgb(${rgb.join(", ")})`;
 }
+
+export const STRESS_COLOR_GRADIENT = `linear-gradient(90deg, ${STRESS_COLOR_STOPS.map(({ score }) => `${scoreToColor(score)} ${score}%`).join(", ")})`;
 
 export function scoreToGradient(score: number): { inner: string; outer: string } {
   const color = scoreToColor(score);

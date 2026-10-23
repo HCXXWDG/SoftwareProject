@@ -46,7 +46,7 @@ export function RoutePreviewPage({ origin, destination, originName, destName, on
   return <main className="route-preview-page"><div className="route-preview-page__content">
     <header className="route-preview-page__topbar">
       {onBack && <button className="route-preview-page__back" type="button" onClick={onBack}><span aria-hidden="true">←</span>修改起终点</button>}
-      <span className="route-preview-page__brand">心途 <span>校园步行</span></span>
+      <span className="route-preview-page__brand">心途 <span>日常步行</span></span>
     </header>
     <div className="route-preview-page__heading"><span className="route-preview-page__step">02</span><div><p className="route-preview-page__eyebrow">把每一段路，走得更从容</p><h2 className="route-preview-page__title">路线预览</h2></div></div>
     <p className="route-preview-page__endpoint-label"><span />本次行程</p>
