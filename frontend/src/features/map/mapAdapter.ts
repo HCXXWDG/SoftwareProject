@@ -13,6 +13,7 @@ import {
   type MapViewport,
   type MapViewportConstraint,
   type ProjectedPoint,
+  getMapSize,
 } from "./viewport";
 
 export interface MapAdapter {
@@ -21,6 +22,7 @@ export interface MapAdapter {
   project: (point: GeoPoint) => ProjectedPoint;
   unproject: (point: ProjectedPoint) => GeoPoint;
   subscribe: (listener: () => void) => () => void;
+  panByPixels: (deltaX: number, deltaY: number) => void;
 }
 
 export interface CreateAMapAdapterOptions {
@@ -163,6 +165,13 @@ export function createAMapAdapter(
         longitude: readCoordinate(lngLat, "getLng", "lng"),
         latitude: readCoordinate(lngLat, "getLat", "lat"),
       };
+    },
+    panByPixels: (deltaX, deltaY) => {
+      const size = getMapSize(container);
+      const target = map.containerToLngLat([size.width / 2 - deltaX, size.height / 2 - deltaY]);
+      const point = { longitude: readCoordinate(target, "getLng", "lng"), latitude: readCoordinate(target, "getLat", "lat") };
+      const next = viewportConstraint ? clampCenterToBounds(point, viewportConstraint.bounds) : point;
+      map.setCenter([next.longitude, next.latitude]);
     },
     subscribe: (listener) => {
       listeners.add(listener);

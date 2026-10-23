@@ -1,9 +1,37 @@
-.app-toolbar, .app-status, .app-route-choices { padding: 14px 18px; background: #fff; border-bottom: 1px solid #d9e1e8; }
-.app-toolbar, .app-route-choices { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.app-toolbar button, .app-status button, .app-route-choices button { padding: 9px 13px; border: 1px solid #aac0d7; border-radius: 8px; background: #f3f7fc; color: #173a64; }
-.app-route-choices button[aria-pressed="true"] { background: #173a64; color: white; }
-.app-status p { margin: 5px 0; }
-button:disabled { cursor: not-allowed; opacity: .6; }
-.app-route-choices p { width: 100%; color: #526575; }
-@media (max-width: 420px) { .app-toolbar, .app-status, .app-route-choices { padding: 10px; } }
+.app-map-shell { width: min(1200px, 100%); margin: 0 auto; padding: 0 28px 40px; display: flex; flex-direction: column; gap: 16px; }
+#root > .commute-completion { order: 1; width: min(1144px, calc(100% - 28px)); align-self: center; margin: 0 0 24px; }
+#root > .commute-completion[data-pending="true"] { order: -1; margin: 16px 0 0; }
+.app-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 26px 2px 10px; }
+.app-brand { display: inline-flex; align-items: center; gap: 11px; border: none; background: transparent; padding: 0; text-align: left; color: var(--ink); }
+.app-brand svg { width: 42px; height: 42px; color: var(--primary); }
+.app-brand strong { display: block; font-size: 23px; font-weight: 750; letter-spacing: 2px; line-height: 1.2; }
+.app-brand small { display: block; margin-top: 3px; font-size: 9px; letter-spacing: 3px; color: var(--muted); }
+.app-campus { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 100px; padding: 6px 12px; }
+.app-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.app-toolbar > span { flex-basis: 100%; order: -1; font-size: clamp(17px, 2vw, 22px); font-weight: 700; color: var(--ink); padding-bottom: 4px; overflow-wrap: anywhere; }
+.app-toolbar button { background: var(--surface); padding: 9px 16px; border-radius: 100px; font-size: 12px; }
+.app-status { border: 1px solid var(--line); border-radius: 20px; padding: 20px 22px; background: var(--surface); }
+.app-status p { margin: 6px 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.app-status h2 { font-size: 18px; font-weight: 700; }
+.app-status[aria-label="服务状态"] { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; background: #eaf1eb; border: none; padding: 10px 16px; border-radius: 12px; }
+.app-status[aria-label="服务状态"] p { margin: 0; font-size: 11px; }
+.app-status[aria-label="服务状态"] p:first-child { color: var(--primary); font-weight: 650; }
+.app-status button { margin: 6px 6px 6px 0; }
+.app-route-choices { display: flex; flex-wrap: wrap; gap: 10px; padding: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; }
+.app-route-choices button { border-radius: 14px; background: #f3f6f3; font-weight: 600; }
+.app-route-choices button[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; }
+.app-route-choices p { width: 100%; font-size: 12px; color: var(--muted); }
+.app-status[aria-label="趋势查询状态"] { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.app-status[aria-label="趋势查询状态"] > div, .app-status[aria-label="趋势查询状态"] > section { flex-basis: 100%; }
 .app { display: flex; flex-direction: column; min-height: 100vh; }
+@media (max-width: 600px) {
+  .app-map-shell { padding: 0 14px 24px; gap: 12px; }
+  .app-header { padding-top: 18px; }
+  .app-brand svg { width: 34px; height: 34px; }
+  .app-brand strong { font-size: 20px; }
+  .app-campus { font-size: 10px; padding: 5px 9px; }
+  .app-toolbar button { padding: 9px 12px; }
+  .app-status { padding: 16px; border-radius: 18px; }
+  .app-route-choices { padding: 14px; }
+  .app-route-choices button { text-align: left; flex: 1 1 100%; font-size: 13px; padding: 12px 14px; }
+}

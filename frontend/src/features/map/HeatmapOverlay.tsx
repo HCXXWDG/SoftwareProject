@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { EmotionTag, FeedbackSource, HeatmapCell } from "../../types";
 import type { ProjectedPoint } from "./viewport";
 import { confidenceToOpacity, scoreToColor, scoreToGradient } from "./viewport";
+import "./HeatmapOverlay.css";
 
 interface HeatmapOverlayProps {
   cells: HeatmapCell[];
@@ -46,7 +47,10 @@ export function HeatmapOverlay({
   const detailsRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const selectedButtonRef = useRef<HTMLButtonElement | null>(null);
+  const gesture = useRef<{ cellId: string; pointerId: number; x: number; y: number; moved: boolean } | null>(null);
+  const [pressedCellId, setPressedCellId] = useState<string | null>(null);
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
+  const detailsId = useId();
   const [detailsPosition, setDetailsPosition] = useState<ProjectedPoint | null>(null);
   const projectedCells = useMemo(
     () => cells.map((cell) => ({
@@ -61,15 +65,42 @@ export function HeatmapOverlay({
 
   const closeDetails = useCallback(() => {
     setSelectedCellId(null);
-    selectedButtonRef.current?.focus();
+    selectedButtonRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  useEffect(() => {
+    // Observe the gesture without capturing or cancelling it: the map can still handle bubbling pointer events.
+    const move = (event: PointerEvent) => {
+      const current = gesture.current;
+      if (!current || current.pointerId !== event.pointerId) return;
+      if (Math.hypot(event.clientX - current.x, event.clientY - current.y) > 8) {
+        current.moved = true;
+        setPressedCellId(null);
+      }
+    };
+    const end = (event: PointerEvent) => {
+      if (gesture.current?.pointerId !== event.pointerId) return;
+      move(event);
+      if (event.type === "pointercancel" && gesture.current) gesture.current.moved = true;
+      setPressedCellId(null);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+    };
   }, []);
 
   useEffect(() => {
     if (selectedCellId && (!selected || !interactionEnabled)) setSelectedCellId(null);
+    if (!interactionEnabled) { setPressedCellId(null); gesture.current = null; }
   }, [selected, selectedCellId, interactionEnabled]);
 
   useEffect(() => {
-    if (detailsVisible) closeRef.current?.focus();
+    if (detailsVisible) closeRef.current?.focus({ preventScroll: true });
   }, [selectedCellId, detailsVisible]);
 
   useLayoutEffect(() => {
@@ -116,19 +147,48 @@ export function HeatmapOverlay({
             className="map-surface__heat-point"
             data-cell-id={cell.cellId}
             data-testid="heatmap-point"
+            data-pressed={pressedCellId === cell.cellId ? "true" : undefined}
+            aria-pressed={selectedCellId === cell.cellId}
+            aria-expanded={selectedCellId === cell.cellId}
+            aria-haspopup="dialog"
+            aria-controls={selectedCellId === cell.cellId ? detailsId : undefined}
             key={cell.cellId}
             disabled={!interactionEnabled}
-            onClick={event => { selectedButtonRef.current = event.currentTarget; setSelectedCellId(cell.cellId); }}
+            onPointerDown={event => {
+              if (event.button !== 0) return;
+              gesture.current = { cellId: cell.cellId, pointerId: event.pointerId,
+                x: event.clientX, y: event.clientY, moved: false };
+              setPressedCellId(cell.cellId);
+            }}
+            onKeyDown={event => {
+              if (event.key === "Enter" || event.key === " ") setPressedCellId(cell.cellId);
+            }}
+            onKeyUp={() => setPressedCellId(null)}
+            onBlur={() => setPressedCellId(null)}
+            onClick={event => {
+              const dragged = event.detail > 0 && gesture.current?.cellId === cell.cellId && gesture.current.moved;
+              gesture.current = null;
+              setPressedCellId(null);
+              if (dragged) return;
+              selectedButtonRef.current = event.currentTarget;
+              setSelectedCellId(cell.cellId);
+            }}
             style={{
               left: `${point.x}px`,
               top: `${point.y}px`,
-              width: `${size}px`,
-              height: `${size}px`,
-              opacity,
-              background: `radial-gradient(circle at 50% 50%, ${inner}, ${glow} 35%, ${outer} 65%, transparent 100%)`,
-            }}
+              width: "44px",
+              height: "44px",
+              "--heatmap-color": inner,
+            } as CSSProperties}
             type="button"
-          />
+          >
+            <span aria-hidden="true" className="heatmap-point__halo" data-testid="heatmap-point-halo" style={{
+              width: `${size * 1.3}px`, height: `${size * 1.3}px`, opacity,
+              background: `radial-gradient(circle at 50% 50%, ${inner}, ${glow} 35%, ${outer} 65%, transparent 100%)`,
+            }} />
+            <span aria-hidden="true" className="heatmap-point__center" />
+            <span aria-hidden="true" className="heatmap-point__selection" />
+          </button>
         );
       })}
 
@@ -137,6 +197,8 @@ export function HeatmapOverlay({
           aria-label="热力点详情"
           className="map-surface__cell-details"
           data-testid="heatmap-cell-details"
+          data-cell-id={selected.cell.cellId}
+          id={detailsId}
           ref={detailsRef}
           role="dialog"
           onPointerDown={event => event.stopPropagation()}
@@ -151,6 +213,7 @@ export function HeatmapOverlay({
             style={{ backgroundColor: scoreToColor(selected.cell.score) }}
           />
           <div className="map-surface__cell-details-body">
+            <span className="heatmap-details__selected">已选热力点</span>
             <strong>{tagLabel(selected.cell.dominantTag)}</strong>
             <span>压力 {Math.round(selected.cell.score)}</span>
             <span>置信度 {Math.round(selected.cell.confidence * 100)}%</span>

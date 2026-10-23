@@ -29,6 +29,7 @@ const MAX_ZOOM = 18;
 const KEYBOARD_PAN_PIXELS = 80;
 
 interface OfflineMapProps {
+  onPanReady?: (pan: ((x: number, y: number, commit: boolean) => void) | null) => void;
   containerRef: RefObject<HTMLDivElement | null>;
   onProjectorChange: (
     project: (point: GeoPoint) => ProjectedPoint,
@@ -47,6 +48,7 @@ interface DragState {
 }
 
 export function OfflineMap({
+  onPanReady,
   containerRef,
   onProjectorChange,
   viewportConstraint,
@@ -100,6 +102,15 @@ export function OfflineMap({
   useEffect(() => {
     publishViewport();
   }, [center, publishViewport, zoom]);
+
+  useEffect(() => {
+    onPanReady?.((x, y, commit) => {
+      commitViewportRef.current = commit;
+      if (x || y) setCenter(current => clampPanCenter(panCenter(current, zoomRef.current, x, y)));
+      else if (commit) publishViewport(true);
+    });
+    return () => onPanReady?.(null);
+  }, [onPanReady, clampPanCenter, publishViewport]);
 
   useEffect(() => {
     const container = containerRef.current;

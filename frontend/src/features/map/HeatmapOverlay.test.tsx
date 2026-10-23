@@ -16,9 +16,92 @@ function open(value: HeatmapCell = cell) {
   return { point, details: screen.getByRole("dialog", { name: "热力点详情" }) };
 }
 
+function enablePointerEvents() {
+  vi.stubGlobal("PointerEvent", class extends MouseEvent {
+    readonly pointerId: number;
+    constructor(type: string, init: PointerEventInit = {}) {
+      super(type, init);
+      this.pointerId = init.pointerId ?? 1;
+    }
+  });
+}
+
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("heatmap cell details", () => {
+  it("keeps a clear 44px touch target while encoding confidence and pressure in the separate halo", () => {
+    render(<HeatmapOverlay cells={[{ ...cell, score: 100, confidence: 0 }]} project={project} viewportRevision={0} />);
+    const point = screen.getByTestId("heatmap-point");
+    expect(point).toHaveStyle({ width: "44px", height: "44px" });
+    expect(point.style.opacity).toBe("");
+    expect(point.style.background).toBe("");
+    const halo = within(point).getByTestId("heatmap-point-halo");
+    expect(halo).toHaveStyle({ opacity: "0.18" });
+    expect(halo.style.background).toContain("rgb(220, 38, 38)");
+    expect(point.style.getPropertyValue("--heatmap-color")).toBe("rgb(220, 38, 38)");
+  });
+
+  it("shows a press immediately, persists selection after release, and associates details with that cell", () => {
+    enablePointerEvents();
+    const down = vi.fn();
+    render(<div onPointerDown={down}><HeatmapOverlay cells={[cell]} project={project} viewportRevision={0} /></div>);
+    const point = screen.getByTestId("heatmap-point");
+    fireEvent.pointerDown(point, { pointerId: 1, button: 0, clientX: 100, clientY: 100 });
+    expect(point).toHaveAttribute("data-pressed", "true");
+    expect(down).toHaveBeenCalledOnce();
+    expect(down.mock.calls[0][0].defaultPrevented).toBe(false);
+    fireEvent.pointerUp(point, { pointerId: 1, clientX: 103, clientY: 104 });
+    expect(point).not.toHaveAttribute("data-pressed");
+    fireEvent.click(point, { detail: 1 });
+    expect(point).toHaveAttribute("aria-pressed", "true");
+    expect(point).toHaveAttribute("aria-expanded", "true");
+    const details = screen.getByRole("dialog", { name: "热力点详情" });
+    expect(details).toHaveAttribute("data-cell-id", cell.cellId);
+    expect(point).toHaveAttribute("aria-controls", details.id);
+    expect(within(details).getByText("已选热力点")).toBeVisible();
+  });
+
+  it("does not open details after a drag exceeding 8px, including an excursion outside the target", () => {
+    enablePointerEvents();
+    render(<HeatmapOverlay cells={[cell]} project={project} viewportRevision={0} />);
+    const point = screen.getByTestId("heatmap-point");
+    fireEvent.pointerDown(point, { pointerId: 1, button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 125, clientY: 100 });
+    expect(point).not.toHaveAttribute("data-pressed");
+    // Returning to the starting point must still be treated as the same drag.
+    fireEvent.pointerUp(point, { pointerId: 1, clientX: 100, clientY: 100 });
+    fireEvent.click(point, { detail: 1 });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(point).toHaveAttribute("aria-pressed", "false");
+    // Native keyboard activation has detail=0 and must not inherit pointer suppression.
+    fireEvent.keyDown(point, { key: "Enter" });
+    expect(point).toHaveAttribute("data-pressed", "true");
+    fireEvent.click(point, { detail: 0 });
+    expect(screen.getByRole("dialog")).toBeVisible();
+  });
+
+  it("preserves keyboard Space activation after a cancelled pointer gesture", () => {
+    enablePointerEvents();
+    render(<HeatmapOverlay cells={[cell]} project={project} viewportRevision={0} />);
+    const point = screen.getByTestId("heatmap-point");
+    fireEvent.pointerDown(point, { pointerId: 1, button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerCancel(window, { pointerId: 1, clientX: 100, clientY: 100 });
+    fireEvent.click(point, { detail: 1 });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.keyDown(point, { key: " " });
+    fireEvent.keyUp(point, { key: " " });
+    fireEvent.click(point, { detail: 0 });
+    expect(screen.getByRole("dialog")).toBeVisible();
+  });
+
+  it("moves focus on open and close without scrolling the page", () => {
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    const { details } = open();
+    expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
+    fireEvent.click(within(details).getByRole("button", { name: "关闭热力点详情" }));
+    expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
+  });
+
   it.each([
     ["NOISE", "噪音"], ["CROWD", "拥挤"], ["SUN", "暴晒"], ["ODOR", "异味"],
     ["QUIET", "安静"], ["SHADE", "树荫"], ["OPEN", "开阔"], ["OTHER", "其他"],

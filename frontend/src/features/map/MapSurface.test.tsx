@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HeatmapCell, MapFeedbackDraft, ScoredRoute } from "../../types";
 import { CAMPUS, DEFAULT_ORIGIN, DEFAULT_DESTINATION } from "../../config/campus";
@@ -92,8 +92,9 @@ describe("MapSurface", () => {
     });
     expect(point).toHaveAttribute("data-testid", "heatmap-point");
     // 热点用径向渐变呈现压力色（score 100 → rgb(220, 38, 38)），透明度由置信度决定
-    expect(point).toHaveStyle({ opacity: "0.18" });
-    expect(point.style.background).toContain("rgb(220, 38, 38)");
+    const halo = within(point).getByTestId("heatmap-point-halo");
+    expect(halo).toHaveStyle({ opacity: "0.18" });
+    expect(halo.style.background).toContain("rgb(220, 38, 38)");
 
     fireEvent.click(point);
 
@@ -130,6 +131,53 @@ describe("MapSurface", () => {
     await waitFor(() =>
       expect(lastCall(onViewportChange)[0]).not.toBe(initialBbox),
     );
+  });
+
+  it("pans from a heatmap target without opening details or feedback", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+    const onViewportChange = vi.fn();
+    render(<MapSurface {...defaultProps} heatmapCells={[heatmapCell]} loading={false}
+      viewportConstraint={campusViewportConstraint} onViewportChange={onViewportChange} />);
+    await screen.findByTestId("offline-map");
+    await waitFor(() => expect(onViewportChange).toHaveBeenCalled());
+    const before = lastCall(onViewportChange)[0];
+    const point = screen.getByTestId("heatmap-point");
+    const surface = screen.getByLabelText("校园通勤情绪地图");
+    fireEvent(point, new MouseEvent("pointerdown", { bubbles: true, clientX: 480, clientY: 300 }));
+    fireEvent(surface, new MouseEvent("pointermove", { bubbles: true, clientX: 560, clientY: 320 }));
+    fireEvent(surface, new MouseEvent("pointerup", { bubbles: true, clientX: 560, clientY: 320 }));
+    fireEvent.click(point, { detail: 1 });
+    await waitFor(() => expect(lastCall(onViewportChange)[0]).not.toBe(before));
+    expect(screen.queryByTestId("heatmap-cell-details")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("feedback-panel")).not.toBeInTheDocument();
+  });
+
+  it("ignores right-button drags and keeps the primary heat gesture when another touch ends", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+    const onViewportChange = vi.fn();
+    render(<MapSurface {...defaultProps} heatmapCells={[heatmapCell]} loading={false}
+      viewportConstraint={campusViewportConstraint} onViewportChange={onViewportChange} />);
+    await screen.findByTestId("offline-map");
+    await waitFor(() => expect(onViewportChange).toHaveBeenCalled());
+    const before = lastCall(onViewportChange)[0];
+    const point = screen.getByTestId("heatmap-point");
+    const surface = screen.getByLabelText("校园通勤情绪地图");
+    const pointer = (type: string, target: HTMLElement, id: number, x: number, button = 0, primary = true) => {
+      const event = new MouseEvent(type, { bubbles: true, clientX: x, clientY: 300, button });
+      Object.defineProperties(event, { pointerId: { value: id }, isPrimary: { value: primary } });
+      fireEvent(target, event);
+    };
+    pointer("pointerdown", point, 1, 480, 2);
+    pointer("pointermove", surface, 1, 540, 2);
+    pointer("pointerup", surface, 1, 540, 2);
+    expect(lastCall(onViewportChange)[0]).toBe(before);
+    pointer("pointerdown", point, 1, 480);
+    pointer("pointerdown", point, 2, 500, 0, false);
+    pointer("pointerup", surface, 2, 500, 0, false);
+    pointer("pointermove", surface, 1, 540);
+    pointer("pointerup", surface, 1, 540);
+    await waitFor(() => expect(lastCall(onViewportChange)[0]).not.toBe(before));
+    expect(screen.queryByTestId("feedback-panel")).not.toBeInTheDocument();
   });
 
   it("falls back offline when the AMap script reports an error", async () => {

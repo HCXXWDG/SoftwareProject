@@ -31,7 +31,7 @@ export function CommuteCompletionPanel(props: Props) {
 
   if (!props.active && !operation.operation && operation.phase !== "blocked") return null;
 
-  return <section className="commute-completion app-status" aria-label="通勤记录">
+  return <section className="commute-completion app-status" aria-label="通勤记录" data-pending={!!pending}>
     <h2>记录本次通勤</h2>
     {operation.receipt ? <>
       <p role="status">{operation.receipt.status === "duplicate" ? "这次通勤已记录，无需重复提交。" : "通勤已记录。"}</p>

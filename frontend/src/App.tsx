@@ -112,8 +112,14 @@ export default function App() {
 
   const displayRoutes = capabilities.showScores ? comparison.routes
     : comparison.routes.map((route) => ({ ...route, leastStressful: false }));
-  return <>
-    {completionPanel}
+  return <>{completionPanel}<main className="app-map-shell">
+    <header className="app-header">
+      <button className="app-brand" type="button" aria-label="心途首页" onClick={() => navigate("welcome")}>
+        <svg aria-hidden="true" viewBox="0 0 40 40" fill="none"><rect width="40" height="40" rx="13" fill="currentColor"/><path d="M11 27c0-8 18 2 18-9 0-7-8-8-8-1 0 4 5 3 5-1" stroke="#d9ef6d" strokeWidth="3" strokeLinecap="round"/><circle cx="12" cy="12" r="3" fill="#fff"/></svg>
+        <span><strong>心途</strong><small>XINTU CAMPUS</small></span>
+      </button>
+      <span className="app-campus">江南大学 · 蠡湖校区</span>
+    </header>
     <nav className="app-toolbar" aria-label="通勤导航">
       <button type="button" onClick={() => navigate("welcome")}>修改起终点</button>
       <button type="button" onClick={() => navigate("route-preview")}>重新规划</button>
@@ -158,5 +164,5 @@ export default function App() {
     <RecentQueries state={history} onRetry={() => { void reloadHistory(); }} onReplan={(origin, destination) => {
       startPreview(origin, destination, findWaypoint(origin)?.name ?? "历史起点", findWaypoint(destination)?.name ?? "历史终点");
     }} />
-  </>;
+  </main></>;
 }

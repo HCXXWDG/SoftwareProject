@@ -73,6 +73,19 @@ afterEach(() => {
 });
 
 describe("createAMapAdapter viewport constraint", () => {
+  it("pans an overlay gesture using projected pixels and clamps the resulting center", () => {
+    const options = { value: null as Record<string, unknown> | null };
+    const namespace = buildNamespace(options);
+    const BaseMap = namespace.Map;
+    const setCenter = vi.fn();
+    const unproject = vi.fn(() => ({ lng: CAMPUS_CONSTRAINT.bounds.east + 1, lat: CAMPUS_CONSTRAINT.bounds.north + 1 }));
+    namespace.Map = class extends BaseMap { setCenter = setCenter; containerToLngLat = unproject; };
+    const adapter = createAMapAdapter(document.createElement("div"), namespace, { viewportConstraint: CAMPUS_CONSTRAINT });
+    adapter.panByPixels(40, -20);
+    expect(unproject).toHaveBeenCalledWith([440, 320]);
+    expect(setCenter).toHaveBeenCalledWith([CAMPUS_CONSTRAINT.bounds.east, CAMPUS_CONSTRAINT.bounds.north]);
+    adapter.destroy();
+  });
   it("applies zooms and limitBounds when a constraint is supplied", () => {
     const container = document.createElement("div");
     const options: { value: Record<string, unknown> | null } = { value: null };

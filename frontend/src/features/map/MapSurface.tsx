@@ -74,6 +74,10 @@ export function MapSurface({
 }: MapSurfaceProps) {
   const mapHostRef = useRef<HTMLDivElement>(null);
   const adapterRef = useRef<MapAdapter | null>(null);
+  const offlinePanRef = useRef<((x: number, y: number, commit: boolean) => void) | null>(null);
+  const registerOfflinePan = useCallback((pan: ((x: number, y: number, commit: boolean) => void) | null) => { offlinePanRef.current = pan; }, []);
+  const heatDragRef = useRef<{ id: number; x: number; y: number; lastX: number; lastY: number; moved: boolean } | null>(null);
+  const suppressHeatClickRef = useRef(false);
   const viewportCallbackRef = useRef(onViewportChange);
   const feedbackSubmitRef = useRef(onFeedbackSubmit);
   feedbackSubmitRef.current = onFeedbackSubmit;
@@ -272,6 +276,14 @@ export function MapSurface({
     handlePointerUp,
   } = useLongPress(handleLongPress);
 
+  const finishHeatDrag = (event: Parameters<typeof handlePointerUp>[0]) => {
+    if (heatDragRef.current?.id === event.pointerId) {
+      if (heatDragRef.current.moved) offlinePanRef.current?.(0, 0, true);
+      heatDragRef.current = null;
+    }
+    handlePointerUp(event);
+  };
+
   const handleFeedbackSubmit = useCallback(
     async (stressLevel: number, tag: EmotionTag) => {
       if (!feedbackGeoPoint || !feedbackPosition || !feedbackEnabled || feedbackDuplicate || feedbackInFlightRef.current) {
@@ -336,14 +348,36 @@ export function MapSurface({
       aria-label="校园通勤情绪地图"
       className="map-surface"
       data-map-mode={mode}
-      onPointerCancel={handlePointerUp}
+      onPointerCancel={finishHeatDrag}
+      onClickCapture={event => {
+        if (event.detail > 0 && suppressHeatClickRef.current && event.target instanceof Element && event.target.closest('[data-testid="heatmap-point"]')) {
+          event.preventDefault(); event.stopPropagation();
+        }
+      }}
       onPointerDown={event => {
+        if (heatDragRef.current && heatDragRef.current.id !== event.pointerId) return;
+        suppressHeatClickRef.current = false;
+        if (event.target instanceof Element && event.target.closest('[data-testid="heatmap-point"]')) {
+          if (event.button !== 0 || event.isPrimary === false) return;
+          heatDragRef.current = { id: event.pointerId, x: event.clientX, y: event.clientY, lastX: event.clientX, lastY: event.clientY, moved: false };
+          return;
+        }
         if (pointSelection) return;
         if (event.target instanceof Element && event.target.closest('button, [role="dialog"]')) return;
         handlePointerDown(event);
       }}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
+      onPointerMove={event => {
+        const drag = heatDragRef.current;
+        if (!drag || drag.id !== event.pointerId) { handlePointerMove(event); return; }
+        if (!drag.moved && Math.hypot(event.clientX - drag.x, event.clientY - drag.y) <= 8) return;
+        const dx = event.clientX - drag.lastX; const dy = event.clientY - drag.lastY;
+        drag.lastX = event.clientX; drag.lastY = event.clientY; drag.moved = true;
+        suppressHeatClickRef.current = true;
+        if (adapterRef.current) adapterRef.current.panByPixels(dx, dy);
+        else offlinePanRef.current?.(dx, dy, false);
+      }}
+      onPointerUp={finishHeatDrag}
+      onPointerLeave={event => { if (heatDragRef.current) finishHeatDrag(event); }}
     >
       <div
         className="map-surface__canvas"
@@ -354,6 +388,7 @@ export function MapSurface({
 
       {mode === "offline" && (
         <OfflineMap
+          onPanReady={registerOfflinePan}
           containerRef={mapHostRef}
           onProjectorChange={handleOfflineProjectorChange}
           viewportConstraint={viewportConstraint}
