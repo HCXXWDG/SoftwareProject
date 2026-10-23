@@ -10,6 +10,7 @@ import {
 } from "react";
 import type { GeoPoint } from "../../types";
 import { SERVICE_AREA } from "../../config/serviceArea";
+import type { MapViewControls } from "./mapAdapter";
 import {
   calculateViewport,
   clampCenterToBounds,
@@ -30,6 +31,8 @@ const MAX_ZOOM = SERVICE_AREA.maxZoom;
 const KEYBOARD_PAN_PIXELS = 80;
 
 interface OfflineMapProps {
+  onControlsReady?: (controls: MapViewControls | null) => void;
+  showControls?: boolean;
   onPanReady?: (pan: ((x: number, y: number, commit: boolean) => void) | null) => void;
   containerRef: RefObject<HTMLDivElement | null>;
   onProjectorChange: (
@@ -49,6 +52,8 @@ interface DragState {
 }
 
 export function OfflineMap({
+  onControlsReady,
+  showControls = true,
   onPanReady,
   containerRef,
   onProjectorChange,
@@ -123,14 +128,27 @@ export function OfflineMap({
     return () => observer.disconnect();
   }, [containerRef, publishViewport]);
 
-  const changeZoom = (delta: number) => {
+  const changeZoom = useCallback((delta: number) => {
     commitViewportRef.current = true;
     setZoom((current) =>
       clampZoom(current + delta, effectiveMinZoom, effectiveMaxZoom),
     );
-  };
+  }, [effectiveMinZoom, effectiveMaxZoom]);
+
+  useEffect(() => {
+    onControlsReady?.({
+      zoomBy: changeZoom,
+      resetViewport: () => {
+        commitViewportRef.current = true;
+        setCenter(viewportConstraint?.center ?? DEFAULT_MAP_CENTER);
+        setZoom(clampZoom(viewportConstraint?.defaultZoom ?? DEFAULT_MAP_ZOOM, effectiveMinZoom, effectiveMaxZoom));
+      },
+    });
+    return () => onControlsReady?.(null);
+  }, [onControlsReady, changeZoom, viewportConstraint, effectiveMinZoom, effectiveMaxZoom]);
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || event.isPrimary === false || dragRef.current) return;
     if (event.target instanceof Element && event.target.closest("button, input, select, textarea, a")) return;
     dragRef.current = {
       center,
@@ -227,15 +245,15 @@ export function OfflineMap({
         街区绿地
       </span>
 
-      <div aria-label="地图缩放" className="map-surface__zoom-controls">
-        <button aria-label="放大地图" onClick={() => changeZoom(1)} type="button">
+      {showControls && <div aria-label="地图缩放" className="map-surface__zoom-controls">
+        <button aria-label="放大地图" disabled={zoom >= effectiveMaxZoom} onClick={() => changeZoom(1)} type="button">
           +
         </button>
         <span aria-label={`缩放级别 ${zoom}`}>{zoom}</span>
-        <button aria-label="缩小地图" onClick={() => changeZoom(-1)} type="button">
+        <button aria-label="缩小地图" disabled={zoom <= effectiveMinZoom} onClick={() => changeZoom(-1)} type="button">
           -
         </button>
-      </div>
+      </div>}
     </div>
   );
 }

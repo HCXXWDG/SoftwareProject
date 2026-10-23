@@ -27,7 +27,8 @@ import java.util.UUID;
  * {@code snapshotId}（D01 查询标识）、{@code operationId}（幂等键）、选中的 {@code routeId}
  * 与用户感受 {@code endStressLevel}；其余字段一律由快照重建。
  *
- * <p>流程：按 ID+设备读快照（归属校验）→ 过期判断 → 校验 routeId 在快照候选内 →
+ * <p>流程：先按设备+操作 ID 重放既有结果 → 按 ID+设备读快照（归属校验）→
+ * 校验 routeId 在快照候选内 → 按选中路线时长判断过期 →
  * 归类快照来源 → 由选中的 {@link ScoredRoute} 取服务端评分/预计秒数（评分不可用时留空，
  * 不补 0）→ 按 (设备, 操作 ID) 幂等保存 → 区分 CREATED / DUPLICATE / CONFLICT。
  *
@@ -40,10 +41,11 @@ public class CommuteService {
     private static final Set<Integer> VALID_STRESS_LEVELS = Set.of(0, 25, 50, 75, 100);
 
     /**
-     * 快照有效期（S00 契约第 2 项"过期策略"，由 D 定义）。超过此时长的快照不可用于完成通勤，
-     * 前端需重新规划路线。取值兼顾"通勤途中完成"与"避免复用陈旧评分"。
+     * 短途保留原有 30 分钟；城市长途按选中路线预计耗时加 15 分钟到达宽限，
+     * 避免用户按预计时间走完后首次提交时快照已经失效。
      */
     private static final Duration SNAPSHOT_MAX_AGE = Duration.ofMinutes(30);
+    private static final Duration ARRIVAL_GRACE = Duration.ofMinutes(15);
 
     private final CommuteRecordRepository repository;
     private final RouteQueryRepository routeQueryRepository;
@@ -93,26 +95,41 @@ public class CommuteService {
         String deviceHash = identityService.hash(rawDeviceId);
         Instant now = Instant.now();
 
-        // 1) 按 ID + 设备读快照（归属校验）：别的设备或 demo 重启后读不到。
+        // A lost success response may be retried after the snapshot expires or disappears.
+        // The device-owned saved record is authoritative and must remain confirmable.
+        Optional<CommuteRecord> saved = repository.findByOperationId(deviceHash, operationId);
+        if (saved.isPresent()) {
+            CommuteRecord existing = saved.get();
+            return new CommuteCompletion(
+                    sameBusinessContent(existing, snapshotId, routeId, endStressLevel)
+                            ? CommuteCompletion.Outcome.DUPLICATE : CommuteCompletion.Outcome.CONFLICT,
+                    existing);
+        }
+
+        // 按 ID + 设备读快照（归属校验）：别的设备或 demo 重启后读不到。
         RouteQueryHistory snapshot = routeQueryRepository.findSnapshotById(snapshotId, deviceHash)
                 .orElseThrow(() -> new SnapshotMissingException(
                         "查询快照不存在或不属于该设备，请重新规划路线。"));
 
-        // 2) 过期判断：与"缺失"区分，前端据此提示重新查询。
-        if (routeQueryRepository.isExpired(snapshot, now, SNAPSHOT_MAX_AGE)) {
-            throw new SnapshotExpiredException("查询快照已过期，请重新规划路线。");
-        }
-
-        // 3) 归类快照来源（不再据此拒绝写入，见 resolveRouteSource 的说明）。
+        // 归类快照来源（不再据此拒绝写入，见 resolveRouteSource 的说明）。
         RouteSource source = resolveRouteSource(snapshot);
 
-        // 4) 从快照重建服务端评分与预计时长，前端传入的分数一律不采信。
+        // 从快照重建服务端评分与预计时长，前端传入的分数一律不采信。
         RouteComparison comparison = snapshot.result();
         List<ScoredRoute> routes = comparison.routes();
         ScoredRoute selected = routes.stream()
                 .filter(route -> route.id().equals(routeId))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("routeId 不在该快照的候选路线中"));
+
+        // Only the chosen route extends validity; another, slower candidate cannot
+        // extend the usable lifetime of a short trip.
+        Duration routeWindow = Duration.ofSeconds(selected.durationSeconds()).plus(ARRIVAL_GRACE);
+        Duration maxAge = routeWindow.compareTo(SNAPSHOT_MAX_AGE) > 0 ? routeWindow : SNAPSHOT_MAX_AGE;
+        if (routeQueryRepository.isExpired(snapshot, now, maxAge)) {
+            throw new SnapshotExpiredException("查询快照已过期，请重新规划路线。");
+        }
+
         ScoredRoute fastest = routes.stream()
                 .filter(ScoredRoute::fastest)
                 .findFirst()
@@ -154,7 +171,7 @@ public class CommuteService {
                 scored ? finiteOrNull(selected.confidence()) : null,
                 completedAt == null ? now : completedAt);
 
-        // 5) 幂等保存：并发重复只写一条。
+        // 幂等保存：并发重复只写一条。
         CommuteSaveResult result = repository.saveIfAbsent(candidate);
         if (result.created()) {
             return new CommuteCompletion(CommuteCompletion.Outcome.CREATED, result.record());
@@ -175,9 +192,13 @@ public class CommuteService {
      * 只比较前端可控的业务输入；评分等由快照派生，给定 snapshotId+routeId 即确定。
      */
     private boolean sameBusinessContent(CommuteRecord existing, CommuteRecord candidate) {
-        return Objects.equals(existing.snapshotId(), candidate.snapshotId())
-                && Objects.equals(existing.routeId(), candidate.routeId())
-                && existing.endStressLevel() == candidate.endStressLevel();
+        return sameBusinessContent(existing, candidate.snapshotId(), candidate.routeId(), candidate.endStressLevel());
+    }
+
+    private boolean sameBusinessContent(CommuteRecord existing, UUID snapshotId, String routeId, int endStressLevel) {
+        return Objects.equals(existing.snapshotId(), snapshotId)
+                && Objects.equals(existing.routeId(), routeId)
+                && existing.endStressLevel() == endStressLevel;
     }
 
     /**

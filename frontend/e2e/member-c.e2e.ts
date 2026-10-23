@@ -243,7 +243,7 @@ for (const width of [390, 320]) {
       const box = await canvas.boundingBox();
       expect(box).not.toBeNull();
       const pointer = {
-        button: 0, pointerType: "mouse", pointerId: 42,
+        button: 0, pointerType: "mouse", isPrimary: true, pointerId: 42,
         clientX: box!.x + (horizontal ? box!.width - 8 : 8),
         clientY: box!.y + (vertical ? box!.height - 8 : 8),
       };

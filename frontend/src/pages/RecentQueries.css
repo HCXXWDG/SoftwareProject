@@ -37,7 +37,8 @@
 }
 .recent-queries button:hover:not(:disabled) { background: #edf3e8; border-color: #a4c4ad; }
 .recent-queries button:focus-visible { outline: 3px solid var(--primary, #18694f); outline-offset: 3px; }
-.recent-queries button:disabled { cursor: wait; opacity: .55; }
+.recent-queries button:disabled { cursor: not-allowed; opacity: .55; }
+.recent-queries[aria-busy="true"] .recent-queries__header button:disabled { cursor: wait; }
 .recent-queries ul { list-style: none; margin: 18px 0 0; padding: 0; }
 .recent-queries li { padding: 18px 0; border-top: 1px solid var(--line, #dbe5df); }
 .recent-queries li:last-child { padding-bottom: 0; }

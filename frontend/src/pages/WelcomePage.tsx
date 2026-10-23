@@ -47,6 +47,10 @@ export function WelcomePage({ onNavigateToPreview, initialOriginId = DEFAULT_ORI
   const canGo = origin != null && destination != null
     && isPointInBounds(origin.point, SERVICE_AREA.bounds) && isPointInBounds(destination.point, SERVICE_AREA.bounds)
     && (origin.point.longitude !== destination.point.longitude || origin.point.latitude !== destination.point.latitude);
+  const selectionHint = canGo ? null : origin && destination
+    && origin.point.longitude === destination.point.longitude && origin.point.latitude === destination.point.latitude
+    ? "起点与终点相同，请选择不同的位置。"
+    : "请在地图上选择梁溪区范围内的起点和终点。";
   const closePicker = () => {
     setPicking(null);
   };
@@ -141,9 +145,11 @@ export function WelcomePage({ onNavigateToPreview, initialOriginId = DEFAULT_ORI
           </p>
         )}
 
+        {selectionHint && <p className="welcome-page__validation" id="trip-selection-hint" role="status">{selectionHint}</p>}
         <button
           className="welcome-page__cta"
           disabled={!canGo}
+          aria-describedby={selectionHint ? "trip-selection-hint" : undefined}
           onClick={handleGo}
           type="button"
         >

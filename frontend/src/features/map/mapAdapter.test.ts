@@ -73,6 +73,52 @@ afterEach(() => {
 });
 
 describe("createAMapAdapter viewport constraint", () => {
+  it("bounds button zooms and restores the configured initial center and zoom", () => {
+    const namespace = buildNamespace({ value: null });
+    const BaseMap = namespace.Map;
+    let currentZoom = 16;
+    const setCenter = vi.fn();
+    const setZoom = vi.fn((zoom: number) => { currentZoom = zoom; });
+    namespace.Map = class extends BaseMap { setCenter = setCenter; setZoom = setZoom; getZoom = () => currentZoom; };
+    const adapter = createAMapAdapter(document.createElement("div"), namespace, { viewportConstraint: CAMPUS_CONSTRAINT });
+    adapter.zoomBy(100);
+    expect(setZoom).toHaveBeenLastCalledWith(18);
+    adapter.zoomBy(-100);
+    expect(setZoom).toHaveBeenLastCalledWith(15);
+    adapter.zoomBy(Number.NaN);
+    expect(setZoom).toHaveBeenCalledTimes(2);
+    adapter.resetViewport();
+    expect(setZoom).toHaveBeenLastCalledWith(16);
+    expect(setCenter).toHaveBeenLastCalledWith([120.273915, 31.479302]);
+    adapter.destroy();
+    adapter.zoomBy(1);
+    adapter.resetViewport();
+    expect(setZoom).toHaveBeenCalledTimes(3);
+  });
+
+  it("distinguishes live overlay reprojection from committed viewport queries and unregisters both", () => {
+    const namespace = buildNamespace({ value: null });
+    const BaseMap = namespace.Map;
+    const events = new Map<string, () => void>();
+    namespace.Map = class extends BaseMap {
+      on = (name: string, listener: () => void) => { events.set(name, listener); };
+      off = (name: string) => { events.delete(name); };
+    };
+    const adapter = createAMapAdapter(document.createElement("div"), namespace);
+    const listener = vi.fn();
+    const unsubscribe = adapter.subscribe(listener);
+    events.get("mapmove")?.();
+    events.get("zoomchange")?.();
+    expect(listener.mock.calls).toEqual([[false], [false]]);
+    events.get("moveend")?.();
+    events.get("zoomend")?.();
+    expect(listener.mock.calls.slice(2)).toEqual([[true], [true]]);
+    unsubscribe();
+    events.get("mapmove")?.();
+    expect(listener).toHaveBeenCalledTimes(4);
+    adapter.destroy();
+    expect(events.size).toBe(0);
+  });
   it("pans an overlay gesture using projected pixels and clamps the resulting center", () => {
     const options = { value: null as Record<string, unknown> | null };
     const namespace = buildNamespace(options);

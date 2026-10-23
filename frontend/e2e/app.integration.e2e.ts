@@ -156,7 +156,7 @@ test.describe("Full-stack demo flow", () => {
       clientX: box!.x + box!.width / 2,
       clientY: box!.y + box!.height / 2,
       pointerId: 1,
-      pointerType: "mouse",
+      pointerType: "mouse", isPrimary: true,
     };
     await mapSection.dispatchEvent("pointerdown", pointer);
     await expect(page.getByTestId("feedback-panel")).toBeVisible({

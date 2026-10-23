@@ -167,7 +167,7 @@ test.describe("Mobile viewport — iPhone 14 Pro (390×844)", () => {
       clientX: box!.x + box!.width / 2,
       clientY: box!.y + box!.height / 2,
       pointerId: 1,
-      pointerType: "mouse",
+      pointerType: "mouse", isPrimary: true,
     };
 
     await mapSection.dispatchEvent("pointerdown", pointer);

@@ -85,7 +85,7 @@ public class RouteComparisonService {
         int fastestDuration = eligible.get(0).durationSeconds();
         GeoBounds bounds = GeoBounds.around(eligible.stream().flatMap(route -> route.polyline().stream()).toList(), 0.001);
         ReportScope scope = source == RouteSource.REAL ? ReportScope.REAL_ONLY : ReportScope.SIMULATED_ONLY;
-        List<HeatmapCell> cells = heatmapService.getHeatmap(bounds, 16, 168, scope);
+        List<HeatmapCell> cells = heatmapService.getRouteScoringCells(bounds, 16, 168, scope);
         FeedbackSource feedback = feedbackSource(cells);
         boolean realEvidence = source == RouteSource.REAL && feedback == FeedbackSource.REAL;
         ScoringStatus unavailableStatus = source == RouteSource.DEMO

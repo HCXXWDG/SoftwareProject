@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import type { EmotionTag } from "../../types";
+import type { EmotionTag, GeoPoint } from "../../types";
 import { scoreToColor } from "./viewport";
 import "./FeedbackPanel.css";
 
@@ -32,6 +32,7 @@ function focusableElements(panel: HTMLElement): HTMLElement[] {
 
 interface FeedbackPanelProps {
   position: { x: number; y: number };
+  location?: GeoPoint;
   onSubmit: (stressLevel: number, tag: EmotionTag) => void;
   onCancel: () => void;
   submitting: boolean;
@@ -43,6 +44,7 @@ interface FeedbackPanelProps {
 
 export function FeedbackPanel({
   position,
+  location,
   onSubmit,
   onCancel,
   submitting,
@@ -62,9 +64,9 @@ export function FeedbackPanel({
     const panel = panelRef.current;
     const previousFocus = document.activeElement instanceof HTMLElement
       ? document.activeElement : null;
-    if (panel) (focusableElements(panel)[0] ?? panel).focus();
+    if (panel) (focusableElements(panel)[0] ?? panel).focus({ preventScroll: true });
     return () => {
-      if (previousFocus?.isConnected) previousFocus.focus();
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     };
   }, []);
 
@@ -143,6 +145,11 @@ export function FeedbackPanel({
           ✕
         </button>
       </div>
+
+      {location && <p className="map-surface__feedback-location" aria-label="本条反馈位置">
+        <strong>已选位置</strong> {location.longitude.toFixed(5)}, {location.latitude.toFixed(5)}
+        <span>移动底图不会改变本条反馈的位置。</span>
+      </p>}
 
       <fieldset className="map-surface__feedback-group" disabled={submitting || isDuplicate}>
         <legend>压力等级</legend>

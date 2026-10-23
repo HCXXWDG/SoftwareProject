@@ -206,25 +206,19 @@ test.describe("Core user flow", () => {
     // Navigate through 3-stage flow to map
     await navigateToMap(page);
 
-    // Long-press on the map area (dispatchEvent for reliable React pointer capture)
+    // A real browser mouse press exercises the DOM capture path and native primary-pointer flags.
     const mapSection = page.locator("[aria-label='心途——通勤情绪地图']");
+    await mapSection.scrollIntoViewIfNeeded();
     const box = await mapSection.boundingBox();
     expect(box).not.toBeNull();
 
-    const pointer = {
-      button: 0,
-      clientX: box!.x + box!.width / 2,
-      clientY: box!.y + box!.height / 2,
-      pointerId: 1,
-      pointerType: "mouse",
-    };
-
     // Hold until the application confirms the long press, then release.
-    await mapSection.dispatchEvent("pointerdown", pointer);
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await page.mouse.down();
     await expect(page.getByTestId("feedback-panel")).toBeVisible({
       timeout: 5000,
     });
-    await mapSection.dispatchEvent("pointerup", pointer);
+    await page.mouse.up();
 
     // Select stress level and tag
     await page.getByRole("button", { name: /压力 50/ }).click();
@@ -251,7 +245,7 @@ test.describe("Core user flow", () => {
     const map = page.getByLabel("心途——通勤情绪地图", { exact: true });
     const box = await map.boundingBox();
     expect(box).not.toBeNull();
-    const pointer = { clientX: box!.x + box!.width / 2, clientY: box!.y + box!.height / 2, pointerId: 1, pointerType: "mouse", button: 0 };
+    const pointer = { clientX: box!.x + box!.width / 2, clientY: box!.y + box!.height / 2, pointerId: 1, pointerType: "mouse", isPrimary: true, button: 0 };
     await map.dispatchEvent("pointerdown", pointer);
     const panel = page.getByTestId("feedback-panel");
     await expect(panel).toBeVisible();

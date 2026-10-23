@@ -72,7 +72,7 @@ export function RoutePreviewPage({ origin, destination, originName, destName, on
       {comparison.routes.length > 0 && <button className="route-preview-page__cta" type="button" onClick={() => onEnterMap(comparison, state.isOfflineFallback)}>进入地图</button>}
       <button className="route-preview-page__refresh" type="button" onClick={() => setAttempt((n) => n + 1)}>重新查询路线</button>
     </>}
-    {!state.loading && <div className="route-preview-page__error-actions">
+    {!state.loading && (demo || !comparison || comparison.routes.length === 0) && <div className="route-preview-page__error-actions">
       {demo ? <button className="route-preview-page__offline-btn" type="button" onClick={enterDemo}>查看匹配的演示路线</button> : <p>这组起终点没有配置演示路线。</p>}
     </div>}
     <p className="route-preview-page__footnote">走进地图，了解这段路上的更多感受。</p>

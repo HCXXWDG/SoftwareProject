@@ -57,6 +57,7 @@ export function CommuteCompletionPanel(props: Props) {
         <legend>本次通勤结束后的压力感受</legend>
         <div className="commute-completion__levels">{levels.map(level => <button type="button" key={level}
           aria-pressed={stress === level} onClick={() => setStress(level)}>{level} · {labels[level]}</button>)}</div>
+        <p className="commute-completion__selection" role="status">{stress === null ? "请选择到达时的压力感受。" : `已选择：${labels[stress]}（${stress}）`}</p>
       </fieldset>}
       <button type="button" aria-describedby="commute-disabled-reason" disabled={!props.active || !capabilities.canComplete || !route || stress === null || submitting}
         onClick={() => {

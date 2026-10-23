@@ -12,6 +12,7 @@ import type {
   MapFeedbackDraft,
   ScoredRoute,
 } from "../../types";
+import { SERVICE_AREA } from "../../config/serviceArea";
 import { EmojiFountain } from "./EmojiFountain";
 import { EndpointMarkers } from "./EndpointMarkers";
 import { FeedbackPanel } from "./FeedbackPanel";
@@ -19,7 +20,7 @@ import { HeatmapOverlay } from "./HeatmapOverlay";
 import { RouteLegend } from "./RouteLegend";
 import { RouteOverlay } from "./RouteOverlay";
 import { loadAMap } from "./amapLoader";
-import { createAMapAdapter, type MapAdapter } from "./mapAdapter";
+import { createAMapAdapter, type MapAdapter, type MapViewControls } from "./mapAdapter";
 import { OfflineMap } from "./OfflineMap";
 import { useLongPress, type LongPressPosition } from "./useLongPress";
 import {
@@ -30,6 +31,7 @@ import {
   type ProjectedPoint,
 } from "./viewport";
 import "./MapSurface.css";
+import "./MapControls.css";
 
 export interface MapSurfaceProps {
   heatmapCells: HeatmapCell[];
@@ -75,6 +77,8 @@ export function MapSurface({
   const mapHostRef = useRef<HTMLDivElement>(null);
   const adapterRef = useRef<MapAdapter | null>(null);
   const offlinePanRef = useRef<((x: number, y: number, commit: boolean) => void) | null>(null);
+  const offlineControlsRef = useRef<MapViewControls | null>(null);
+  const registerOfflineControls = useCallback((controls: MapViewControls | null) => { offlineControlsRef.current = controls; }, []);
   const registerOfflinePan = useCallback((pan: ((x: number, y: number, commit: boolean) => void) | null) => { offlinePanRef.current = pan; }, []);
   const heatDragRef = useRef<{ id: number; x: number; y: number; lastX: number; lastY: number; moved: boolean } | null>(null);
   const suppressHeatClickRef = useRef(false);
@@ -91,6 +95,7 @@ export function MapSurface({
     (point: ProjectedPoint) => GeoPoint
   >(() => unavailableUnprojector);
   const [viewportRevision, setViewportRevision] = useState(0);
+  const [currentZoom, setCurrentZoom] = useState(viewportConstraint?.defaultZoom ?? SERVICE_AREA.defaultZoom);
 
   // Feedback panel state
   const [feedbackPosition, setFeedbackPosition] =
@@ -110,9 +115,9 @@ export function MapSurface({
     if (feedbackPosition || !feedbackReturnFocusRef.current) return;
     const previous = feedbackReturnFocusRef.current;
     feedbackReturnFocusRef.current = null;
-    if (previous.isConnected && !previous.matches(":disabled")) previous.focus();
-    else if (recordHereRef.current && !recordHereRef.current.disabled) recordHereRef.current.focus();
-    else mapHostRef.current?.focus();
+    if (previous.isConnected && !previous.matches(":disabled")) previous.focus({ preventScroll: true });
+    else if (recordHereRef.current && !recordHereRef.current.disabled) recordHereRef.current.focus({ preventScroll: true });
+    else mapHostRef.current?.focus({ preventScroll: true });
   }, [feedbackPosition]);
 
   useLayoutEffect(() => {
@@ -126,8 +131,9 @@ export function MapSurface({
       if (measured.width <= 0 || measured.height <= 0) return;
       const x = Math.min(Math.max(8, feedbackPosition.x + 12), Math.max(8, size.width - measured.width - 8));
       const above = feedbackPosition.y - measured.height - 12;
+      // Keep the provider's attribution at the bottom of the map visible.
       const y = Math.min(Math.max(8, above >= 8 ? above : feedbackPosition.y + 12),
-        Math.max(8, size.height - measured.height - 8));
+        Math.max(8, size.height - measured.height - 34));
       setPanelPosition(current => current?.x === x && current.y === y ? current : { x, y });
     };
     placePanel();
@@ -147,9 +153,10 @@ export function MapSurface({
     viewportCallbackRef.current = onViewportChange;
   }, [onViewportChange]);
 
-  const publishAdapterViewport = useCallback((adapter: MapAdapter) => {
+  const publishAdapterViewport = useCallback((adapter: MapAdapter, commitViewport = true) => {
     const viewport = adapter.getViewport();
-    viewportCallbackRef.current(viewport.bbox, viewport.zoom);
+    setCurrentZoom(viewport.zoom);
+    if (commitViewport) viewportCallbackRef.current(viewport.bbox, viewport.zoom);
     setViewportRevision((current) => current + 1);
   }, []);
 
@@ -188,7 +195,7 @@ export function MapSurface({
         setUnprojector(
           () => (point: ProjectedPoint) => adapter.unproject(point),
         );
-        unsubscribe = adapter.subscribe(() => publishAdapterViewport(adapter));
+        unsubscribe = adapter.subscribe(commit => publishAdapterViewport(adapter, commit));
         setMode("amap");
         publishAdapterViewport(adapter);
       })
@@ -211,6 +218,7 @@ export function MapSurface({
     ) => {
       setProjector(() => nextProjector);
       setUnprojector(() => nextUnprojector);
+      setCurrentZoom(viewport.zoom);
       setViewportRevision((current) => current + 1);
       if (commitViewport) {
         viewportCallbackRef.current(viewport.bbox, viewport.zoom);
@@ -275,6 +283,20 @@ export function MapSurface({
     handlePointerMove,
     handlePointerUp,
   } = useLongPress(handleLongPress);
+  const pendingPressRef = useRef<Parameters<typeof handlePointerDown>[0] | null>(null);
+  useEffect(() => () => {
+    if (pendingPressRef.current) handlePointerUp(pendingPressRef.current);
+  }, [handlePointerUp]);
+
+  const zoomBy = (delta: number) => {
+    (adapterRef.current ?? offlineControlsRef.current)?.zoomBy(delta);
+  };
+  const resetViewport = () => {
+    (adapterRef.current ?? offlineControlsRef.current)?.resetViewport();
+  };
+  const minimumZoom = viewportConstraint?.minZoom ?? SERVICE_AREA.minZoom;
+  const maximumZoom = viewportConstraint?.maxZoom ?? SERVICE_AREA.maxZoom;
+  const feedbackMarker = feedbackGeoPoint ? projector(feedbackGeoPoint) : null;
 
   const finishHeatDrag = (event: Parameters<typeof handlePointerUp>[0]) => {
     if (heatDragRef.current?.id === event.pointerId) {
@@ -348,6 +370,28 @@ export function MapSurface({
       aria-label="心途——通勤情绪地图"
       className="map-surface"
       data-map-mode={mode}
+      onPointerDownCapture={event => {
+        // AMap handles native gestures inside its canvas and stops bubbling.
+        // Observe in capture phase without preventing the provider's gestures.
+        if (event.isPrimary === false) {
+          if (pendingPressRef.current) handlePointerUp(pendingPressRef.current);
+          pendingPressRef.current = null;
+          return;
+        }
+        if (event.button !== 0 || pointSelection) return;
+        if (event.target instanceof Element && event.target.closest('button, input, select, textarea, a, [role="dialog"]')) return;
+        pendingPressRef.current = event;
+        handlePointerDown(event);
+      }}
+      onPointerMoveCapture={handlePointerMove}
+      onPointerUpCapture={event => {
+        handlePointerUp(event);
+        if (pendingPressRef.current?.pointerId === event.pointerId) pendingPressRef.current = null;
+      }}
+      onPointerCancelCapture={event => {
+        handlePointerUp(event);
+        if (pendingPressRef.current?.pointerId === event.pointerId) pendingPressRef.current = null;
+      }}
       onPointerCancel={finishHeatDrag}
       onClickCapture={event => {
         if (event.detail > 0 && suppressHeatClickRef.current && event.target instanceof Element && event.target.closest('[data-testid="heatmap-point"]')) {
@@ -362,13 +406,10 @@ export function MapSurface({
           heatDragRef.current = { id: event.pointerId, x: event.clientX, y: event.clientY, lastX: event.clientX, lastY: event.clientY, moved: false };
           return;
         }
-        if (pointSelection) return;
-        if (event.target instanceof Element && event.target.closest('button, [role="dialog"]')) return;
-        handlePointerDown(event);
       }}
       onPointerMove={event => {
         const drag = heatDragRef.current;
-        if (!drag || drag.id !== event.pointerId) { handlePointerMove(event); return; }
+        if (!drag || drag.id !== event.pointerId) return;
         if (!drag.moved && Math.hypot(event.clientX - drag.x, event.clientY - drag.y) <= 8) return;
         const dx = event.clientX - drag.lastX; const dy = event.clientY - drag.lastY;
         drag.lastX = event.clientX; drag.lastY = event.clientY; drag.moved = true;
@@ -383,11 +424,23 @@ export function MapSurface({
         className="map-surface__canvas"
         data-testid="map-canvas"
         ref={mapHostRef}
-        tabIndex={-1}
+        tabIndex={mode === "amap" ? 0 : -1}
+        aria-label={mode === "amap" ? "地图区域，方向键移动，加减键缩放" : undefined}
+        onKeyDown={event => {
+          if (mode !== "amap" || feedbackPosition) return;
+          if (event.key === "+" || event.key === "=") { event.preventDefault(); zoomBy(1); }
+          else if (event.key === "-") { event.preventDefault(); zoomBy(-1); }
+          else {
+            const delta = ({ ArrowLeft: [80, 0], ArrowRight: [-80, 0], ArrowUp: [0, 80], ArrowDown: [0, -80] } as Record<string, [number, number]>)[event.key];
+            if (delta) { event.preventDefault(); adapterRef.current?.panByPixels(delta[0], delta[1]); }
+          }
+        }}
       />
 
       {mode === "offline" && (
         <OfflineMap
+          onControlsReady={registerOfflineControls}
+          showControls={false}
           onPanReady={registerOfflinePan}
           containerRef={mapHostRef}
           onProjectorChange={handleOfflineProjectorChange}
@@ -426,6 +479,7 @@ export function MapSurface({
       {feedbackPosition && (
         <div ref={feedbackLayerRef}>
         <FeedbackPanel
+          location={feedbackGeoPoint ?? undefined}
           position={panelPosition ?? feedbackPosition}
           submitting={submitting}
           submissionEnabled={feedbackEnabled}
@@ -436,6 +490,22 @@ export function MapSurface({
         />
         </div>
       )}
+
+      {feedbackMarker && Number.isFinite(feedbackMarker.x) && Number.isFinite(feedbackMarker.y) && (
+        <div className="map-controls__feedback-pin" role="img" aria-label="反馈位置"
+          style={{ left: feedbackMarker.x, top: feedbackMarker.y }}>
+          <span aria-hidden="true">●</span><small>反馈位置</small>
+        </div>
+      )}
+
+      {mode !== "loading" && <div className="map-controls" role="group" aria-label="地图视野控制">
+        <div className="map-controls__zoom">
+          <button type="button" aria-label="放大地图" disabled={!!feedbackPosition || currentZoom >= maximumZoom} onClick={() => zoomBy(1)}>+</button>
+          <span aria-label={`缩放级别 ${currentZoom}`}>{currentZoom}</span>
+          <button type="button" aria-label="缩小地图" disabled={!!feedbackPosition || currentZoom <= minimumZoom} onClick={() => zoomBy(-1)}>−</button>
+        </div>
+        <button type="button" className="map-controls__reset" aria-label="重置视野" title="重置视野" disabled={!!feedbackPosition} onClick={resetViewport}>重置</button>
+      </div>}
 
       {pointSelection ? <>
         <span className="map-surface__crosshair" aria-hidden="true">＋</span>

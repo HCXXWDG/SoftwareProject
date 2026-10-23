@@ -37,6 +37,7 @@
 .heatmap-point__halo--passive { z-index: -1; }
 .heatmap-density-hint { position: absolute; top: 92px; left: 12px; max-width: calc(100% - 24px); margin: 0; padding: 6px 9px; border-radius: 8px; background: #fffffff0; color: #61736a; font-size: 11px; pointer-events: none; }
 .heatmap-details__scope { font-size: 10px; color: #61736a; }
+.heatmap-details__caution { color: #815a22; font-size: 11px; line-height: 1.5; }
 .heatmap-point__center {
   width: 18px;
   height: 18px;

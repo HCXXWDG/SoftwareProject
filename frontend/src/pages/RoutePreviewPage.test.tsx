@@ -44,6 +44,13 @@ describe("RoutePreviewPage", () => {
     expect(await screen.findByText("这组起终点没有配置演示路线。")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "查看匹配的演示路线" })).not.toBeInTheDocument();
   });
+  it("does not present a missing demo route as a problem after a successful real query", async () => {
+    request.mockResolvedValue({ ...routeComparison, routeSource: "REAL" });
+    render(<RoutePreviewPage {...baseProps} destination={WAYPOINTS[2].point} onEnterMap={vi.fn()} />);
+    expect(await screen.findByRole("button", { name: "进入地图" })).toBeEnabled();
+    expect(screen.queryByText("这组起终点没有配置演示路线。")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "查看匹配的演示路线" })).not.toBeInTheDocument();
+  });
   it("cancels superseded requests and ignores late responses even when fetch ignores abort", async () => {
     const old = deferred<RouteComparison>(); const recent = deferred<RouteComparison>();
     request.mockReturnValueOnce(old.promise).mockReturnValueOnce(recent.promise);

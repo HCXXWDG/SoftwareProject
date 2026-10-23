@@ -1,5 +1,5 @@
 :root {
-  --app-bg: #f3f6f3; --ink: #17352e; --muted: #667b73; --primary: #18694f;
+  --app-bg: #f3f6f3; --ink: #17352e; --muted: #5c7168; --primary: #18694f;
   --accent: #d9ef6d; --line: #dbe5df; --surface: #fff;
   color-scheme: light; font-synthesis: none;
 }
@@ -48,7 +48,7 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 input, select, textarea { font: inherit; }
-button:hover:not(:disabled) { background: #edf5ef; border-color: #9db8a9; }
+button:where(:hover:not(:disabled)) { background: #edf5ef; border-color: #9db8a9; }
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid #338f6c; outline-offset: 3px; }
 button:disabled { cursor: not-allowed; opacity: .55; }
 button[aria-pressed="true"] { border-color: var(--primary); }

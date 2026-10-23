@@ -636,7 +636,7 @@ describe("MapSurface explicit feedback and recovery", () => {
         expect(Number.parseFloat(panel.style.left)).toBeGreaterThanOrEqual(8);
         expect(Number.parseFloat(panel.style.left) + 300).toBeLessThanOrEqual(size.width - 8);
         expect(Number.parseFloat(panel.style.top)).toBeGreaterThanOrEqual(8);
-        expect(Number.parseFloat(panel.style.top) + 350).toBeLessThanOrEqual(size.height - 8);
+        expect(Number.parseFloat(panel.style.top) + 350).toBeLessThanOrEqual(size.height - 34);
       };
       expectInside();
       size.width = 320; size.height = 420;

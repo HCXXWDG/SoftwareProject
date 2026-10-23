@@ -29,11 +29,12 @@
 .welcome-page__map-pick:hover { background: #e9f2e9; border-color: var(--primary, #18694f); }
 .welcome-page__shortcuts { margin: 12px 0 8px; color: var(--muted, #667b73); font-size: 11px; }
 .welcome-page__grid { display: flex; flex-wrap: wrap; gap: 7px; }
-.welcome-page__point { min-width: 0; max-width: 100%; padding: 7px 10px; border: 1px solid var(--line, #dbe5df); border-radius: 8px; background: var(--surface, #fff); color: var(--muted, #667b73); font-size: 12px; font-weight: 450; cursor: pointer; line-height: 1.5; overflow-wrap: anywhere; text-align: left; transition: background 150ms, border-color 150ms; -webkit-tap-highlight-color: transparent; }
+.welcome-page__point { min-width: 0; min-height: 44px; max-width: 100%; padding: 7px 10px; border: 1px solid var(--line, #dbe5df); border-radius: 8px; background: var(--surface, #fff); color: var(--muted, #667b73); font-size: 12px; font-weight: 450; cursor: pointer; line-height: 1.5; overflow-wrap: anywhere; text-align: left; transition: background 150ms, border-color 150ms; -webkit-tap-highlight-color: transparent; }
 .welcome-page__point:hover { border-color: #a5c2ae; background: #f5f8f4; }
 .welcome-page__point--selected { border-color: var(--primary, #18694f); background: #eaf2e8; color: var(--primary, #18694f); font-weight: 650; }
 .welcome-page__route-hint { margin: 23px 0 16px; padding: 12px 0 0; border-top: 1px solid var(--line, #dbe5df); font-size: 12px; color: var(--muted, #667b73); line-height: 1.9; overflow-wrap: anywhere; }
 .welcome-page__route-hint strong { color: var(--ink, #17352e); font-weight: 550; }
+.welcome-page__validation { margin: 0 0 12px; color: #92502f; font-size: 12px; line-height: 1.7; }
 .welcome-page__cta { display: block; width: 100%; min-height: 50px; padding: 13px 20px; border: 1px solid transparent; border-radius: 12px; background: var(--primary, #18694f); color: #fff; font-size: 15px; font-weight: 650; letter-spacing: 1px; cursor: pointer; transition: background 150ms; }
 .welcome-page__cta:hover:not(:disabled) { background: #11563f; }
 .welcome-page__cta:disabled { background: #dde7df; color: #80968b; cursor: not-allowed; }

@@ -237,6 +237,7 @@ export function HeatmapOverlay({
             <strong>{tagLabel(selected.cell.dominantTag)}</strong>
             <span>压力 {Math.round(selected.cell.score)}</span>
             <span>置信度 {Math.round(selected.cell.confidence * 100)}%</span>
+            {selected.cell.confidence < 0.3 && <span className="heatmap-details__caution">反馈证据有限，请结合实际路况判断。</span>}
             <span>{selected.cell.count} 条反馈</span>
             <span>来源：{sourceLabel(selected.cell.feedbackSource)}</span>
             <span>更新时间：{updatedLabel(selected.cell.updatedAt)}</span>

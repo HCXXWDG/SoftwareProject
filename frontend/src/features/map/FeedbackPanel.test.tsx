@@ -3,6 +3,18 @@ import { describe, expect, it, vi } from "vitest";
 import { FeedbackPanel } from "./FeedbackPanel";
 
 describe("FeedbackPanel", () => {
+  it("shows the selected location and keeps keyboard focus changes from scrolling the map", () => {
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    const { unmount } = render(<FeedbackPanel position={{ x: 20, y: 30 }}
+      location={{ longitude: 120.30864, latitude: 31.566744 }} submitting={false}
+      onCancel={vi.fn()} onSubmit={vi.fn()} />);
+    expect(screen.getByLabelText("本条反馈位置")).toHaveTextContent("120.30864, 31.56674");
+    expect(screen.getByLabelText("本条反馈位置")).toHaveTextContent("移动底图不会改变本条反馈的位置");
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    unmount();
+    focus.mockRestore();
+  });
+
   it("renders stress levels and emotion tags", () => {
     render(
       <FeedbackPanel

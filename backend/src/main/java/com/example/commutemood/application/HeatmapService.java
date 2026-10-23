@@ -39,6 +39,19 @@ public class HeatmapService {
     }
 
     public List<HeatmapCell> getHeatmap(GeoBounds bounds, int zoom, int hours, ReportScope scope) {
+        return aggregate(bounds, zoom, hours, scope, AggregationPurpose.MAP_OBSERVATIONS);
+    }
+
+    /**
+     * Route scoring retains its existing neutral prior independently of map presentation.
+     * Changing the visible pressure scale must not change saved scoring-version semantics.
+     */
+    public List<HeatmapCell> getRouteScoringCells(GeoBounds bounds, int zoom, int hours, ReportScope scope) {
+        return aggregate(bounds, zoom, hours, scope, AggregationPurpose.ROUTE_SCORING);
+    }
+
+    private List<HeatmapCell> aggregate(GeoBounds bounds, int zoom, int hours, ReportScope scope,
+                                       AggregationPurpose purpose) {
         if (scope == null) throw new IllegalArgumentException("Report scope is required");
         if (zoom < 10 || zoom > 20) {
             throw new IllegalArgumentException("zoom must be between 10 and 20");
@@ -65,8 +78,12 @@ public class HeatmapService {
         for (Map.Entry<GridKey, CellAccumulator> entry : cells.entrySet()) {
             GridKey key = entry.getKey();
             CellAccumulator accumulator = entry.getValue();
-            double score = (accumulator.weightedStress + PRIOR_WEIGHT * PRIOR_SCORE)
-                    / (accumulator.totalWeight + PRIOR_WEIGHT);
+            // The map shows the observed, time-weighted pressure. Sparse evidence stays
+            // visibly sparse through confidence/count rather than inventing neutral reports.
+            double score = purpose == AggregationPurpose.ROUTE_SCORING
+                    ? (accumulator.weightedStress + PRIOR_WEIGHT * PRIOR_SCORE)
+                            / (accumulator.totalWeight + PRIOR_WEIGHT)
+                    : accumulator.weightedStress / accumulator.totalWeight;
             double confidence = 1.0 - Math.exp(-accumulator.totalWeight / 5.0);
             EmotionTag dominantTag = accumulator.tagWeights.entrySet().stream()
                     .max(Map.Entry.comparingByValue())
@@ -104,6 +121,8 @@ public class HeatmapService {
     private static double round(double value) {
         return Math.round(value * 100.0) / 100.0;
     }
+
+    private enum AggregationPurpose { MAP_OBSERVATIONS, ROUTE_SCORING }
 
     private record GridKey(long x, long y) {
         static GridKey from(GeoPoint point, double gridSize) {

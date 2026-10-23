@@ -1,4 +1,5 @@
 import type { GeoPoint } from "../../types";
+import { SERVICE_AREA } from "../../config/serviceArea";
 import type {
   AMapInstanceLike,
   AMapLngLatLike,
@@ -16,12 +17,17 @@ import {
   getMapSize,
 } from "./viewport";
 
-export interface MapAdapter {
+export interface MapViewControls {
+  zoomBy: (delta: number) => void;
+  resetViewport: () => void;
+}
+
+export interface MapAdapter extends MapViewControls {
   destroy: () => void;
   getViewport: () => MapViewport;
   project: (point: GeoPoint) => ProjectedPoint;
   unproject: (point: ProjectedPoint) => GeoPoint;
-  subscribe: (listener: () => void) => () => void;
+  subscribe: (listener: (commitViewport: boolean) => void) => () => void;
   panByPixels: (deltaX: number, deltaY: number) => void;
 }
 
@@ -88,11 +94,14 @@ export function createAMapAdapter(
         }
       : {}),
   });
-  const listeners = new Set<() => void>();
+  const listeners = new Set<(commitViewport: boolean) => void>();
   let destroyed = false;
 
   const notify = () => {
-    listeners.forEach((listener) => listener());
+    listeners.forEach((listener) => listener(true));
+  };
+  const notifyProjection = () => {
+    listeners.forEach((listener) => listener(false));
   };
 
   const handleMoveEnd = () => {
@@ -113,6 +122,8 @@ export function createAMapAdapter(
 
   map.on("moveend", handleMoveEnd);
   map.on("zoomend", notify);
+  map.on("mapmove", notifyProjection);
+  map.on("zoomchange", notifyProjection);
 
   const resizeObserver = typeof ResizeObserver === "undefined"
     ? null
@@ -131,6 +142,8 @@ export function createAMapAdapter(
       resizeObserver?.disconnect();
       map.off("moveend", handleMoveEnd);
       map.off("zoomend", notify);
+      map.off("mapmove", notifyProjection);
+      map.off("zoomchange", notifyProjection);
       listeners.clear();
       map.destroy();
     },
@@ -172,6 +185,17 @@ export function createAMapAdapter(
       const point = { longitude: readCoordinate(target, "getLng", "lng"), latitude: readCoordinate(target, "getLat", "lat") };
       const next = viewportConstraint ? clampCenterToBounds(point, viewportConstraint.bounds) : point;
       map.setCenter([next.longitude, next.latitude]);
+    },
+    zoomBy: (delta) => {
+      if (destroyed || !Number.isFinite(delta)) return;
+      map.setZoom(clampZoom(map.getZoom() + delta,
+        viewportConstraint?.minZoom ?? SERVICE_AREA.minZoom,
+        viewportConstraint?.maxZoom ?? SERVICE_AREA.maxZoom));
+    },
+    resetViewport: () => {
+      if (destroyed) return;
+      map.setCenter([initialCenter.longitude, initialCenter.latitude]);
+      map.setZoom(initialZoom);
     },
     subscribe: (listener) => {
       listeners.add(listener);

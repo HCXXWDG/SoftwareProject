@@ -50,7 +50,12 @@ describe("WelcomePage", () => {
   it("cannot plan with identical origin and destination", () => {
     render(<WelcomePage onNavigateToPreview={vi.fn()} />);
     fireEvent.click(within(screen.getByRole("group", { name: "选择终点" })).getByRole("button", { name: DEFAULT_ORIGIN.name }));
-    expect(screen.getByRole("button", { name: "查看路线" })).toBeDisabled();
+    const button = screen.getByRole("button", { name: "查看路线" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription("起点与终点相同，请选择不同的位置。");
+    fireEvent.click(within(screen.getByRole("group", { name: "选择终点" })).getByRole("button", { name: DEFAULT_DESTINATION.name }));
+    expect(button).toBeEnabled();
+    expect(screen.queryByText("起点与终点相同，请选择不同的位置。")).not.toBeInTheDocument();
   });
   it("restores selections without requesting the API", () => {
     const fetch = vi.spyOn(globalThis, "fetch");

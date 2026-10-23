@@ -182,7 +182,7 @@ test.describe("Welcome flow & 3-stage navigation", () => {
       clientX: box!.x + box!.width / 2,
       clientY: box!.y + box!.height / 2,
       pointerId: 1,
-      pointerType: "mouse",
+      pointerType: "mouse", isPrimary: true,
     };
 
     await mapSection.dispatchEvent("pointerdown", pointer);
