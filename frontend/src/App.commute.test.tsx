@@ -62,6 +62,15 @@ async function selectAndComplete(level = "25 · 比较轻松") {
 }
 
 describe("A/D07 commute UI using the real recovery hook", () => {
+  it("discloses temporary record retention before and after saving in the acceptance environment", async () => {
+    vi.stubEnv("VITE_EPHEMERAL_RECORDS", "true");
+    render(<App />); await enterMap();
+    expect(panel().getByRole("note")).toHaveTextContent("通勤记录仅在本次服务器运行期间保留");
+    await selectAndComplete();
+    await waitFor(() => expect(panel().getByText("通勤已记录。", { exact: true })).toBeVisible());
+    expect(panel().getByRole("note")).toBeVisible();
+  });
+
   it("records REAL routes with no feedback or scores and keeps genuine zero arrival stress", async () => {
     render(<App />); await enterMap();
     expect(panel().getByRole("button", { name: "完成本次通勤" })).toBeDisabled();

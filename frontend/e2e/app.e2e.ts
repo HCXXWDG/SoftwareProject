@@ -288,7 +288,7 @@ test.describe("Core user flow", () => {
     const submit = page.getByRole("button", { name: "完成本次通勤", exact: true });
     await expect(submit).toBeDisabled();
     await expect(submit).toHaveAttribute("aria-describedby", "commute-disabled-reason");
-    await expect(page.locator("#commute-disabled-reason")).toHaveText("当前路线暂不支持记录通勤，可继续查看路线和历史趋势。");
+    await expect(page.locator("#commute-disabled-reason")).toHaveText("此版本尚未开放通勤记录，可继续查看路线和历史趋势。");
     expect(writes).toEqual([]);
   });
 });

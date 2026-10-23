@@ -33,6 +33,7 @@ export function CommuteCompletionPanel(props: Props) {
 
   return <section className="commute-completion app-status" aria-label="通勤记录" data-pending={!!pending}>
     <h2>记录本次通勤</h2>
+    {enabled && import.meta.env.VITE_EPHEMERAL_RECORDS === "true" && <p role="note">当前为体验环境，通勤记录仅在本次服务器运行期间保留。</p>}
     {operation.receipt ? <>
       <p role="status">{operation.receipt.status === "duplicate" ? "这次通勤已记录，无需重复提交。" : "通勤已记录。"}</p>
       <p>{operation.receipt.routeLabel} · 到达感受：{labels[operation.receipt.endStressLevel]}</p>

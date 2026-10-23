@@ -28,7 +28,7 @@ test("B demo compare with omitted scores and snapshotId reaches the map without 
   await page.getByRole("button", { name: "进入地图", exact: true }).click();
   await expect(page.getByRole("navigation", { name: "通勤导航" })).toBeVisible();
   await expect(page.getByRole("button", { name: "完成本次通勤", exact: true })).toBeDisabled();
-  await expect(page.getByText("演示通勤记录尚待接口联调，不会计入真实趋势。", { exact: true })).toBeVisible();
+  await expect(page.getByText("此版本尚未开放通勤记录，可继续查看路线和历史趋势。", { exact: true })).toBeVisible();
   await expect(page.getByTestId("route-panel")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^选择 / })).toHaveCount(comparison.routes.length);
   expect(commuteWrites).toEqual([]);
