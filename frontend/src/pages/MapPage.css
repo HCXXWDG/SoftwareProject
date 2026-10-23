@@ -7,6 +7,11 @@
   overflow: hidden;
 }
 
+.map-page__viewport {
+  position: relative;
+  min-height: inherit;
+}
+
 .map-page__placeholder {
   position: absolute;
   inset: 0;

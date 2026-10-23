@@ -98,7 +98,7 @@ describe("MapSurface", () => {
     fireEvent.click(point);
 
     expect(screen.getByTestId("heatmap-cell-details")).toBeInTheDocument();
-    expect(screen.getByText("NOISE")).toBeInTheDocument();
+    expect(screen.getByText("噪音")).toBeInTheDocument();
     expect(screen.getByText("压力 100")).toBeInTheDocument();
     expect(screen.getByText("置信度 5%")).toBeInTheDocument();
     expect(screen.getByText("18 条反馈")).toBeInTheDocument();
@@ -491,5 +491,100 @@ describe("MapSurface campus bounds", () => {
 
     // silence unused var lint in some toolchains
     expect(offlineMap).toBeInTheDocument();
+  });
+});
+
+describe("MapSurface explicit feedback and recovery", () => {
+  it("uses the currently panned map center and preserves the failed draft for retry", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+    const onViewportChange = vi.fn();
+    const onFeedbackSubmit = vi.fn<MapSurfaceProps["onFeedbackSubmit"]>()
+      .mockRejectedValueOnce(new Error("请稍后重试"))
+      .mockResolvedValueOnce({ status: "created" });
+    render(<MapSurface {...defaultProps} heatmapCells={[]} loading={false}
+      viewportConstraint={campusViewportConstraint} onViewportChange={onViewportChange}
+      onFeedbackSubmit={onFeedbackSubmit} />);
+    const map = await screen.findByTestId("offline-map");
+    await waitFor(() => expect(onViewportChange).toHaveBeenCalled());
+    const originalBbox = lastCall(onViewportChange)[0];
+    fireEvent.keyDown(map, { key: "ArrowLeft" });
+    await waitFor(() => expect(lastCall(onViewportChange)[0]).not.toBe(originalBbox));
+    fireEvent.click(screen.getByRole("button", { name: "记录此处感受" }));
+    fireEvent.click(screen.getByRole("button", { name: "压力 25 还好" }));
+    fireEvent.click(screen.getByRole("button", { name: "原因 安静" }));
+    fireEvent.click(screen.getByRole("button", { name: "提交反馈" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("请稍后重试");
+    expect(screen.getByRole("button", { name: "压力 25 还好" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "原因 安静" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "记录此处感受" })).toBeDisabled();
+    expect(onFeedbackSubmit.mock.calls[0][0].location.longitude).toBeLessThan(campusViewportConstraint.center.longitude);
+    fireEvent.click(screen.getByRole("button", { name: "提交反馈" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(onFeedbackSubmit.mock.calls[1][0]).toEqual(onFeedbackSubmit.mock.calls[0][0]);
+  });
+
+  it("keeps a duplicate receipt visible without animation and clears it for a new draft", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+    const onFeedbackSubmit = vi.fn<MapSurfaceProps["onFeedbackSubmit"]>()
+      .mockResolvedValue({ status: "duplicate" });
+    render(<MapSurface {...defaultProps} heatmapCells={[]} loading={false} onFeedbackSubmit={onFeedbackSubmit} />);
+    await screen.findByTestId("offline-map");
+    const entry = screen.getByRole("button", { name: "记录此处感受" });
+    await waitFor(() => expect(entry).toBeEnabled());
+    fireEvent.click(entry);
+    fireEvent.click(screen.getByRole("button", { name: "压力 0 轻松" }));
+    fireEvent.click(screen.getByRole("button", { name: "原因 开阔" }));
+    fireEvent.click(screen.getByRole("button", { name: "提交反馈" }));
+    await screen.findByText(/已记录/);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.queryByTestId("emoji-fountain")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "提交反馈" }));
+    expect(onFeedbackSubmit).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "关闭反馈面板" }));
+    fireEvent.click(entry);
+    expect(screen.queryByText(/已记录/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "提交反馈" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "原因 开阔" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("keeps the measured dialog inside a narrow map after resizing", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+    const size = { width: 390, height: 600 };
+    const originalRect = HTMLElement.prototype.getBoundingClientRect;
+    const measure = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      const map = this.dataset.testid === "map-canvas";
+      if (!map && this.dataset.testid !== "feedback-panel") return originalRect.call(this);
+      const width = map ? size.width : 300;
+      const height = map ? size.height : 350;
+      return { x: 0, y: 0, left: 0, top: 0, width, height, right: width, bottom: height, toJSON: () => ({}) };
+    });
+    try {
+      render(<MapSurface {...defaultProps} heatmapCells={[]} loading={false} />);
+      await screen.findByTestId("offline-map");
+      const entry = screen.getByRole("button", { name: "记录此处感受" });
+      await waitFor(() => expect(entry).toBeEnabled());
+      fireEvent.click(entry);
+      const panel = screen.getByRole("dialog");
+      const expectInside = () => {
+        expect(Number.parseFloat(panel.style.left)).toBeGreaterThanOrEqual(8);
+        expect(Number.parseFloat(panel.style.left) + 300).toBeLessThanOrEqual(size.width - 8);
+        expect(Number.parseFloat(panel.style.top)).toBeGreaterThanOrEqual(8);
+        expect(Number.parseFloat(panel.style.top) + 350).toBeLessThanOrEqual(size.height - 8);
+      };
+      expectInside();
+      size.width = 320; size.height = 420;
+      fireEvent(window, new Event("resize"));
+      expectInside();
+    } finally { measure.mockRestore(); }
+  });
+
+  it("disables the explicit action while feedback capability is unavailable", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+    render(<MapSurface {...defaultProps} heatmapCells={[]} loading={false} feedbackEnabled={false} />);
+    await screen.findByTestId("offline-map");
+    const entry = screen.getByRole("button", { name: "记录此处感受" });
+    expect(entry).toBeDisabled();
+    fireEvent.click(entry);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

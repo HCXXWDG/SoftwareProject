@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -23,6 +24,7 @@ import { OfflineMap } from "./OfflineMap";
 import { useLongPress, type LongPressPosition } from "./useLongPress";
 import {
   isPointInBounds,
+  getMapSize,
   type MapViewport,
   type MapViewportConstraint,
   type ProjectedPoint,
@@ -43,6 +45,7 @@ export interface MapSurfaceProps {
   /** A 统一派生操作能力；不以底图模式推断后端状态。 */
   feedbackEnabled?: boolean;
   onModeChange?: (mode: MapMode) => void;
+  onFeedbackOpen?: () => void;
 }
 
 type MapMode = "loading" | "amap" | "offline";
@@ -63,6 +66,7 @@ export function MapSurface({
   viewportConstraint,
   feedbackEnabled = true,
   onModeChange,
+  onFeedbackOpen,
 }: MapSurfaceProps) {
   const mapHostRef = useRef<HTMLDivElement>(null);
   const adapterRef = useRef<MapAdapter | null>(null);
@@ -86,6 +90,45 @@ export function MapSurface({
   const [feedbackGeoPoint, setFeedbackGeoPoint] = useState<GeoPoint | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
+  const [feedbackDuplicate, setFeedbackDuplicate] = useState(false);
+  const feedbackOpenRef = useRef(false);
+  const feedbackInFlightRef = useRef(false);
+  const recordHereRef = useRef<HTMLButtonElement>(null);
+  const feedbackReturnFocusRef = useRef<HTMLElement | null>(null);
+  const feedbackLayerRef = useRef<HTMLDivElement>(null);
+  const [panelPosition, setPanelPosition] = useState<ProjectedPoint | null>(null);
+
+  useEffect(() => {
+    if (feedbackPosition || !feedbackReturnFocusRef.current) return;
+    const previous = feedbackReturnFocusRef.current;
+    feedbackReturnFocusRef.current = null;
+    if (previous.isConnected && !previous.matches(":disabled")) previous.focus();
+    else if (recordHereRef.current && !recordHereRef.current.disabled) recordHereRef.current.focus();
+    else mapHostRef.current?.focus();
+  }, [feedbackPosition]);
+
+  useLayoutEffect(() => {
+    if (!feedbackPosition) return;
+    const container = mapHostRef.current;
+    const panel = feedbackLayerRef.current?.querySelector<HTMLElement>('[role="dialog"]');
+    if (!container || !panel) return;
+    const placePanel = () => {
+      const size = getMapSize(container);
+      const measured = panel.getBoundingClientRect();
+      if (measured.width <= 0 || measured.height <= 0) return;
+      const x = Math.min(Math.max(8, feedbackPosition.x + 12), Math.max(8, size.width - measured.width - 8));
+      const above = feedbackPosition.y - measured.height - 12;
+      const y = Math.min(Math.max(8, above >= 8 ? above : feedbackPosition.y + 12),
+        Math.max(8, size.height - measured.height - 8));
+      setPanelPosition(current => current?.x === x && current.y === y ? current : { x, y });
+    };
+    placePanel();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(placePanel);
+    observer?.observe(container);
+    observer?.observe(panel);
+    window.addEventListener("resize", placePanel);
+    return () => { observer?.disconnect(); window.removeEventListener("resize", placePanel); };
+  }, [feedbackPosition, feedbackError, feedbackDuplicate]);
 
   // Emoji fountain state
   const [fountainPosition, setFountainPosition] =
@@ -168,33 +211,43 @@ export function MapSurface({
     [],
   );
 
-  // Long-press handler: screen position -> GeoPoint -> show feedback panel
-  // 校园外长按不弹出反馈面板
-  const handleLongPress = useCallback(
-    (position: LongPressPosition) => {
-      if (!feedbackEnabled || submitting || feedbackPosition) return;
-      const container = mapHostRef.current;
-      if (!container) {
-        return;
-      }
-      // Convert screen coords to container-relative coords
-      const rect = container.getBoundingClientRect();
-      const relativePoint: ProjectedPoint = {
-        x: position.x - rect.left,
-        y: position.y - rect.top,
-      };
+  const openFeedback = useCallback(
+    (relativePoint: ProjectedPoint) => {
+      if (!feedbackEnabled || feedbackOpenRef.current || feedbackInFlightRef.current
+        || mode === "loading" || unprojector === unavailableUnprojector) return;
       const geoPoint = unprojector(relativePoint);
-      // Reject long-press feedback coordinates outside the campus bounds
+      if (!Number.isFinite(geoPoint.longitude) || !Number.isFinite(geoPoint.latitude)
+        || Math.abs(geoPoint.longitude) > 180 || Math.abs(geoPoint.latitude) > 90) return;
       if (viewportConstraint && !isPointInBounds(geoPoint, viewportConstraint.bounds)) {
         return;
       }
-
+      feedbackOpenRef.current = true;
+      // Capture before the same render disables the entry button and the browser blurs it.
+      feedbackReturnFocusRef.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+        ? document.activeElement : recordHereRef.current;
+      onFeedbackOpen?.();
       setFeedbackGeoPoint(geoPoint);
       setFeedbackError(null);
+      setFeedbackDuplicate(false);
+      setPanelPosition(null);
       setFeedbackPosition(relativePoint);
     },
-    [unprojector, viewportConstraint, feedbackEnabled, submitting, feedbackPosition],
+    [unprojector, viewportConstraint, feedbackEnabled, mode, onFeedbackOpen],
   );
+
+  const handleLongPress = useCallback((position: LongPressPosition) => {
+    const container = mapHostRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    openFeedback({ x: position.x - rect.left, y: position.y - rect.top });
+  }, [openFeedback]);
+
+  const handleRecordHere = () => {
+    const container = mapHostRef.current;
+    if (!container) return;
+    const size = getMapSize(container);
+    openFeedback({ x: size.width / 2, y: size.height / 2 });
+  };
 
   const {
     longPressPosition: _lpPos,
@@ -206,9 +259,10 @@ export function MapSurface({
 
   const handleFeedbackSubmit = useCallback(
     async (stressLevel: number, tag: EmotionTag) => {
-      if (!feedbackGeoPoint || !feedbackPosition || !feedbackEnabled) {
+      if (!feedbackGeoPoint || !feedbackPosition || !feedbackEnabled || feedbackDuplicate || feedbackInFlightRef.current) {
         return;
       }
+      feedbackInFlightRef.current = true;
       setSubmitting(true);
       setFeedbackError(null);
       try {
@@ -217,7 +271,11 @@ export function MapSurface({
           stressLevel: stressLevel as MapFeedbackDraft["stressLevel"],
           tag,
         });
-        // Show emoji fountain on success
+        if (result?.status === "duplicate") {
+          setFeedbackDuplicate(true);
+          return;
+        }
+        // Only a newly created report produces a fountain.
         const emojiMap: Record<number, string> = {
           0: "😊",
           25: "🙂",
@@ -225,27 +283,31 @@ export function MapSurface({
           75: "😟",
           100: "😫",
         };
-        if (result?.status !== "duplicate") {
-          setFountainPosition(feedbackPosition);
-          setFountainEmoji(emojiMap[stressLevel] ?? "✨");
-        }
+        setFountainPosition(feedbackPosition);
+        setFountainEmoji(emojiMap[stressLevel] ?? "✨");
+        feedbackOpenRef.current = false;
         setFeedbackPosition(null);
         setFeedbackGeoPoint(null);
         clearLongPress();
       } catch (error) {
         setFeedbackError(error instanceof Error ? error.message : "反馈提交失败，请稍后重试。");
       } finally {
+        feedbackInFlightRef.current = false;
         setSubmitting(false);
       }
     },
-    [feedbackGeoPoint, feedbackPosition, clearLongPress, feedbackEnabled],
+    [feedbackGeoPoint, feedbackPosition, clearLongPress, feedbackEnabled, feedbackDuplicate],
   );
 
   const handleFeedbackCancel = useCallback(() => {
+    if (feedbackInFlightRef.current) return;
+    feedbackOpenRef.current = false;
     setFeedbackPosition(null);
     setFeedbackGeoPoint(null);
     setSubmitting(false);
     setFeedbackError(null);
+    setFeedbackDuplicate(false);
+    setPanelPosition(null);
     clearLongPress();
   }, [clearLongPress]);
 
@@ -260,7 +322,10 @@ export function MapSurface({
       className="map-surface"
       data-map-mode={mode}
       onPointerCancel={handlePointerUp}
-      onPointerDown={handlePointerDown}
+      onPointerDown={event => {
+        if (event.target instanceof Element && event.target.closest('button, [role="dialog"]')) return;
+        handlePointerDown(event);
+      }}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
     >
@@ -268,6 +333,7 @@ export function MapSurface({
         className="map-surface__canvas"
         data-testid="map-canvas"
         ref={mapHostRef}
+        tabIndex={-1}
       />
 
       {mode === "offline" && (
@@ -292,6 +358,7 @@ export function MapSurface({
           cells={heatmapCells}
           project={(cell) => projector(cell.center)}
           viewportRevision={viewportRevision}
+          interactionEnabled={!feedbackPosition}
         />
       )}
 
@@ -306,15 +373,23 @@ export function MapSurface({
       )}
 
       {feedbackPosition && (
+        <div ref={feedbackLayerRef}>
         <FeedbackPanel
-          position={feedbackPosition}
+          position={panelPosition ?? feedbackPosition}
           submitting={submitting}
           submissionEnabled={feedbackEnabled}
+          error={feedbackError}
+          isDuplicate={feedbackDuplicate}
           onCancel={handleFeedbackCancel}
           onSubmit={handleFeedbackSubmit}
         />
+        </div>
       )}
-      {feedbackPosition && feedbackError && <p className="map-surface__feedback-error" role="alert">{feedbackError}</p>}
+
+      <button className="map-surface__record-here" type="button" onClick={handleRecordHere} ref={recordHereRef}
+        disabled={!feedbackEnabled || mode === "loading" || unprojector === unavailableUnprojector || submitting || feedbackPosition !== null}>
+        记录此处感受
+      </button>
 
       {fountainPosition && fountainEmoji && (
         <EmojiFountain

@@ -1,4 +1,5 @@
 import type { ScoredRoute } from "../../types";
+import { formatDuration } from "../../config/capabilities";
 import "./RoutePanel.css";
 
 interface RoutePanelProps {
@@ -20,11 +21,6 @@ function formatDistance(meters: number): string {
     : `${Math.round(meters)} m`;
 }
 
-function formatDuration(seconds: number): string {
-  const minutes = Math.round(seconds / 60);
-  return `${minutes} 分钟`;
-}
-
 export function RoutePanel({
   routes,
   selectedRouteId,
@@ -38,12 +34,15 @@ export function RoutePanel({
 
   return (
     <div aria-label="路线对比" className="route-panel" data-testid="route-panel">
-      {routeSource === "unknown" && <p role="status">路线来源与评分状态待确认</p>}
+      {routeSource === "unknown" && <p className="route-panel__source-warning" role="status">路线来源与评分状态待确认</p>}
       {routes.map((route) => {
         const isSelected = route.id === selectedRouteId;
         const score = route.stressScore;
+        const environmentIndex = route.stressExposure;
         const showScore = routeSource === "real" && scoringStatus === "valid"
-          && isValidScore(route.stressExposure) && isValidScore(score);
+          && isValidScore(environmentIndex) && isValidScore(score)
+          && Number.isFinite(route.confidence) && route.confidence >= 0 && route.confidence <= 1
+          && (route.scoringStatus === undefined || route.scoringStatus === "VALID");
         return (
           <button
             aria-label={`选择 ${route.label}`}
@@ -79,14 +78,25 @@ export function RoutePanel({
                 <span className="route-panel__stat-value">
                   {formatDuration(route.durationSeconds)}
                 </span>
-                <span className="route-panel__stat-label">时间</span>
+                <span className="route-panel__stat-label">预计时间</span>
               </div>
-              <div className="route-panel__stat">
-                <span className="route-panel__stat-value">
-                  {showScore ? Math.round(score) : "—"}
-                </span>
-                <span className="route-panel__stat-label">{showScore ? "综合评分" : "评分待确认"}</span>
-              </div>
+              {showScore ? (
+                <>
+                  <div className="route-panel__stat">
+                    <span className="route-panel__stat-value">{Math.round(environmentIndex)}</span>
+                    <span className="route-panel__stat-label">环境指数</span>
+                  </div>
+                  <div className="route-panel__stat">
+                    <span className="route-panel__stat-value">{Math.round(score)}</span>
+                    <span className="route-panel__stat-label">综合评分</span>
+                  </div>
+                </>
+              ) : (
+                <div className="route-panel__stat">
+                  <span className="route-panel__stat-value route-panel__stat-value--pending">—</span>
+                  <span className="route-panel__stat-label">评分待确认</span>
+                </div>
+              )}
             </div>
           </button>
         );
