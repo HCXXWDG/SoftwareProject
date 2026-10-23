@@ -2,6 +2,7 @@ import { expect, test, type Response, type Page } from "@playwright/test";
 
 interface HeatmapResponse {
   cellId: string;
+  feedbackSource: "REAL" | "DEMO" | "MIXED" | "NONE" | "UNKNOWN";
 }
 
 interface RouteResponse {
@@ -86,7 +87,9 @@ test.describe("Full-stack demo flow", () => {
       (await routesResponse.json()) as RouteComparisonResponse;
     const trends = (await trendsResponse.json()) as TrendResponse;
 
-    expect(heatmap.length).toBeGreaterThan(0);
+    // The isolated backend seeds simulated reports only. Default real scope must stay empty.
+    expect(new URL(heatmapResponse.url()).searchParams.get("scope")).toBe("REAL_ONLY");
+    expect(heatmap).toEqual([]);
     expect(comparison.routes.length).toBeGreaterThanOrEqual(2);
     expect(comparison.routeSource).toBe("DEMO");
     expect(comparison.scoringStatus).toBe("UNAVAILABLE");
@@ -102,7 +105,31 @@ test.describe("Full-stack demo flow", () => {
       "data-map-mode",
       /amap|offline/,
     );
+    await expect(page.getByTestId("heatmap-point")).toHaveCount(0);
+    const source = page.getByRole("region", { name: "热力图来源", exact: true });
+    await expect(source.getByText(/当前地图范围近 7 天暂无真实反馈/)).toBeVisible();
+    const demoHeatmapPromise = page.waitForResponse(async response =>
+      isApiResponse(response, "GET", "/api/v1/heatmap")
+      && new URL(response.url()).searchParams.get("scope") === "SIMULATED_ONLY"
+      && await response.finished() === null,
+    );
+    await source.getByRole("button", { name: "演示热力图", exact: true }).click();
+    const demoHeatmapResponse = await demoHeatmapPromise;
+    expect(demoHeatmapResponse.status()).toBe(200);
+    const demoHeatmap = await demoHeatmapResponse.json() as HeatmapResponse[];
+    expect(demoHeatmap.length).toBeGreaterThan(0);
+    expect(demoHeatmap.every(cell => cell.feedbackSource === "DEMO")).toBe(true);
     await expect(page.getByTestId("heatmap-point").first()).toBeVisible();
+
+    // A real submission should update the real overlay, independently of simulated seed data.
+    const realHeatmapPromise = page.waitForResponse(async response =>
+      isApiResponse(response, "GET", "/api/v1/heatmap")
+      && new URL(response.url()).searchParams.get("scope") === "REAL_ONLY"
+      && await response.finished() === null,
+    );
+    await source.getByRole("button", { name: "真实反馈", exact: true }).click();
+    expect(await (await realHeatmapPromise).json()).toEqual([]);
+    await expect(page.getByTestId("heatmap-point")).toHaveCount(0);
 
     // D07 demo candidates have no verifiable scores; A exposes choices without score cards.
     await expect(page.getByTestId("route-panel")).toHaveCount(0);
@@ -143,6 +170,11 @@ test.describe("Full-stack demo flow", () => {
     const reportPromise = page.waitForResponse((response) =>
       isApiResponse(response, "POST", "/api/v1/reports"),
     );
+    const updatedHeatmapPromise = page.waitForResponse(async response =>
+      isApiResponse(response, "GET", "/api/v1/heatmap")
+      && new URL(response.url()).searchParams.get("scope") === "REAL_ONLY"
+      && await response.finished() === null,
+    );
     await page.getByRole("button", { name: "提交反馈" }).click();
 
     const reportResponse = await reportPromise;
@@ -154,6 +186,10 @@ test.describe("Full-stack demo flow", () => {
     await expect(page.getByTestId("feedback-panel")).not.toBeVisible({
       timeout: 5000,
     });
+    const updatedHeatmap = await (await updatedHeatmapPromise).json() as HeatmapResponse[];
+    expect(updatedHeatmap.length).toBeGreaterThan(0);
+    expect(updatedHeatmap.every(cell => cell.feedbackSource === "REAL")).toBe(true);
+    await expect(page.getByTestId("heatmap-point").first()).toBeVisible();
 
     await page.getByRole("button", { name: "50 · 一般", exact: true }).click();
 

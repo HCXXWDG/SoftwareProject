@@ -495,6 +495,24 @@ describe("MapSurface campus bounds", () => {
 });
 
 describe("MapSurface explicit feedback and recovery", () => {
+  it("selects the current map center as an endpoint without opening feedback", async () => {
+    vi.stubEnv("VITE_AMAP_JS_KEY", "");
+    const onSelect = vi.fn();
+    render(<MapSurface {...defaultProps} heatmapCells={[]} loading={false} feedbackEnabled={false}
+      viewportConstraint={campusViewportConstraint} pointSelection={{ label: "使用此位置作为起点", onSelect }} />);
+    const map = await screen.findByTestId("offline-map");
+    const button = screen.getByRole("button", { name: "使用此位置作为起点" });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.keyDown(map, { key: "ArrowLeft" });
+    fireEvent.click(button);
+    expect(onSelect).toHaveBeenCalledOnce();
+    const point = onSelect.mock.calls[0][0];
+    expect(point.longitude).toBeLessThan(campusViewportConstraint.center.longitude);
+    expect(point.latitude).toBeCloseTo(campusViewportConstraint.center.latitude, 5);
+    expect(screen.queryByRole("button", { name: "记录此处感受" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("feedback-panel")).not.toBeInTheDocument();
+  });
+
   it("uses the currently panned map center and preserves the failed draft for retry", async () => {
     vi.stubEnv("VITE_AMAP_JS_KEY", "");
     const onViewportChange = vi.fn();

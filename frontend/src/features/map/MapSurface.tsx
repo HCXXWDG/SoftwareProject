@@ -46,6 +46,8 @@ export interface MapSurfaceProps {
   feedbackEnabled?: boolean;
   onModeChange?: (mode: MapMode) => void;
   onFeedbackOpen?: () => void;
+  pointSelection?: { label: string; onSelect: (point: GeoPoint) => void };
+  heatmapLabel?: string;
 }
 
 type MapMode = "loading" | "amap" | "offline";
@@ -67,6 +69,8 @@ export function MapSurface({
   feedbackEnabled = true,
   onModeChange,
   onFeedbackOpen,
+  pointSelection,
+  heatmapLabel,
 }: MapSurfaceProps) {
   const mapHostRef = useRef<HTMLDivElement>(null);
   const adapterRef = useRef<MapAdapter | null>(null);
@@ -249,6 +253,17 @@ export function MapSurface({
     openFeedback({ x: size.width / 2, y: size.height / 2 });
   };
 
+  const handleSelectCenter = () => {
+    const container = mapHostRef.current;
+    if (!container || !pointSelection || mode === "loading" || unprojector === unavailableUnprojector) return;
+    const size = getMapSize(container);
+    const point = unprojector({ x: size.width / 2, y: size.height / 2 });
+    if (!Number.isFinite(point.longitude) || !Number.isFinite(point.latitude)
+      || Math.abs(point.longitude) > 180 || Math.abs(point.latitude) > 90
+      || (viewportConstraint && !isPointInBounds(point, viewportConstraint.bounds))) return;
+    pointSelection.onSelect({ longitude: Number(point.longitude.toFixed(6)), latitude: Number(point.latitude.toFixed(6)) });
+  };
+
   const {
     longPressPosition: _lpPos,
     clearLongPress,
@@ -323,6 +338,7 @@ export function MapSurface({
       data-map-mode={mode}
       onPointerCancel={handlePointerUp}
       onPointerDown={event => {
+        if (pointSelection) return;
         if (event.target instanceof Element && event.target.closest('button, [role="dialog"]')) return;
         handlePointerDown(event);
       }}
@@ -386,10 +402,16 @@ export function MapSurface({
         </div>
       )}
 
-      <button className="map-surface__record-here" type="button" onClick={handleRecordHere} ref={recordHereRef}
+      {pointSelection ? <>
+        <span className="map-surface__crosshair" aria-hidden="true">＋</span>
+        <button className="map-surface__record-here" type="button" onClick={handleSelectCenter}
+          disabled={mode === "loading" || unprojector === unavailableUnprojector}>
+          {pointSelection.label}
+        </button>
+      </> : <button className="map-surface__record-here" type="button" onClick={handleRecordHere} ref={recordHereRef}
         disabled={!feedbackEnabled || mode === "loading" || unprojector === unavailableUnprojector || submitting || feedbackPosition !== null}>
         记录此处感受
-      </button>
+      </button>}
 
       {fountainPosition && fountainEmoji && (
         <EmojiFountain
@@ -408,6 +430,7 @@ export function MapSurface({
         {mode === "amap" && "高德地图"}
         {mode === "offline" && "离线演示地图"}
       </div>
+      {heatmapLabel && <div className="map-surface__heatmap-label" aria-label="热力图数据标识">{heatmapLabel}</div>}
 
       {loading && (
         <div aria-live="polite" className="map-surface__loading" role="status">

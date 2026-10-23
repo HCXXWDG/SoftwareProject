@@ -1,0 +1,8 @@
+.campus-picker { display: flex; flex-direction: column; min-height: 100dvh; background: #f4f7fc; color: #17324d; }
+.campus-picker__header { padding: max(16px, env(safe-area-inset-top)) 18px 12px; }
+.campus-picker__header h2 { margin: 12px 0 8px; font-size: 22px; }
+.campus-picker__header p { margin: 0; line-height: 1.6; }
+.campus-picker__header button { padding: 10px 16px; border: 1px solid #aac1db; border-radius: 10px; background: white; color: #17324d; }
+.campus-picker__map { position: relative; flex: 1; min-height: 440px; }
+.campus-picker .map-surface__record-here { max-width: calc(100% - 32px); bottom: max(24px, env(safe-area-inset-bottom)); }
+.map-surface__crosshair { position: absolute; z-index: 7; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; display: grid; place-items: center; width: 40px; height: 40px; border: 2px solid #fff; border-radius: 50%; color: #fff; background: #d63542; box-shadow: 0 2px 12px #17324d66; font-size: 32px; line-height: 1; }

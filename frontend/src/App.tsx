@@ -79,7 +79,7 @@ export default function App() {
         setFeedbackNotice("这条反馈已提交过，无需重复提交。");
         return result;
       }
-      const refreshed = await heatmap.refresh();
+      const refreshed = await heatmap.setScope("REAL_ONLY", true);
       if (!isCurrentTrip()) return;
       setFeedbackNotice(refreshed === "success" ? "反馈已提交，当前视口热力图已更新。"
         : refreshed === "failed" ? "反馈已提交，但地图刷新失败。请仅重试刷新地图。"
@@ -90,7 +90,7 @@ export default function App() {
       setFeedbackNotice(error instanceof Error ? error.message : "反馈提交失败，请稍后重试。");
       throw error;
     } finally { feedbackLock.current = false; }
-  }, [capabilities.canReport, heatmap.refresh]);
+  }, [capabilities.canReport, heatmap.setScope]);
 
   const completionPanel = <CommuteCompletionPanel comparison={comparison} selectedRouteId={selectedRouteId}
     backend={backend} baseMap={baseMap} active={stage === "map" && comparison !== null}
@@ -128,8 +128,10 @@ export default function App() {
       {identity.storageRestricted && <p role="status">{identity.message}</p>}
       {feedbackNotice && <p role={feedbackSaved ? "status" : "alert"}>{feedbackNotice}</p>}
     </section>
-    <MapPage state={{ heatmapCells: heatmap.cells, loading: heatmap.loading, error: heatmap.error, routeComparison: comparison, trend: trends.data }}
+    <MapPage heatmapScope={heatmap.scope} onHeatmapScopeChange={heatmap.setScope}
+      state={{ heatmapCells: heatmap.cells, loading: heatmap.loading, error: heatmap.error, routeComparison: comparison, trend: trends.data }}
       mapSlot={<MapSurface heatmapCells={heatmap.cells} routes={displayRoutes} selectedRouteId={selectedRouteId}
+          heatmapLabel={heatmap.scope === "SIMULATED_ONLY" ? "演示热力图 · 模拟反馈" : "真实反馈热力图"}
           loading={heatmap.loading} onFeedbackSubmit={handleFeedbackSubmit} feedbackEnabled={capabilities.canReport}
           onFeedbackOpen={() => { setFeedbackNotice(null); setFeedbackSaved(false); }}
         onRouteSelect={(id) => { if (comparison.routes.some((r) => r.id === id)) setSelectedRouteId(id); }}

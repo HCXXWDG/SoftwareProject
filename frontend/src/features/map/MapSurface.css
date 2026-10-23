@@ -101,9 +101,11 @@
 }
 
 .map-surface__heatmap {
-  z-index: 3;
+  z-index: 4;
   pointer-events: none;
 }
+
+.map-surface__heatmap-label { position: absolute; z-index: 5; top: 56px; left: 12px; max-width: calc(100% - 24px); padding: 6px 10px; border-radius: 8px; background: #fff5dbeF; color: #674500; font-size: 12px; pointer-events: none; }
 
 .map-surface__heatmap--details-open {
   z-index: 6;
